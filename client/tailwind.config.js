@@ -21,8 +21,8 @@ export default {
           800: '#222222',
           700: '#363636',
           600: '#4F4F4F',
-          500: '#707070',
-          400: '#999999',
+          500: '#5A5652', // Crisp secondary font color
+          400: '#78736E', // Legible caption/meta font color (meets WCAG AA)
           300: '#C4C4C4',
           200: '#E2E2E2',
           100: '#F2F2F2',
