@@ -1,0 +1,23 @@
+{
+  "name": "footzi-monorepo",
+  "version": "1.0.0",
+  "description": "Footzi — Premium Footwear Ecommerce Platform inspired by modern minimalism and Agra architectural heritage",
+  "private": true,
+  "scripts": {
+    "dev": "npm run dev --prefix client",
+    "build": "npm run build --prefix client",
+    "preview": "npm run preview --prefix client"
+  },
+  "keywords": [
+    "footwear",
+    "ecommerce",
+    "footzi",
+    "agra",
+    "minimalism",
+    "react",
+    "typescript",
+    "tailwind"
+  ],
+  "author": "Footzi Team",
+  "license": "MIT"
+}

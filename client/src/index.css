@@ -1,0 +1,61 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --font-serif: 'Cormorant Garamond', Georgia, serif;
+    --font-sans: 'Plus Jakarta Sans', system-ui, sans-serif;
+  }
+
+  body {
+    @apply bg-ivory-100 text-charcoal-900 font-sans antialiased overflow-x-hidden;
+    background-color: #FAF8F5;
+  }
+
+  h1, h2, h3, h4, .font-serif {
+    font-family: var(--font-serif);
+    letter-spacing: -0.01em;
+  }
+
+  /* Custom subtle scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #FAF8F5;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #D9C1A5;
+    border-radius: 9999px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #C8A27C;
+  }
+}
+
+/* Subtle architectural Agra lattice / jaali motif background pattern */
+.bg-agra-jaali {
+  background-color: #FAF8F5;
+  background-image: radial-gradient(#C8A27C 0.65px, transparent 0.65px), radial-gradient(#C8A27C 0.65px, #FAF8F5 0.65px);
+  background-size: 26px 26px;
+  background-position: 0 0, 13px 13px;
+  opacity: 0.95;
+}
+
+/* Marble subtle texture */
+.bg-marble-subtle {
+  background-color: #FAF8F5;
+  background-image: 
+    radial-gradient(at 10% 20%, rgba(200, 162, 124, 0.04) 0px, transparent 50%),
+    radial-gradient(at 90% 80%, rgba(231, 217, 198, 0.08) 0px, transparent 50%);
+}
+
+/* Subtle arch clip path for Agra-inspired silhouettes */
+.clip-agra-arch {
+  clip-path: ellipse(100% 90% at 50% 0%);
+}
