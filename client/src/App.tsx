@@ -11,6 +11,8 @@ import { AccountPage } from '@/pages/AccountPage';
 import { AdminDashboardPage } from '@/pages/AdminDashboardPage';
 import { LoginPage } from '@/pages/LoginPage';
 import { RegisterPage } from '@/pages/RegisterPage';
+import { ProtectedRoute } from '@/components/common/ProtectedRoute';
+import { AdminRoute } from '@/components/common/AdminRoute';
 
 const queryClient = new QueryClient();
 
@@ -25,12 +27,26 @@ export const App: React.FC = () => {
             <Route path="product/:slug" element={<ProductDetailPage />} />
             <Route path="cart" element={<CartPage />} />
             <Route path="checkout" element={<CheckoutPage />} />
-            <Route path="account/*" element={<AccountPage />} />
+            <Route
+              path="account/*"
+              element={
+                <ProtectedRoute>
+                  <AccountPage />
+                </ProtectedRoute>
+              }
+            />
             <Route path="wishlist" element={<AccountPage />} />
             <Route path="login" element={<LoginPage />} />
             <Route path="register" element={<RegisterPage />} />
             <Route path="brand-story" element={<Navigate to="/#heritage" replace />} />
-            <Route path="admin" element={<AdminDashboardPage />} />
+            <Route
+              path="admin"
+              element={
+                <AdminRoute>
+                  <AdminDashboardPage />
+                </AdminRoute>
+              }
+            />
             <Route
               path="*"
               element={

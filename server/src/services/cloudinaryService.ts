@@ -18,10 +18,18 @@ export interface UploadResult {
 
 export class CloudinaryService {
   private isConfigured(): boolean {
+    const key = process.env.CLOUDINARY_API_KEY || '';
+    const secret = process.env.CLOUDINARY_API_SECRET || '';
+    const name = process.env.CLOUDINARY_CLOUD_NAME || '';
+
     return Boolean(
-      process.env.CLOUDINARY_CLOUD_NAME &&
-      process.env.CLOUDINARY_API_KEY &&
-      process.env.CLOUDINARY_API_SECRET
+      name &&
+      key &&
+      !key.includes('placeholder') &&
+      !key.includes('123456789012345') &&
+      secret &&
+      !secret.includes('placeholder') &&
+      !secret.includes('sample_secret_key')
     );
   }
 

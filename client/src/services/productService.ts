@@ -23,6 +23,22 @@ export interface ProductsResponse {
   totalPages: number;
 }
 
+export const normalizeProduct = (p: any): Product => {
+  if (!p) return p;
+  return {
+    ...p,
+    id: p.id || p._id || '',
+    variants: (p.variants || []).map((v: any) => ({
+      ...v,
+      id: v.id || v._id || '',
+    })),
+    reviews: (p.reviews || []).map((r: any) => ({
+      ...r,
+      id: r.id || r._id || '',
+    })),
+  };
+};
+
 export const productService = {
   // Fetch products with comprehensive filtering, sorting & pagination
   async getProducts(params: ProductQueryParams = {}): Promise<ProductsResponse> {
@@ -59,7 +75,11 @@ export const productService = {
 
       const res = await fetch(`/api/products?${query.toString()}`);
       if (res.ok) {
-        return await res.json();
+        const data = await res.json();
+        return {
+          ...data,
+          products: (data.products || []).map(normalizeProduct),
+        };
       }
     } catch {
       // Backend not running yet or unreachable, use client dataset
@@ -140,13 +160,15 @@ export const productService = {
     try {
       const res = await fetch(`/api/products/${slug}`);
       if (res.ok) {
-        return await res.json();
+        const data = await res.json();
+        return normalizeProduct(data);
       }
     } catch {
       // Backend not running, use mock
     }
 
-    return MOCK_PRODUCTS.find((p) => p.slug === slug) || null;
+    const mock = MOCK_PRODUCTS.find((p) => p.slug === slug);
+    return mock ? normalizeProduct(mock) : null;
   },
 
   // Submit customer review

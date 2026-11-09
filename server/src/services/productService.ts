@@ -17,6 +17,22 @@ export interface ProductQueryFilters {
   includeInactive?: boolean;
 }
 
+const formatProduct = (p: any) => {
+  if (!p) return null;
+  return {
+    ...p,
+    id: p._id ? p._id.toString() : p.id,
+    variants: (p.variants || []).map((v: any) => ({
+      ...v,
+      id: v._id ? v._id.toString() : v.id,
+    })),
+    reviews: (p.reviews || []).map((r: any) => ({
+      ...r,
+      id: r._id ? r._id.toString() : r.id,
+    })),
+  };
+};
+
 export class ProductService {
   async getProducts(filters: ProductQueryFilters) {
     const {
@@ -89,12 +105,13 @@ export class ProductService {
 
     try {
       const total = await Product.countDocuments(mongoQuery);
-      const products = await Product.find(mongoQuery)
+      const rawProducts = await Product.find(mongoQuery)
         .sort(sortOption)
         .skip(skip)
         .limit(limit)
         .lean();
 
+      const products = rawProducts.map(formatProduct);
       const totalPages = Math.ceil(total / limit) || 1;
 
       return {
@@ -116,7 +133,7 @@ export class ProductService {
   async getProductBySlug(slug: string) {
     try {
       const product = await Product.findOne({ slug, isActive: true }).lean();
-      return product;
+      return formatProduct(product);
     } catch {
       return null;
     }
@@ -125,7 +142,7 @@ export class ProductService {
   async getProductById(id: string) {
     try {
       const product = await Product.findById(id).lean();
-      return product;
+      return formatProduct(product);
     } catch {
       return null;
     }

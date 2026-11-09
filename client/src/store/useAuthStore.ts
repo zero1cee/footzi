@@ -10,6 +10,7 @@ interface AuthState {
   error: string | null;
 
   login: (email: string, password: string) => Promise<boolean>;
+  loginAsDemo: (role?: 'patron' | 'admin') => Promise<boolean>;
   register: (name: string, email: string, password: string, phone?: string) => Promise<boolean>;
   logout: () => void;
   checkAuth: () => Promise<void>;
@@ -19,15 +20,9 @@ interface AuthState {
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
-      user: {
-        _id: 'demo-user-1',
-        name: 'Arjun Kapoor',
-        email: 'patron@footzi.in',
-        role: 'customer',
-        phone: '+91 98765 43210',
-      },
-      token: 'demo-jwt-token-authenticated',
-      isAuthenticated: true,
+      user: null,
+      token: null,
+      isAuthenticated: false,
       isLoading: false,
       error: null,
 
@@ -43,8 +38,9 @@ export const useAuthStore = create<AuthState>()(
           });
           return true;
         } catch (err: any) {
-          // If backend isn't reachable, support simulated fallback for demo accounts
+          // If live backend fails, check if valid demo credentials match
           if (email === 'patron@footzi.in' && password === 'Footzi@2026') {
+            console.warn('[Footzi Auth] Live login unavailable, falling back to simulated patron session.');
             set({
               user: {
                 _id: 'demo-user-1',
@@ -60,6 +56,7 @@ export const useAuthStore = create<AuthState>()(
             return true;
           }
           if (email === 'admin@footzi.in' && password === 'Footzi@2026') {
+            console.warn('[Footzi Auth] Live login unavailable, falling back to simulated admin session.');
             set({
               user: {
                 _id: 'demo-admin-1',
@@ -78,6 +75,11 @@ export const useAuthStore = create<AuthState>()(
           set({ error: err.message || 'Login failed', isLoading: false });
           return false;
         }
+      },
+
+      loginAsDemo: async (role = 'patron') => {
+        const email = role === 'admin' ? 'admin@footzi.in' : 'patron@footzi.in';
+        return get().login(email, 'Footzi@2026');
       },
 
       register: async (name, email, password, phone) => {
@@ -111,11 +113,18 @@ export const useAuthStore = create<AuthState>()(
         const token = get().token;
         if (!token) return;
 
+        // Auto-heal legacy mock tokens from local storage so live backend routes work cleanly
+        if (token.startsWith('demo-jwt-token')) {
+          set({ user: null, token: null, isAuthenticated: false });
+          return;
+        }
+
         try {
           const user = await authService.getMe(token);
           set({ user, isAuthenticated: true });
         } catch {
-          // Keep current state or logout if invalidated
+          // Token expired or invalid signature
+          set({ user: null, token: null, isAuthenticated: false });
         }
       },
 

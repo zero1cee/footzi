@@ -18,12 +18,13 @@ import { formatINR } from '@/lib/utils';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { adminService } from '@/services/adminService';
+import { productService } from '@/services/productService';
 import { useAuthStore } from '@/store/useAuthStore';
 import { MOCK_PRODUCTS } from '@/data/mockProducts';
 
 export const AdminDashboardPage: React.FC = () => {
   const { token } = useAuthStore();
-  const activeToken = token || 'demo-jwt-token-admin';
+  const activeToken = token || '';
 
   const [activeTab, setActiveTab] = useState<
     'overview' | 'suppliers' | 'products' | 'returns' | 'inventory'
@@ -34,7 +35,7 @@ export const AdminDashboardPage: React.FC = () => {
       totalRevenue: 428500,
       totalPaidOrders: 142,
       totalOrdersCount: 156,
-      totalProducts: 12,
+      totalProducts: 16,
       lowStockCount: 3,
       activeSupplierOrders: 4,
       totalReturnsCount: 8,
@@ -113,11 +114,12 @@ export const AdminDashboardPage: React.FC = () => {
   const fetchAdminData = async () => {
     try {
       setIsLoading(true);
-      const [analyticsData, supplierData, invData, returnsData] = await Promise.all([
+      const [analyticsData, supplierData, invData, returnsData, catalogData] = await Promise.all([
         adminService.getAnalytics(activeToken).catch(() => null),
         adminService.getSupplierOrders(activeToken).catch(() => null),
         adminService.getInventory(activeToken).catch(() => null),
         adminService.getReturns(activeToken).catch(() => null),
+        productService.getProducts({ limit: 100 }).catch(() => null),
       ]);
 
       if (analyticsData) setAnalytics(analyticsData);
@@ -129,6 +131,9 @@ export const AdminDashboardPage: React.FC = () => {
       }
       if (returnsData && Array.isArray(returnsData) && returnsData.length > 0) {
         setReturnsList(returnsData);
+      }
+      if (catalogData && Array.isArray(catalogData.products) && catalogData.products.length > 0) {
+        setProductsList(catalogData.products);
       }
     } catch {
       // Retain mock fallback

@@ -95,4 +95,18 @@ export const orderService = {
     if (!res.ok) throw new Error('Order not found');
     return res.json();
   },
+
+  async cancelOrder(id: string, reason: string | undefined, token: string) {
+    const res = await fetch(`/api/orders/${id}/cancel`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ reason }),
+    });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error || 'Failed to cancel order');
+    return body;
+  },
 };

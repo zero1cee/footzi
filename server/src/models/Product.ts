@@ -135,6 +135,37 @@ const ProductSchema = new Schema<IProduct>(
   }
 );
 
+ProductSchema.set('toJSON', {
+  virtuals: true,
+  transform: (_doc, ret: any) => {
+    if (ret._id) ret.id = ret._id.toString();
+    if (Array.isArray(ret.variants)) {
+      ret.variants.forEach((v: any) => {
+        if (v._id) v.id = v._id.toString();
+      });
+    }
+    if (Array.isArray(ret.reviews)) {
+      ret.reviews.forEach((r: any) => {
+        if (r._id) r.id = r._id.toString();
+      });
+    }
+    return ret;
+  },
+});
+
+ProductSchema.set('toObject', {
+  virtuals: true,
+  transform: (_doc, ret: any) => {
+    if (ret._id) ret.id = ret._id.toString();
+    if (Array.isArray(ret.variants)) {
+      ret.variants.forEach((v: any) => {
+        if (v._id) v.id = v._id.toString();
+      });
+    }
+    return ret;
+  },
+});
+
 // Database Indexes for Fast Ecommerce Queries
 ProductSchema.index({ category: 1, price: 1 });
 ProductSchema.index({ 'variants.sku': 1 });

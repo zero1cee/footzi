@@ -29,10 +29,18 @@ export const LoginPage: React.FC = () => {
     }
   };
 
-  const fillDemoAccount = (demoEmail: string) => {
+  const handleInstantDemoLogin = async (demoEmail: string) => {
     setEmail(demoEmail);
     setPassword('Footzi@2026');
     clearError();
+    const success = await login(demoEmail, 'Footzi@2026');
+    if (success) {
+      if (demoEmail.includes('admin')) {
+        navigate('/admin');
+      } else {
+        navigate(from, { replace: true });
+      }
+    }
   };
 
   return (
@@ -58,20 +66,20 @@ export const LoginPage: React.FC = () => {
           {/* Quick Demo Credentials Bar */}
           <div className="mb-6 p-3 bg-ivory-100/90 border border-ivory-300 rounded-xs">
             <span className="text-[10px] uppercase tracking-wider font-semibold text-charcoal-700 block mb-2 flex items-center gap-1">
-              <Sparkles className="w-3 h-3 text-sand-500" /> 1-Click Demo Credentials:
+              <Sparkles className="w-3 h-3 text-sand-500" /> 1-Click Instant Demo Login:
             </span>
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={() => fillDemoAccount('patron@footzi.in')}
-                className="flex-1 py-1.5 px-2 bg-white hover:bg-ivory-200 text-charcoal-800 text-[11px] font-medium border border-ivory-300 rounded-xs transition-colors"
+                onClick={() => handleInstantDemoLogin('patron@footzi.in')}
+                className="flex-1 py-1.5 px-2 bg-white hover:bg-ivory-200 text-charcoal-800 text-[11px] font-medium border border-ivory-300 rounded-xs transition-colors flex items-center justify-center gap-1"
               >
                 Patron Demo
               </button>
               <button
                 type="button"
-                onClick={() => fillDemoAccount('admin@footzi.in')}
-                className="flex-1 py-1.5 px-2 bg-charcoal-900 hover:bg-charcoal-800 text-white text-[11px] font-medium rounded-xs transition-colors"
+                onClick={() => handleInstantDemoLogin('admin@footzi.in')}
+                className="flex-1 py-1.5 px-2 bg-charcoal-900 hover:bg-charcoal-800 text-white text-[11px] font-medium rounded-xs transition-colors flex items-center justify-center gap-1"
               >
                 Admin Deck
               </button>

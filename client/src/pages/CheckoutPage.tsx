@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Lock, CheckCircle2, ArrowRight, Truck, CreditCard, Sparkles, AlertCircle } from 'lucide-react';
+import { Lock, CheckCircle2, ArrowRight, Truck, CreditCard, Sparkles, AlertCircle, ShieldCheck } from 'lucide-react';
 import { useCartStore } from '@/store/useCartStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { orderService } from '@/services/orderService';
@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/Button';
 
 export const CheckoutPage: React.FC = () => {
   const { items, getSubtotal, getDiscountAmount, getShippingFee, getTotal, clearCart, couponCode } = useCartStore();
-  const { user, token } = useAuthStore();
+  const { user, token, loginAsDemo } = useAuthStore();
 
   const [formData, setFormData] = useState({
     firstName: user?.name ? user.name.split(' ')[0] : 'Arjun',
@@ -31,6 +31,26 @@ export const CheckoutPage: React.FC = () => {
     total: number;
   } | null>(null);
 
+  // Interactive Payment Sheet Modal State
+  const [pendingPayment, setPendingPayment] = useState<{
+    createdOrder: any;
+    gatewayOrder: any;
+    activeToken: string;
+  } | null>(null);
+  const [isVerifyingPayment, setIsVerifyingPayment] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      setFormData((prev) => ({
+        ...prev,
+        firstName: user.name.split(' ')[0],
+        lastName: user.name.split(' ').slice(1).join(' ') || prev.lastName,
+        email: user.email,
+        phone: user.phone || prev.phone,
+      }));
+    }
+  }, [user]);
+
   const subtotal = getSubtotal();
   const discount = getDiscountAmount();
   const shipping = getShippingFee();
@@ -46,7 +66,12 @@ export const CheckoutPage: React.FC = () => {
     setIsProcessing(true);
 
     try {
-      const activeToken = token || 'demo-jwt-token-authenticated';
+      // If user has no valid live token, authenticate as demo patron seamlessly so order persists in Mongo
+      let activeToken = token;
+      if (!activeToken || activeToken.startsWith('demo-jwt-token')) {
+        await loginAsDemo('patron');
+        activeToken = useAuthStore.getState().token || '';
+      }
 
       // 1. Create order on backend with server-computed prices and stock reservation
       const orderPayload = {
@@ -75,6 +100,7 @@ export const CheckoutPage: React.FC = () => {
       try {
         createdOrder = await orderService.createOrder(orderPayload, activeToken);
       } catch (err: any) {
+        console.warn('[Checkout] Order creation notice:', err.message);
         // Fallback simulation if backend server offline
         createdOrder = {
           _id: `ord_${Date.now()}`,
@@ -90,22 +116,45 @@ export const CheckoutPage: React.FC = () => {
       } catch {
         gatewayOrder = {
           gatewayOrderId: `order_${Date.now()}`,
+          keyId: 'rzp_test_placeholder_key_id',
         };
       }
 
-      // 3. Cryptographic Signature Verification
+      // Open interactive payment gateway modal for patron confirmation
+      setPendingPayment({
+        createdOrder,
+        gatewayOrder,
+        activeToken,
+      });
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Payment initiation failed. Please check your bag and try again.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Confirm Payment in Test Modal
+  const handleConfirmTestPayment = async () => {
+    if (!pendingPayment) return;
+    setIsVerifyingPayment(true);
+    setErrorMessage(null);
+
+    const { createdOrder, gatewayOrder, activeToken } = pendingPayment;
+
+    try {
       let verifyResult: any = null;
       try {
         verifyResult = await orderService.verifyPayment(
           {
             orderId: createdOrder._id,
             razorpayOrderId: gatewayOrder.gatewayOrderId,
-            razorpayPaymentId: `pay_${Date.now()}`,
+            razorpayPaymentId: `pay_test_${Date.now()}`,
             razorpaySignature: 'mock_valid_signature_test_mode',
           },
           activeToken
         );
-      } catch {
+      } catch (err: any) {
+        console.warn('[Checkout] Payment verification offline fallback:', err.message);
         verifyResult = {
           verified: true,
           supplierOrder: {
@@ -121,14 +170,32 @@ export const CheckoutPage: React.FC = () => {
       setCompletedOrderData({
         orderNumber: createdOrder.orderNumber,
         trackingNumber: assignedTracking,
-        total,
+        total: createdOrder.total || total,
       });
 
+      setPendingPayment(null);
       clearCart();
     } catch (err: any) {
-      setErrorMessage(err.message || 'Payment processing failed. Please verify your address and try again.');
+      setErrorMessage(err.message || 'Signature verification failed.');
     } finally {
-      setIsProcessing(false);
+      setIsVerifyingPayment(false);
+    }
+  };
+
+  // Cancel Payment & Release Reserved Stock
+  const handleCancelPayment = async () => {
+    if (!pendingPayment) return;
+    const { createdOrder, activeToken } = pendingPayment;
+
+    try {
+      if (createdOrder._id && !createdOrder._id.startsWith('ord_')) {
+        await orderService.cancelOrder(createdOrder._id, 'Customer aborted payment sheet', activeToken);
+      }
+    } catch {
+      // Ignored
+    } finally {
+      setPendingPayment(null);
+      setErrorMessage('Payment was cancelled. Reserved inventory has been released.');
     }
   };
 
@@ -225,7 +292,7 @@ export const CheckoutPage: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Title */}
-        <div className="mb-10 text-center sm:text-left">
+        <div className="mb-8 text-center sm:text-left">
           <span className="text-[11px] uppercase tracking-widest text-sand-600 font-semibold block mb-1">
             Secure Payment Gateway
           </span>
@@ -236,6 +303,34 @@ export const CheckoutPage: React.FC = () => {
             Prices, discounts, and inventory are recalculated and cryptographically verified on the backend.
           </p>
         </div>
+
+        {/* 1-Click Patron Sign-In for Guests */}
+        {!user && (
+          <div className="mb-8 p-4 bg-sand-50/90 border border-sand-300 rounded-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+            <div className="flex items-center gap-3">
+              <Sparkles className="w-5 h-5 text-sand-600 shrink-0" />
+              <div>
+                <p className="text-xs font-semibold text-charcoal-900">
+                  Testing as an Interviewer or Reviewer?
+                </p>
+                <p className="text-[11px] text-charcoal-600">
+                  1-Click sign in as Demo Patron to auto-fill verified address details, bind this order to your account, and track BlueDart fulfillment.
+                </p>
+              </div>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                await loginAsDemo('patron');
+              }}
+              className="text-xs whitespace-nowrap self-start sm:self-center"
+            >
+              1-Click Patron Sign-In
+            </Button>
+          </div>
+        )}
 
         {errorMessage && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xs flex items-center gap-2">
@@ -469,6 +564,75 @@ export const CheckoutPage: React.FC = () => {
           </div>
 
         </form>
+
+        {/* Interactive Razorpay Test Modal */}
+        {pendingPayment && (
+          <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4 bg-charcoal-950/70 backdrop-blur-sm animate-fade-in">
+            <div className="relative bg-white max-w-md w-full rounded-xs shadow-2xl border border-ivory-300 overflow-hidden z-10 p-6 sm:p-8 space-y-6">
+              <div className="flex items-center justify-between border-b border-ivory-200 pb-3">
+                <div className="flex items-center gap-2">
+                  <CreditCard className="w-5 h-5 text-sand-600" />
+                  <h3 className="font-serif text-lg font-semibold text-charcoal-950">
+                    Razorpay Checkout
+                  </h3>
+                </div>
+                <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 bg-sand-100 text-sand-800 rounded-xs border border-sand-300">
+                  Sandbox Mode
+                </span>
+              </div>
+
+              <div className="space-y-3 bg-ivory-100/70 p-4 rounded-xs border border-ivory-200 text-xs">
+                <div className="flex justify-between text-charcoal-600">
+                  <span>Gateway Order:</span>
+                  <span className="font-mono font-medium text-charcoal-900">{pendingPayment.gatewayOrder.gatewayOrderId}</span>
+                </div>
+                <div className="flex justify-between text-charcoal-600">
+                  <span>Footzi Order Ref:</span>
+                  <span className="font-mono font-semibold text-charcoal-900">{pendingPayment.createdOrder.orderNumber}</span>
+                </div>
+                <div className="flex justify-between text-charcoal-600">
+                  <span>Recipient:</span>
+                  <span className="text-charcoal-900">{formData.firstName} {formData.lastName} ({formData.city})</span>
+                </div>
+                <div className="pt-2 border-t border-ivory-300 flex justify-between text-sm font-bold text-charcoal-950">
+                  <span>Total Amount:</span>
+                  <span className="text-lg text-charcoal-950">{formatINR(pendingPayment.createdOrder.total || total)}</span>
+                </div>
+              </div>
+
+              <div className="text-[11px] text-charcoal-500 space-y-1.5">
+                <div className="flex items-center gap-1.5 text-charcoal-700 font-medium">
+                  <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                  <span>Simulated 256-bit Encrypted Transaction</span>
+                </div>
+                <p className="leading-relaxed">
+                  Clicking confirm executes the backend payment verification endpoint, checks cryptographic signature integrity, deducts reserved stock, and allocates an Agra BlueDart tracking number.
+                </p>
+              </div>
+
+              <div className="space-y-2.5 pt-2">
+                <Button
+                  variant="primary"
+                  size="md"
+                  isLoading={isVerifyingPayment}
+                  onClick={handleConfirmTestPayment}
+                  className="w-full text-xs tracking-wider uppercase font-semibold"
+                >
+                  Confirm & Authorize Payment
+                </Button>
+                <Button
+                  variant="outline"
+                  size="md"
+                  disabled={isVerifyingPayment}
+                  onClick={handleCancelPayment}
+                  className="w-full text-xs text-charcoal-600 hover:text-red-700"
+                >
+                  Cancel Transaction & Release Stock
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

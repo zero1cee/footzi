@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, Loader2 } from 'lucide-react';
+import { useProducts } from '@/hooks/useProducts';
 import { MOCK_PRODUCTS } from '@/data/mockProducts';
 import { ProductCard } from '@/components/ui/ProductCard';
 import { Button } from '@/components/ui/Button';
@@ -10,10 +11,19 @@ const CATEGORIES = ['All', 'Loafers', 'Sneakers', 'Oxfords', 'Boots'] as const;
 export const NewArrivalsGrid: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
 
-  const filteredProducts =
+  const { data, isLoading } = useProducts({
+    category: selectedCategory === 'All' ? undefined : selectedCategory,
+    limit: 12,
+  });
+
+  const fallbackFiltered =
     selectedCategory === 'All'
       ? MOCK_PRODUCTS
       : MOCK_PRODUCTS.filter((p) => p.category === selectedCategory);
+
+  const displayedProducts = (data && data.products && data.products.length > 0)
+    ? data.products
+    : fallbackFiltered;
 
   return (
     <section className="py-16 md:py-24 bg-ivory-100 border-b border-ivory-200">
@@ -48,17 +58,23 @@ export const NewArrivalsGrid: React.FC = () => {
         </div>
 
         {/* Product Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
-          {filteredProducts.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
-        </div>
+        {isLoading && !data ? (
+          <div className="py-20 flex justify-center items-center">
+            <Loader2 className="w-8 h-8 animate-spin text-sand-500" />
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+            {displayedProducts.map((product) => (
+              <ProductCard key={product.id || product.slug} product={product} />
+            ))}
+          </div>
+        )}
 
         {/* View All Button */}
         <div className="mt-14 text-center">
           <Link to="/shop">
             <Button variant="outline" size="lg" className="gap-2">
-              Explore All 24 Footwear Styles <ArrowRight className="w-4 h-4" />
+              Explore All Footwear Styles <ArrowRight className="w-4 h-4" />
             </Button>
           </Link>
         </div>

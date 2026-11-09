@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { CartItem, Product, ShoeSize } from '@/types';
+import { useAuthStore } from './useAuthStore';
+import { cartService } from '@/services/cartService';
 
 interface CartState {
   items: CartItem[];
@@ -15,6 +17,7 @@ interface CartState {
   removeItem: (itemId: string) => void;
   updateQuantity: (itemId: string, quantity: number) => void;
   clearCart: () => void;
+  syncWithBackend: () => Promise<void>;
   openCart: () => void;
   closeCart: () => void;
   toggleCart: () => void;
@@ -49,9 +52,12 @@ export const useCartStore = create<CartState>()(
       discountRate: 0,
 
       addItem: (product, size, color, colorHex, quantity = 1) => {
-        // Find variant
-        const variant = product.variants.find((v) => v.size === size && v.color === color) || product.variants[0];
-        const itemId = `${product.id}-${variant ? variant.sku : `${size}-${color}`}`;
+        const prodId = product.id || (product as any)._id || 'prod-default';
+        const variant =
+          product.variants?.find((v) => v.size === size && v.color === color) ||
+          product.variants?.[0];
+        const sku = variant ? variant.sku : `FTZ-${prodId}-${size}`;
+        const itemId = `${prodId}-${sku}`;
         const stockLimit = variant ? variant.stock : 10;
 
         const currentItems = get().items;
@@ -69,25 +75,46 @@ export const useCartStore = create<CartState>()(
         } else {
           const newItem: CartItem = {
             id: itemId,
-            productId: product.id,
+            productId: prodId,
             productName: product.name,
             productSlug: product.slug,
-            variantId: variant ? variant.id : 'v-default',
-            sku: variant ? variant.sku : `FTZ-${product.id}`,
+            variantId: variant ? (variant.id || (variant as any)._id || 'v-default') : 'v-default',
+            sku,
             size,
             color,
             colorHex,
             price: variant?.priceOverride ?? product.price,
-            image: product.images[0],
+            image: product.images?.[0] || '',
             quantity: Math.min(quantity, stockLimit),
             stock: stockLimit,
           };
           set({ items: [...currentItems, newItem], isOpen: true });
         }
+
+        // Asynchronously sync with backend for authenticated patrons
+        const token = useAuthStore.getState().token;
+        if (token && !token.startsWith('demo-jwt-token')) {
+          cartService
+            .addItem(
+              {
+                productId: prodId,
+                variantSku: sku,
+                size,
+                color,
+                quantity,
+              },
+              token
+            )
+            .catch(() => {});
+        }
       },
 
       removeItem: (itemId) => {
         set({ items: get().items.filter((i) => i.id !== itemId) });
+        const token = useAuthStore.getState().token;
+        if (token && !token.startsWith('demo-jwt-token')) {
+          cartService.removeItem(itemId, token).catch(() => {});
+        }
       },
 
       updateQuantity: (itemId, quantity) => {
@@ -100,9 +127,49 @@ export const useCartStore = create<CartState>()(
             i.id === itemId ? { ...i, quantity: Math.min(quantity, i.stock) } : i
           ),
         });
+
+        const token = useAuthStore.getState().token;
+        if (token && !token.startsWith('demo-jwt-token')) {
+          cartService.updateQuantity(itemId, quantity, token).catch(() => {});
+        }
       },
 
-      clearCart: () => set({ items: [] }),
+      clearCart: () => {
+        set({ items: [] });
+        const token = useAuthStore.getState().token;
+        if (token && !token.startsWith('demo-jwt-token')) {
+          cartService.clearCart(token).catch(() => {});
+        }
+      },
+
+      syncWithBackend: async () => {
+        const token = useAuthStore.getState().token;
+        if (!token || token.startsWith('demo-jwt-token')) return;
+
+        try {
+          const serverCart = await cartService.getCart(token);
+          if (serverCart && Array.isArray(serverCart.items) && serverCart.items.length > 0) {
+            const mappedItems: CartItem[] = serverCart.items.map((si) => ({
+              id: `${si.product._id || si.product.id}-${si.sku}`,
+              productId: si.product._id || si.product.id || '',
+              productName: si.product.name,
+              productSlug: si.product.slug,
+              variantId: si.sku,
+              sku: si.sku,
+              size: si.size as ShoeSize,
+              color: si.color,
+              colorHex: si.colorHex || '#1C1C1C',
+              price: si.price,
+              image: si.product.images?.[0] || '',
+              quantity: si.quantity,
+              stock: 10,
+            }));
+            set({ items: mappedItems });
+          }
+        } catch {
+          // Keep local storage items if offline
+        }
+      },
 
       openCart: () => set({ isOpen: true }),
       closeCart: () => set({ isOpen: false }),
