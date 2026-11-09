@@ -1,4 +1,5 @@
 import express, { Express, Request, Response } from 'express';
+import path from 'path';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
@@ -25,6 +26,7 @@ export const createApp = (): Express => {
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
   app.use(morgan('dev'));
+  app.use('/images', express.static(path.join(process.cwd(), 'public/images')));
 
   // Healthcheck Endpoint
   app.get('/api/health', (_req: Request, res: Response) => {
