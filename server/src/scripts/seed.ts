@@ -709,6 +709,10 @@ const seed = async () => {
   console.log('[Seed] Seeding default Demo Accounts...');
   const salt = await bcrypt.genSalt(10);
   const passwordHash = await bcrypt.hash('Footzi@2026', salt);
+  // The demo password is public (README, 1-click login). Set SEED_ADMIN_PASSWORD on a
+  // real deployment to give the admin account a private password instead.
+  const adminPassword = process.env.SEED_ADMIN_PASSWORD;
+  const adminPasswordHash = adminPassword ? await bcrypt.hash(adminPassword, salt) : passwordHash;
 
   await User.create([
     {
@@ -732,13 +736,17 @@ const seed = async () => {
     {
       name: 'Devraj Chauhan',
       email: 'admin@footzi.in',
-      passwordHash,
+      passwordHash: adminPasswordHash,
       role: 'admin',
       phone: '+91 98111 22334',
       addresses: [],
     },
   ]);
-  console.log('[Seed] Demo accounts created: patron@footzi.in & admin@footzi.in (Password: Footzi@2026)');
+  console.log(
+    adminPassword
+      ? '[Seed] Accounts created: patron@footzi.in (Password: Footzi@2026) & admin@footzi.in (password from SEED_ADMIN_PASSWORD)'
+      : '[Seed] Demo accounts created: patron@footzi.in & admin@footzi.in (Password: Footzi@2026)'
+  );
 
   await mongoose.connection.close();
   console.log('[Seed Complete] All databases initialized successfully.');

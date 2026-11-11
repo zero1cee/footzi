@@ -9,6 +9,10 @@ export interface AddItemDTO {
   quantity: number;
 }
 
+// A cart line can be addressed by its own _id or by its variant SKU (what the client knows)
+const matchesItem = (item: { _id?: unknown; variantSku: string }, key: string): boolean =>
+  item._id?.toString() === key || item.variantSku === key;
+
 export class CartService {
   async getCart(userId: string): Promise<ICart> {
     let cart = await Cart.findOne({ user: userId });
@@ -85,7 +89,7 @@ export class CartService {
       throw new Error('Cart not found.');
     }
 
-    const itemIndex = cart.items.findIndex((item) => item._id?.toString() === itemId);
+    const itemIndex = cart.items.findIndex((item) => matchesItem(item, itemId));
     if (itemIndex === -1) {
       throw new Error('Item not found in cart.');
     }
@@ -112,7 +116,7 @@ export class CartService {
       throw new Error('Cart not found.');
     }
 
-    cart.items = cart.items.filter((item) => item._id?.toString() !== itemId) as any;
+    cart.items = cart.items.filter((item) => !matchesItem(item, itemId)) as any;
     cart.calculateSubtotal();
     await cart.save();
     return cart;

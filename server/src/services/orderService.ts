@@ -2,6 +2,7 @@ import { Order, IOrder, IOrderItemSnapshot, IShippingAddressSnapshot } from '../
 import { Product } from '../models/Product.js';
 import { Inventory, IInventory } from '../models/Inventory.js';
 import { Cart } from '../models/Cart.js';
+import { escapeRegex } from './productService.js';
 
 export interface CreateOrderDTO {
   userId: string;
@@ -179,6 +180,12 @@ export class OrderService {
       throw new Error('Order not found.');
     }
 
+    // A paid order has already had its stock deducted and money captured; undoing
+    // that needs a refund, which goes through the returns workflow instead.
+    if (order.paymentStatus === 'paid') {
+      throw new Error('A paid order cannot be cancelled here. Please request a return instead.');
+    }
+
     if (!order.canTransitionTo('cancelled')) {
       throw new Error(`Order in '${order.orderStatus}' state cannot be cancelled.`);
     }
@@ -203,7 +210,10 @@ export class OrderService {
   }
 
   async getAllOrders(query: any = {}) {
-    const { status, search, page = 1, limit = 20 } = query;
+    const status = typeof query.status === 'string' ? query.status : undefined;
+    const search = typeof query.search === 'string' ? escapeRegex(query.search) : undefined;
+    const page = Math.max(1, Math.floor(Number(query.page)) || 1);
+    const limit = Math.min(100, Math.max(1, Math.floor(Number(query.limit)) || 20));
     const filter: any = {};
 
     if (status && status !== 'all') {

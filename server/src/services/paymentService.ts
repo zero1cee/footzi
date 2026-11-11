@@ -3,7 +3,19 @@ import { razorpayInstance, RAZORPAY_CONFIG } from '../config/razorpay.js';
 import { Order } from '../models/Order.js';
 import { Payment } from '../models/Payment.js';
 import { Inventory } from '../models/Inventory.js';
+import { Product } from '../models/Product.js';
+import { SupplierOrder } from '../models/SupplierOrder.js';
 import { supplierFulfillmentService } from './supplierFulfillmentService.js';
+
+// Demo mode = the server is running on the placeholder Razorpay credentials.
+const isDemoMode = (): boolean =>
+  RAZORPAY_CONFIG.key_id.includes('placeholder') || RAZORPAY_CONFIG.key_secret.includes('placeholder');
+
+const safeEqual = (a: string, b: string): boolean => {
+  const x = Buffer.from(a, 'utf8');
+  const y = Buffer.from(b, 'utf8');
+  return x.length === y.length && crypto.timingSafeEqual(x, y);
+};
 
 export class PaymentService {
   // Create Razorpay Gateway Order
@@ -17,12 +29,17 @@ export class PaymentService {
       throw new Error('This order has already been paid for.');
     }
 
+    if (order.orderStatus !== 'pending_payment') {
+      throw new Error(`Order in '${order.orderStatus}' state cannot be paid for.`);
+    }
+
     const amountInPaise = Math.round(order.total * 100);
 
     let gatewayOrderId = `order_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
 
-    try {
-      if (RAZORPAY_CONFIG.key_id && !RAZORPAY_CONFIG.key_id.includes('placeholder')) {
+    // With real credentials a gateway failure is a real failure; only demo mode simulates
+    if (!isDemoMode()) {
+      try {
         const rzpOrder = await razorpayInstance.orders.create({
           amount: amountInPaise,
           currency: 'INR',
@@ -33,9 +50,11 @@ export class PaymentService {
           },
         });
         gatewayOrderId = rzpOrder.id;
+      } catch (err: any) {
+        const reason = err?.error?.description || err?.message || 'unknown gateway error';
+        console.error('[Razorpay API] Order creation failed:', reason);
+        throw new Error('The payment gateway is unavailable right now. Please try again.');
       }
-    } catch (err: any) {
-      console.warn('[Razorpay API] Using simulated test gateway order:', err.message);
     }
 
     // Save payment record
@@ -64,6 +83,7 @@ export class PaymentService {
       amountInPaise,
       currency: 'INR',
       keyId: RAZORPAY_CONFIG.key_id,
+      demoMode: isDemoMode(),
       customer: {
         name: order.customerName,
         email: order.customerEmail,
@@ -93,30 +113,41 @@ export class PaymentService {
       throw new Error('Associated payment record not found.');
     }
 
+    // Idempotency: a repeated verification of an already-paid order changes nothing
+    if (order.paymentStatus === 'paid') {
+      return this.alreadyPaidResult(order);
+    }
+
+    if (order.orderStatus !== 'pending_payment') {
+      throw new Error(`Order in '${order.orderStatus}' state cannot be paid for.`);
+    }
+
     // Compute HMAC SHA256 signature
     const generatedSignature = crypto
       .createHmac('sha256', RAZORPAY_CONFIG.key_secret)
       .update(`${razorpayOrderId}|${razorpayPaymentId}`)
       .digest('hex');
 
-    const expected = Buffer.from(generatedSignature, 'utf8');
-    const received = Buffer.from(razorpaySignature, 'utf8');
-    const hmacMatches =
-      expected.length === received.length && crypto.timingSafeEqual(expected, received);
-
     // The mock signature is honoured only in demo mode, i.e. while the server
     // is running on placeholder Razorpay credentials. With real keys configured,
     // nothing but a genuine HMAC is accepted.
-    const isDemoMode = RAZORPAY_CONFIG.key_secret.includes('placeholder');
     const isSignatureValid =
-      hmacMatches || (isDemoMode && razorpaySignature === 'mock_valid_signature_test_mode');
+      safeEqual(generatedSignature, razorpaySignature) ||
+      (isDemoMode() && razorpaySignature === 'mock_valid_signature_test_mode');
 
     if (!isSignatureValid) {
       payment.status = 'failed';
       payment.failureReason = 'Cryptographic signature mismatch';
       await payment.save();
 
+      // The order is closed so its stock is released exactly once and it cannot be retried
       order.paymentStatus = 'failed';
+      order.orderStatus = 'cancelled';
+      order.statusHistory.push({
+        status: 'cancelled',
+        timestamp: new Date(),
+        note: 'Payment signature verification failed. Order cancelled and stock released.',
+      });
       await order.save();
 
       // Release reserved inventory
@@ -131,6 +162,15 @@ export class PaymentService {
         verified: false,
         message: 'Payment verification failed: Signature mismatch. Potential tampering detected.',
       };
+    }
+
+    // Atomically claim the order: of several concurrent verifications only one proceeds
+    const claim = await Order.updateOne(
+      { _id: order._id, paymentStatus: { $ne: 'paid' } },
+      { $set: { paymentStatus: 'paid' } }
+    );
+    if (claim.modifiedCount === 0) {
+      return this.alreadyPaidResult(order);
     }
 
     // Mark payment as captured & verified
@@ -163,6 +203,11 @@ export class PaymentService {
       if (inv) {
         await inv.confirmFulfillment(item.quantity);
       }
+      // Keep the catalog's displayed stock in step with the sold inventory
+      await Product.updateOne(
+        { _id: item.product, variants: { $elemMatch: { sku: item.sku, stock: { $gte: item.quantity } } } },
+        { $inc: { 'variants.$.stock': -item.quantity } }
+      );
     }
 
     // Trigger dropshipping supplier fulfillment order in Agra
@@ -188,17 +233,35 @@ export class PaymentService {
     };
   }
 
+  private async alreadyPaidResult(order: any) {
+    const fresh = await Order.findById(order._id);
+    const supplierOrder = await SupplierOrder.findOne({ customerOrder: order._id });
+    return {
+      verified: true,
+      message: 'Payment was already verified for this order.',
+      order: fresh,
+      supplierOrder,
+    };
+  }
+
   // Handle Webhook Events
-  async handleWebhook(body: any, webhookSignature: string) {
-    if (RAZORPAY_CONFIG.webhook_secret && !RAZORPAY_CONFIG.webhook_secret.includes('placeholder')) {
+  async handleWebhook(body: any, webhookSignature: string, rawBody?: Buffer) {
+    const secret = RAZORPAY_CONFIG.webhook_secret;
+    const hasRealSecret = Boolean(secret) && !secret.includes('placeholder');
+
+    if (hasRealSecret) {
+      // Razorpay signs the exact bytes it sent, so verify against the raw body
       const expectedSignature = crypto
-        .createHmac('sha256', RAZORPAY_CONFIG.webhook_secret)
-        .update(JSON.stringify(body))
+        .createHmac('sha256', secret)
+        .update(rawBody ?? Buffer.from(JSON.stringify(body)))
         .digest('hex');
 
-      if (expectedSignature !== webhookSignature) {
+      if (!safeEqual(expectedSignature, webhookSignature)) {
         throw new Error('Webhook signature verification failed');
       }
+    } else if (!isDemoMode()) {
+      // Real payments are live but webhooks cannot be authenticated: reject them
+      throw new Error('Webhook secret is not configured');
     }
 
     const event = body.event;

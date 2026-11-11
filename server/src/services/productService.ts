@@ -17,6 +17,8 @@ export interface ProductQueryFilters {
   includeInactive?: boolean;
 }
 
+export const escapeRegex = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 const formatProduct = (p: any) => {
   if (!p) return null;
   return {
@@ -69,10 +71,11 @@ export class ProductService {
     }
 
     if (search) {
+      const term = escapeRegex(search);
       mongoQuery.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } },
-        { category: { $regex: search, $options: 'i' } },
+        { name: { $regex: term, $options: 'i' } },
+        { description: { $regex: term, $options: 'i' } },
+        { category: { $regex: term, $options: 'i' } },
       ];
     }
 
@@ -81,7 +84,7 @@ export class ProductService {
     }
 
     if (color) {
-      mongoQuery['variants.color'] = { $regex: new RegExp(`^${color}$`, 'i') };
+      mongoQuery['variants.color'] = { $regex: new RegExp(`^${escapeRegex(color)}$`, 'i') };
     }
 
     if (minPrice !== undefined || maxPrice !== undefined) {

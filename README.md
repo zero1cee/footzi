@@ -327,6 +327,48 @@ Both compile with **0 errors**.
 
 ---
 
+## 7. Production Deployment (Render + MongoDB Atlas)
+
+Footzi deploys as **one Render web service**: the build compiles the API and the React client, and Express serves both from the same origin. The repository's [`render.yaml`](render.yaml) describes the service.
+
+> **Database:** Footzi needs MongoDB. Upstash does not offer MongoDB (it provides Redis, Vector and QStash), so use the free **MongoDB Atlas** M0 tier.
+
+### 1. Create the database (MongoDB Atlas)
+1. Create a free M0 cluster at <https://www.mongodb.com/atlas>, ideally in the same region as the Render service.
+2. **Database Access**: add a database user with a generated password.
+3. **Network Access**: allow `0.0.0.0/0` (Render's free tier has no fixed outbound IP).
+4. **Connect → Drivers**: copy the connection string and put the database name in it:
+   `mongodb+srv://USER:PASSWORD@CLUSTER.mongodb.net/footzi?retryWrites=true&w=majority`
+
+### 2. Seed the catalog (once, from your machine)
+```bash
+MONGODB_URI="<atlas connection string>" SEED_ADMIN_PASSWORD="<private admin password>" npm run seed
+```
+The seed **deletes all products, inventory and users** before inserting, so run it only on a fresh database. Without `SEED_ADMIN_PASSWORD`, `admin@footzi.in` gets the public demo password.
+
+### 3. Deploy on Render
+1. Push the repository to GitHub.
+2. In Render: **New → Blueprint**, pick the repository; Render reads `render.yaml`.
+3. Enter `MONGODB_URI` when prompted. `JWT_SECRET` is generated automatically.
+4. Deploy, then open `https://<service>.onrender.com/api/health`.
+
+| Variable | Required | Purpose |
+| :--- | :--- | :--- |
+| `NODE_ENV` | yes (`production`) | Enables fail-fast config checks and production logging |
+| `MONGODB_URI` | yes | Atlas connection string |
+| `JWT_SECRET` | yes | At least 32 random characters; the server refuses to start otherwise |
+| `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` | no | Real Razorpay keys. Unset = demo mode with the sandbox payment sheet |
+| `RAZORPAY_WEBHOOK_SECRET` | with real keys | Webhook URL: `https://<service>.onrender.com/api/payments/webhook` |
+| `CLOUDINARY_*` | no | Real image uploads; unset = uploads are simulated |
+| `CORS_ORIGIN` | no | Only if a separately hosted frontend calls this API |
+
+### Production behaviour
+- The server exits at startup if `MONGODB_URI` is missing, `JWT_SECRET` is weak, or the database is unreachable.
+- Rate limits: 600 requests / 15 min per IP on `/api`, 20 / 15 min on login and register.
+- Free Render services sleep after 15 minutes idle; the first request afterwards takes up to a minute.
+
+---
+
 <div align="center">
   <sub>Crafted with passion for engineering excellence • Inspired by the timeless heritage of Agra</sub>
 </div>

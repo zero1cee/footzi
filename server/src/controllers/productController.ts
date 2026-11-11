@@ -1,6 +1,16 @@
 import { Request, Response } from 'express';
 import { productService } from '../services/productService.js';
 
+// Query params can arrive as arrays or objects (?category[$ne]=x). Only plain
+// strings are passed on, so operators can never be smuggled into a Mongo query.
+const str = (value: unknown): string | undefined =>
+  typeof value === 'string' && value.length > 0 ? value.slice(0, 100) : undefined;
+
+const num = (value: unknown): number | undefined => {
+  const n = Number(str(value));
+  return Number.isFinite(n) ? n : undefined;
+};
+
 export const getProducts = async (req: Request, res: Response): Promise<void> => {
   try {
     const {
@@ -19,18 +29,18 @@ export const getProducts = async (req: Request, res: Response): Promise<void> =>
     } = req.query;
 
     const result = await productService.getProducts({
-      category: category as string,
-      brand: brand as string,
-      badge: badge as string,
-      search: search as string,
-      size: size as string,
-      color: color as string,
-      minPrice: minPrice ? Number(minPrice) : undefined,
-      maxPrice: maxPrice ? Number(maxPrice) : undefined,
+      category: str(category),
+      brand: str(brand),
+      badge: str(badge),
+      search: str(search),
+      size: str(size),
+      color: str(color),
+      minPrice: num(minPrice),
+      maxPrice: num(maxPrice),
       inStockOnly: inStockOnly === 'true',
-      sort: sort as string,
-      page: page ? Number(page) : 1,
-      limit: limit ? Number(limit) : 9,
+      sort: str(sort),
+      page: Math.max(1, Math.floor(num(page) ?? 1)),
+      limit: Math.min(100, Math.max(1, Math.floor(num(limit) ?? 9))),
     });
 
     res.status(200).json(result);

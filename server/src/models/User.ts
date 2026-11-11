@@ -1,6 +1,7 @@
 import mongoose, { Schema, Document, Model } from 'mongoose';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { getJwtSecret } from '../config/env.js';
 
 export interface IUserAddress {
   _id?: mongoose.Types.ObjectId;
@@ -91,7 +92,7 @@ UserSchema.methods.comparePassword = async function (candidatePassword: string):
 
 // Generate JWT authentication token
 UserSchema.methods.generateAuthToken = function (): string {
-  const secret = process.env.JWT_SECRET || 'footzi_super_secret_jwt_key_development_only_change_in_prod';
+  const secret = getJwtSecret();
   const expiresIn = process.env.JWT_EXPIRES_IN || '7d';
 
   return jwt.sign(

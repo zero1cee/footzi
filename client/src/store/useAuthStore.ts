@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { authService, AuthUser, SavedAddress } from '@/services/authService';
+import { isBackendUnreachable } from '@/lib/utils';
 
 interface AuthState {
   user: AuthUser | null;
@@ -39,8 +40,10 @@ export const useAuthStore = create<AuthState>()(
           });
           return true;
         } catch (err: any) {
-          // If live backend fails, check if valid demo credentials match
-          if (email === 'patron@footzi.in' && password === 'Footzi@2026') {
+          // Simulated sessions exist only for offline demos: a real rejection from
+          // the API (wrong password, rate limit) is never papered over.
+          const offline = isBackendUnreachable(err);
+          if (offline && email === 'patron@footzi.in' && password === 'Footzi@2026') {
             console.warn('[Footzi Auth] Live login unavailable, falling back to simulated patron session.');
             set({
               user: {
@@ -56,7 +59,7 @@ export const useAuthStore = create<AuthState>()(
             });
             return true;
           }
-          if (email === 'admin@footzi.in' && password === 'Footzi@2026') {
+          if (offline && email === 'admin@footzi.in' && password === 'Footzi@2026') {
             console.warn('[Footzi Auth] Live login unavailable, falling back to simulated admin session.');
             set({
               user: {

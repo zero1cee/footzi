@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { User, IUser } from '../models/User.js';
+import { getJwtSecret } from '../config/env.js';
 
 // Extend Express Request interface to include authenticated user
 export interface AuthRequest extends Request {
@@ -30,7 +31,7 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
       return;
     }
 
-    const secret = process.env.JWT_SECRET || 'footzi_super_secret_jwt_key_development_only_change_in_prod';
+    const secret = getJwtSecret();
     const decoded = jwt.verify(token, secret) as JwtPayload;
 
     const user = await User.findById(decoded.id);

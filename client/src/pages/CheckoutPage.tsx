@@ -7,6 +7,24 @@ import { orderService } from '@/services/orderService';
 import { formatINR, isBackendUnreachable } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 
+interface PendingPayment {
+  createdOrder: any;
+  gatewayOrder: any;
+  activeToken: string;
+}
+
+const RAZORPAY_SCRIPT = 'https://checkout.razorpay.com/v1/checkout.js';
+
+const loadRazorpayScript = (): Promise<void> =>
+  new Promise((resolve, reject) => {
+    if ((window as any).Razorpay) return resolve();
+    const script = document.createElement('script');
+    script.src = RAZORPAY_SCRIPT;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error('Could not load the payment gateway. Check your connection and try again.'));
+    document.body.appendChild(script);
+  });
+
 export const CheckoutPage: React.FC = () => {
   const { items, getSubtotal, getDiscountAmount, getShippingFee, getTotal, clearCart, couponCode } = useCartStore();
   const { user, token, loginAsDemo } = useAuthStore();
@@ -32,11 +50,7 @@ export const CheckoutPage: React.FC = () => {
   } | null>(null);
 
   // Interactive Payment Sheet Modal State
-  const [pendingPayment, setPendingPayment] = useState<{
-    createdOrder: any;
-    gatewayOrder: any;
-    activeToken: string;
-  } | null>(null);
+  const [pendingPayment, setPendingPayment] = useState<PendingPayment | null>(null);
   const [isVerifyingPayment, setIsVerifyingPayment] = useState(false);
 
   useEffect(() => {
@@ -62,6 +76,8 @@ export const CheckoutPage: React.FC = () => {
   const shipping = getShippingFee();
   const total = getTotal();
 
+  const orderCustomerName = () => `${formData.firstName} ${formData.lastName}`.trim();
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
@@ -72,11 +88,10 @@ export const CheckoutPage: React.FC = () => {
     setIsProcessing(true);
 
     try {
-      // If user has no valid live token, authenticate as demo patron seamlessly so order persists in Mongo
-      let activeToken = token;
-      if (!activeToken || activeToken.startsWith('demo-jwt-token')) {
-        await loginAsDemo('patron');
-        activeToken = useAuthStore.getState().token || '';
+      // Orders belong to an account: never place one under someone else's session
+      const activeToken = token;
+      if (!activeToken) {
+        throw new Error('Please sign in to place your order. You can use 1-Click Patron Sign-In above.');
       }
 
       // 1. Create order on backend with server-computed prices and stock reservation
@@ -137,12 +152,15 @@ export const CheckoutPage: React.FC = () => {
         }
       }
 
-      // Open interactive payment gateway modal for patron confirmation
-      setPendingPayment({
-        createdOrder,
-        gatewayOrder,
-        activeToken,
-      });
+      const pending = { createdOrder, gatewayOrder, activeToken };
+
+      if (!createdOrder.simulated && gatewayOrder.demoMode === false) {
+        // Live Razorpay credentials: hand over to the real hosted checkout
+        await openRazorpayCheckout(pending);
+      } else {
+        // Demo mode: open the sandbox sheet for patron confirmation
+        setPendingPayment(pending);
+      }
     } catch (err: any) {
       setErrorMessage(err.message || 'Payment initiation failed. Please check your bag and try again.');
     } finally {
@@ -150,13 +168,67 @@ export const CheckoutPage: React.FC = () => {
     }
   };
 
+  // Real Razorpay hosted checkout (used only when the server runs on live/test keys)
+  const openRazorpayCheckout = async (pending: PendingPayment) => {
+    const { createdOrder, gatewayOrder, activeToken } = pending;
+
+    const releaseOrder = (reason: string) =>
+      orderService.cancelOrder(createdOrder._id, reason, activeToken).catch(() => {});
+
+    try {
+      await loadRazorpayScript();
+    } catch (err) {
+      await releaseOrder('Payment gateway failed to load');
+      throw err;
+    }
+
+    // Guards against releasing the order if the window closes after a successful payment
+    let paymentCompleted = false;
+
+    const checkout = new (window as any).Razorpay({
+      key: gatewayOrder.keyId,
+      amount: gatewayOrder.amountInPaise,
+      currency: gatewayOrder.currency || 'INR',
+      name: 'Footzi',
+      description: `Order ${createdOrder.orderNumber}`,
+      order_id: gatewayOrder.gatewayOrderId,
+      prefill: {
+        name: orderCustomerName(),
+        email: formData.email,
+        contact: formData.phone,
+      },
+      theme: { color: '#121212' },
+      handler: (response: { razorpay_payment_id: string; razorpay_signature: string }) => {
+        paymentCompleted = true;
+        finalizePayment(pending, response.razorpay_payment_id, response.razorpay_signature);
+      },
+      modal: {
+        ondismiss: () => {
+          if (paymentCompleted) return;
+          releaseOrder('Customer closed the payment window');
+          setErrorMessage('Payment was cancelled. Reserved inventory has been released.');
+        },
+      },
+    });
+    checkout.open();
+  };
+
   // Confirm Payment in Test Modal
   const handleConfirmTestPayment = async () => {
     if (!pendingPayment) return;
+    await finalizePayment(pendingPayment, `pay_test_${Date.now()}`, 'mock_valid_signature_test_mode');
+  };
+
+  // Ask the server to verify the payment; only its answer confirms the order
+  const finalizePayment = async (
+    pending: PendingPayment,
+    razorpayPaymentId: string,
+    razorpaySignature: string
+  ) => {
     setIsVerifyingPayment(true);
     setErrorMessage(null);
 
-    const { createdOrder, gatewayOrder, activeToken } = pendingPayment;
+    const { createdOrder, gatewayOrder, activeToken } = pending;
 
     try {
       // Only an order that was simulated offline skips server verification.
@@ -167,8 +239,8 @@ export const CheckoutPage: React.FC = () => {
             {
               orderId: createdOrder._id,
               razorpayOrderId: gatewayOrder.gatewayOrderId,
-              razorpayPaymentId: `pay_test_${Date.now()}`,
-              razorpaySignature: 'mock_valid_signature_test_mode',
+              razorpayPaymentId,
+              razorpaySignature,
             },
             activeToken
           );

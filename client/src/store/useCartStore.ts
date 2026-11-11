@@ -110,10 +110,11 @@ export const useCartStore = create<CartState>()(
       },
 
       removeItem: (itemId) => {
+        const removed = get().items.find((i) => i.id === itemId);
         set({ items: get().items.filter((i) => i.id !== itemId) });
         const token = useAuthStore.getState().token;
-        if (token && !token.startsWith('demo-jwt-token')) {
-          cartService.removeItem(itemId, token).catch(() => {});
+        if (removed && token && !token.startsWith('demo-jwt-token')) {
+          cartService.removeItem(removed.sku, token).catch(() => {});
         }
       },
 
@@ -128,9 +129,10 @@ export const useCartStore = create<CartState>()(
           ),
         });
 
+        const updated = get().items.find((i) => i.id === itemId);
         const token = useAuthStore.getState().token;
-        if (token && !token.startsWith('demo-jwt-token')) {
-          cartService.updateQuantity(itemId, quantity, token).catch(() => {});
+        if (updated && token && !token.startsWith('demo-jwt-token')) {
+          cartService.updateQuantity(updated.sku, updated.quantity, token).catch(() => {});
         }
       },
 
@@ -150,17 +152,17 @@ export const useCartStore = create<CartState>()(
           const serverCart = await cartService.getCart(token);
           if (serverCart && Array.isArray(serverCart.items) && serverCart.items.length > 0) {
             const mappedItems: CartItem[] = serverCart.items.map((si) => ({
-              id: `${si.product._id || si.product.id}-${si.sku}`,
-              productId: si.product._id || si.product.id || '',
-              productName: si.product.name,
-              productSlug: si.product.slug,
-              variantId: si.sku,
-              sku: si.sku,
+              id: `${si.product}-${si.variantSku}`,
+              productId: si.product,
+              productName: si.productName,
+              productSlug: si.productSlug,
+              variantId: si.variantSku,
+              sku: si.variantSku,
               size: si.size as ShoeSize,
               color: si.color,
               colorHex: si.colorHex || '#1C1C1C',
-              price: si.price,
-              image: si.product.images?.[0] || '',
+              price: si.unitPrice,
+              image: si.image || '',
               quantity: si.quantity,
               stock: 10,
             }));

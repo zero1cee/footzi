@@ -1,20 +1,17 @@
 import { parseApiJson } from '@/lib/utils';
 
+// Mirrors the cart line stored by the server (server/src/models/Cart.ts)
 export interface ServerCartItem {
   _id: string;
-  product: {
-    _id: string;
-    id?: string;
-    name: string;
-    slug: string;
-    images: string[];
-    price: number;
-  };
-  sku: string;
+  product: string;
+  productName: string;
+  productSlug: string;
+  image: string;
+  variantSku: string;
   size: string;
   color: string;
   colorHex?: string;
-  price: number;
+  unitPrice: number;
   quantity: number;
   lineTotal: number;
 }
@@ -56,8 +53,9 @@ export const cartService = {
     return parseApiJson(res, 'Failed to add item to bag');
   },
 
-  async updateQuantity(itemId: string, quantity: number, token: string): Promise<{ message: string; cart: ServerCart }> {
-    const res = await fetch(`/api/cart/items/${itemId}`, {
+  // Cart lines are addressed by variant SKU, which both client and server know
+  async updateQuantity(sku: string, quantity: number, token: string): Promise<{ message: string; cart: ServerCart }> {
+    const res = await fetch(`/api/cart/items/${encodeURIComponent(sku)}`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
@@ -68,8 +66,8 @@ export const cartService = {
     return parseApiJson(res, 'Failed to update bag');
   },
 
-  async removeItem(itemId: string, token: string): Promise<{ message: string; cart: ServerCart }> {
-    const res = await fetch(`/api/cart/items/${itemId}`, {
+  async removeItem(sku: string, token: string): Promise<{ message: string; cart: ServerCart }> {
+    const res = await fetch(`/api/cart/items/${encodeURIComponent(sku)}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${token}` },
     });
