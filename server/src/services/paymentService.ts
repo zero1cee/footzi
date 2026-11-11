@@ -75,13 +75,15 @@ export class PaymentService {
   // Cryptographically verify Razorpay signature
   async verifyPaymentSignature(params: {
     orderId: string;
+    userId: string;
     razorpayOrderId: string;
     razorpayPaymentId: string;
     razorpaySignature: string;
   }) {
-    const { orderId, razorpayOrderId, razorpayPaymentId, razorpaySignature } = params;
+    const { orderId, userId, razorpayOrderId, razorpayPaymentId, razorpaySignature } = params;
 
-    const order = await Order.findById(orderId);
+    // Only the patron who placed the order may verify its payment
+    const order = await Order.findOne({ _id: orderId, user: userId });
     if (!order) {
       throw new Error('Order not found.');
     }
@@ -97,11 +99,17 @@ export class PaymentService {
       .update(`${razorpayOrderId}|${razorpayPaymentId}`)
       .digest('hex');
 
-    // In test/demo mode with placeholder credentials, accept mock signatures
+    const expected = Buffer.from(generatedSignature, 'utf8');
+    const received = Buffer.from(razorpaySignature, 'utf8');
+    const hmacMatches =
+      expected.length === received.length && crypto.timingSafeEqual(expected, received);
+
+    // The mock signature is honoured only in demo mode, i.e. while the server
+    // is running on placeholder Razorpay credentials. With real keys configured,
+    // nothing but a genuine HMAC is accepted.
+    const isDemoMode = RAZORPAY_CONFIG.key_secret.includes('placeholder');
     const isSignatureValid =
-      generatedSignature === razorpaySignature ||
-      razorpaySignature === 'mock_valid_signature_test_mode' ||
-      RAZORPAY_CONFIG.key_secret === 'placeholder_secret_key';
+      hmacMatches || (isDemoMode && razorpaySignature === 'mock_valid_signature_test_mode');
 
     if (!isSignatureValid) {
       payment.status = 'failed';

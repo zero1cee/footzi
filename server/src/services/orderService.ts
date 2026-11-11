@@ -1,6 +1,6 @@
 import { Order, IOrder, IOrderItemSnapshot, IShippingAddressSnapshot } from '../models/Order.js';
 import { Product } from '../models/Product.js';
-import { Inventory } from '../models/Inventory.js';
+import { Inventory, IInventory } from '../models/Inventory.js';
 import { Cart } from '../models/Cart.js';
 
 export interface CreateOrderDTO {
@@ -21,6 +21,29 @@ export interface CreateOrderDTO {
 
 export class OrderService {
   async createOrder(data: CreateOrderDTO): Promise<IOrder> {
+    const reservations: { inventory: IInventory; quantity: number }[] = [];
+
+    let order: IOrder;
+    try {
+      order = await this.reserveAndCreateOrder(data, reservations);
+    } catch (error) {
+      // Roll back every reservation made before the failure so stock is not stranded
+      for (const { inventory, quantity } of reservations) {
+        await inventory.releaseStock(quantity).catch(() => false);
+      }
+      throw error;
+    }
+
+    // Clear customer's server cart upon order placement
+    await Cart.findOneAndUpdate({ user: data.userId }, { items: [], subtotal: 0 });
+
+    return order;
+  }
+
+  private async reserveAndCreateOrder(
+    data: CreateOrderDTO,
+    reservations: { inventory: IInventory; quantity: number }[]
+  ): Promise<IOrder> {
     const {
       userId,
       customerName,
@@ -75,8 +98,11 @@ export class OrderService {
       // Atomic stock reservation
       const reserved = await inventory.reserveStock(reqItem.quantity);
       if (!reserved) {
-        throw new Error(`Stock reservation failed for SKU ${variant.sku}. Please try again.`);
+        throw new Error(
+          `Insufficient stock for ${product.name} (${variant.size} - ${variant.color}). It was just reserved by another patron.`
+        );
       }
+      reservations.push({ inventory, quantity: reqItem.quantity });
 
       const unitPrice = variant.priceOverride ?? product.price;
       const lineTotal = unitPrice * reqItem.quantity;
@@ -110,7 +136,7 @@ export class OrderService {
     const total = Math.max(0, subtotal - discount + shippingFee);
 
     // 4. Create Order document
-    const order = await Order.create({
+    return Order.create({
       orderNumber,
       user: userId,
       customerName,
@@ -133,11 +159,6 @@ export class OrderService {
         },
       ],
     });
-
-    // 5. Clear customer's server cart upon order placement
-    await Cart.findOneAndUpdate({ user: userId }, { items: [], subtotal: 0 });
-
-    return order;
   }
 
   async getUserOrders(userId: string): Promise<any[]> {

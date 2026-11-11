@@ -37,30 +37,31 @@ const InventorySchema = new Schema<IInventory>(
 
 // Method: Atomically reserve stock for an order pending payment
 InventorySchema.methods.reserveStock = async function (qty: number): Promise<boolean> {
-  if (this.availableStock < qty) {
-    return false;
-  }
-  this.availableStock -= qty;
-  this.reservedStock += qty;
-  await this.save();
-  return true;
+  // Single conditional update: the stock check and the decrement happen in one
+  // document-level operation, so concurrent buyers cannot both take the last pair.
+  const result = await Inventory.updateOne(
+    { _id: this._id, availableStock: { $gte: qty } },
+    { $inc: { availableStock: -qty, reservedStock: qty } }
+  );
+  return result.modifiedCount === 1;
 };
 
 // Method: Release reserved stock (e.g. payment failed or cancelled)
 InventorySchema.methods.releaseStock = async function (qty: number): Promise<boolean> {
-  const toRelease = Math.min(qty, this.reservedStock);
-  this.reservedStock -= toRelease;
-  this.availableStock += toRelease;
-  await this.save();
-  return true;
+  const result = await Inventory.updateOne(
+    { _id: this._id, reservedStock: { $gte: qty } },
+    { $inc: { reservedStock: -qty, availableStock: qty } }
+  );
+  return result.modifiedCount === 1;
 };
 
 // Method: Confirm fulfillment (payment verified -> reserved stock permanently deducted)
 InventorySchema.methods.confirmFulfillment = async function (qty: number): Promise<boolean> {
-  const toDeduct = Math.min(qty, this.reservedStock);
-  this.reservedStock -= toDeduct;
-  await this.save();
-  return true;
+  const result = await Inventory.updateOne(
+    { _id: this._id, reservedStock: { $gte: qty } },
+    { $inc: { reservedStock: -qty } }
+  );
+  return result.modifiedCount === 1;
 };
 
 export const Inventory: Model<IInventory> = mongoose.model<IInventory>('Inventory', InventorySchema);

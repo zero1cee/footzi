@@ -6,7 +6,6 @@ export interface RegisterDTO {
   email: string;
   password: string;
   phone?: string;
-  role?: 'customer' | 'admin';
 }
 
 export class AuthService {
@@ -24,7 +23,8 @@ export class AuthService {
       email: data.email.toLowerCase().trim(),
       passwordHash,
       phone: data.phone?.trim(),
-      role: data.role || 'customer',
+      // Public signup always creates a customer; admins are provisioned by the seed script
+      role: 'customer',
       addresses: [],
     });
 

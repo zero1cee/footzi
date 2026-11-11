@@ -42,7 +42,10 @@ export const verifyPayment = async (req: AuthRequest, res: Response): Promise<vo
     }
 
     const validated = verifyPaymentSchema.parse(req.body);
-    const result = await paymentService.verifyPaymentSignature(validated);
+    const result = await paymentService.verifyPaymentSignature({
+      ...validated,
+      userId: req.user.id,
+    });
 
     if (!result.verified) {
       res.status(400).json(result);
