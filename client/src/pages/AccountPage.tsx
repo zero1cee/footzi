@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   Package,
   Heart,
@@ -11,9 +11,11 @@ import {
   CheckCircle2,
   Truck,
   X,
+  Plus,
 } from 'lucide-react';
 import { useCartStore } from '@/store/useCartStore';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useProducts } from '@/hooks/useProducts';
 import { MOCK_PRODUCTS } from '@/data/mockProducts';
 import { ProductCard } from '@/components/ui/ProductCard';
 import { formatINR } from '@/lib/utils';
@@ -23,19 +25,54 @@ import { orderService } from '@/services/orderService';
 import { returnService } from '@/services/returnService';
 import { ShoeSize } from '@/types';
 
+type AccountTab = 'orders' | 'wishlist' | 'addresses' | 'returns';
+
+const resolveTabFromPath = (pathname: string): AccountTab => {
+  if (pathname.includes('/returns')) return 'returns';
+  if (pathname.includes('/wishlist')) return 'wishlist';
+  if (pathname.includes('/addresses')) return 'addresses';
+  return 'orders';
+};
+
 export const AccountPage: React.FC = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'orders' | 'wishlist' | 'addresses' | 'returns'>('orders');
+  const location = useLocation();
+  const [activeTab, setActiveTab] = useState<AccountTab>(() => resolveTabFromPath(location.pathname));
   const { wishlist } = useCartStore();
-  const { user, token, isAuthenticated, logout } = useAuthStore();
+  const { user, token, isAuthenticated, logout, addAddress } = useAuthStore();
+  const { data: catalogData } = useProducts({ limit: 100 });
 
-  const wishlistedProducts = MOCK_PRODUCTS.filter((p) => wishlist.includes(p.id));
+  useEffect(() => {
+    setActiveTab(resolveTabFromPath(location.pathname));
+  }, [location.pathname]);
+
+  const handleTabChange = (tab: AccountTab) => {
+    setActiveTab(tab);
+    navigate(`/account/${tab}`);
+  };
+
+  const catalog = catalogData?.products && catalogData.products.length > 0 ? catalogData.products : MOCK_PRODUCTS;
+  const wishlistedProducts = catalog.filter((p) => wishlist.includes(p.id));
 
   // Orders and Returns state
   const [orders, setOrders] = useState<any[]>([]);
   const [returnsList, setReturnsList] = useState<any[]>([]);
   const [, setIsLoading] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
+
+  // Add Address Form State
+  const [isAddAddressOpen, setIsAddAddressOpen] = useState(false);
+  const [addrForm, setAddrForm] = useState({
+    name: user?.name || '',
+    phone: user?.phone || '',
+    addressLine: '',
+    city: '',
+    state: '',
+    pincode: '',
+    isDefault: true,
+  });
+  const [addrError, setAddrError] = useState<string | null>(null);
+  const [isSavingAddr, setIsSavingAddr] = useState(false);
 
   // Exchange/Return Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -46,7 +83,7 @@ export const AccountPage: React.FC = () => {
   const [comments, setComments] = useState('');
   const [isSubmittingReturn, setIsSubmittingReturn] = useState(false);
 
-  // Fallback sample orders for patrons with brand new accounts
+  // Fallback sample orders only when backend is offline
   const fallbackOrders = [
     {
       _id: 'ord_fallback_1',
@@ -71,7 +108,7 @@ export const AccountPage: React.FC = () => {
   ];
 
   const fetchUserData = async () => {
-    if (!token) {
+    if (!token || token.startsWith('demo-jwt-token')) {
       setOrders(fallbackOrders);
       return;
     }
@@ -83,7 +120,7 @@ export const AccountPage: React.FC = () => {
         returnService.getMyReturns(token).catch(() => null),
       ]);
 
-      if (fetchedOrders && Array.isArray(fetchedOrders) && fetchedOrders.length > 0) {
+      if (fetchedOrders !== null && Array.isArray(fetchedOrders)) {
         setOrders(fetchedOrders);
       } else {
         setOrders(fallbackOrders);
@@ -102,6 +139,32 @@ export const AccountPage: React.FC = () => {
   useEffect(() => {
     fetchUserData();
   }, [token]);
+
+  const handleSaveAddress = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAddrError(null);
+    setIsSavingAddr(true);
+
+    const ok = await addAddress(addrForm);
+    setIsSavingAddr(false);
+
+    if (ok) {
+      setIsAddAddressOpen(false);
+      setAddrForm({
+        name: user?.name || '',
+        phone: user?.phone || '',
+        addressLine: '',
+        city: '',
+        state: '',
+        pincode: '',
+        isDefault: false,
+      });
+      setFeedback('Delivery address saved to your Footzi profile.');
+      setTimeout(() => setFeedback(null), 4000);
+    } else {
+      setAddrError(useAuthStore.getState().error || 'Please check address fields (10-digit phone & 6-digit PIN code).');
+    }
+  };
 
   const handleOpenExchangeModal = (order: any) => {
     setSelectedOrder(order);
@@ -238,7 +301,7 @@ export const AccountPage: React.FC = () => {
         {/* Tab Navigation */}
         <div className="flex border-b border-ivory-300 mb-8 overflow-x-auto">
           <button
-            onClick={() => setActiveTab('orders')}
+            onClick={() => handleTabChange('orders')}
             className={`pb-3 px-4 text-xs uppercase tracking-wider font-semibold transition-all border-b-2 flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'orders'
                 ? 'border-charcoal-900 text-charcoal-950'
@@ -249,7 +312,7 @@ export const AccountPage: React.FC = () => {
           </button>
 
           <button
-            onClick={() => setActiveTab('returns')}
+            onClick={() => handleTabChange('returns')}
             className={`pb-3 px-4 text-xs uppercase tracking-wider font-semibold transition-all border-b-2 flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'returns'
                 ? 'border-charcoal-900 text-charcoal-950'
@@ -260,7 +323,7 @@ export const AccountPage: React.FC = () => {
           </button>
 
           <button
-            onClick={() => setActiveTab('wishlist')}
+            onClick={() => handleTabChange('wishlist')}
             className={`pb-3 px-4 text-xs uppercase tracking-wider font-semibold transition-all border-b-2 flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'wishlist'
                 ? 'border-charcoal-900 text-charcoal-950'
@@ -271,91 +334,106 @@ export const AccountPage: React.FC = () => {
           </button>
 
           <button
-            onClick={() => setActiveTab('addresses')}
+            onClick={() => handleTabChange('addresses')}
             className={`pb-3 px-4 text-xs uppercase tracking-wider font-semibold transition-all border-b-2 flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'addresses'
                 ? 'border-charcoal-900 text-charcoal-950'
                 : 'border-transparent text-charcoal-500 hover:text-charcoal-800'
             }`}
           >
-            <MapPin className="w-4 h-4" /> Saved Addresses
+            <MapPin className="w-4 h-4" /> Saved Addresses ({user?.addresses?.length || 0})
           </button>
         </div>
 
         {/* Tab 1: Orders */}
         {activeTab === 'orders' && (
           <div className="space-y-4">
-            {orders.map((order) => {
-              const firstItem = order.items && order.items[0];
-              return (
-                <div
-                  key={order._id || order.orderNumber}
-                  className="bg-white p-6 rounded-xs border border-ivory-200 shadow-sm"
-                >
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-ivory-200 gap-2 mb-4">
-                    <div>
-                      <span className="font-mono text-xs font-bold text-charcoal-900">
-                        #{order.orderNumber}
-                      </span>
-                      <p className="text-[11px] text-charcoal-500">
-                        Placed on {new Date(order.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
-                      </p>
+            {orders.length === 0 ? (
+              <div className="bg-white p-12 text-center rounded-xs border border-ivory-200 shadow-sm">
+                <Package className="w-10 h-10 text-charcoal-300 mx-auto mb-3" />
+                <h3 className="font-serif text-lg font-medium text-charcoal-900">
+                  No orders recorded yet
+                </h3>
+                <p className="text-xs text-charcoal-500 mt-1 mb-4">
+                  Explore our Agra handcrafted collection and place your first order to track dispatch here.
+                </p>
+                <Link to="/shop" className="text-xs uppercase tracking-wider font-semibold text-sand-600 underline">
+                  Browse Footwear
+                </Link>
+              </div>
+            ) : (
+              orders.map((order) => {
+                const firstItem = order.items && order.items[0];
+                return (
+                  <div
+                    key={order._id || order.orderNumber}
+                    className="bg-white p-6 rounded-xs border border-ivory-200 shadow-sm"
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-ivory-200 gap-2 mb-4">
+                      <div>
+                        <span className="font-mono text-xs font-bold text-charcoal-900">
+                          #{order.orderNumber}
+                        </span>
+                        <p className="text-[11px] text-charcoal-500">
+                          Placed on {new Date(order.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <Badge variant={order.orderStatus === 'delivered' ? 'default' : 'sand'}>
+                          {order.orderStatus || 'confirmed'}
+                        </Badge>
+                        <span className="font-serif text-sm font-semibold text-charcoal-900">
+                          {formatINR(order.total)}
+                        </span>
+                      </div>
                     </div>
 
-                    <div className="flex items-center gap-3">
-                      <Badge variant={order.orderStatus === 'delivered' ? 'default' : 'sand'}>
-                        {order.orderStatus || 'confirmed'}
-                      </Badge>
-                      <span className="font-serif text-sm font-semibold text-charcoal-900">
-                        {formatINR(order.total)}
-                      </span>
-                    </div>
-                  </div>
+                    {firstItem && (
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                        <div className="flex items-center gap-4">
+                          <img
+                            src={firstItem.image}
+                            alt={firstItem.name}
+                            className="w-16 h-16 object-cover rounded-xs border border-ivory-300"
+                          />
+                          <div>
+                            <h4 className="font-serif text-sm font-semibold text-charcoal-900">
+                              {firstItem.name}
+                            </h4>
+                            <p className="text-xs text-charcoal-500">
+                              Size: {firstItem.size} • Color: {firstItem.color}
+                            </p>
+                            <div className="mt-1 text-[11px] text-charcoal-600 flex items-center gap-1">
+                              <Clock className="w-3 h-3 text-sand-600" />
+                              <span>Supplier Dispatch: Agra Master Artisan Guild</span>
+                            </div>
+                          </div>
+                        </div>
 
-                  {firstItem && (
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                      <div className="flex items-center gap-4">
-                        <img
-                          src={firstItem.image}
-                          alt={firstItem.name}
-                          className="w-16 h-16 object-cover rounded-xs border border-ivory-300"
-                        />
-                        <div>
-                          <h4 className="font-serif text-sm font-semibold text-charcoal-900">
-                            {firstItem.name}
-                          </h4>
-                          <p className="text-xs text-charcoal-500">
-                            Size: {firstItem.size} • Color: {firstItem.color}
+                        <div className="flex flex-col sm:items-end gap-2 text-xs">
+                          <p className="text-charcoal-600">
+                            Tracking:{' '}
+                            <strong className="font-mono text-charcoal-900">
+                              {order.trackingNumber || 'Pending Allocation'}
+                            </strong>{' '}
+                            ({order.carrier || 'BlueDart Air Express'})
                           </p>
-                          <div className="mt-1 text-[11px] text-charcoal-600 flex items-center gap-1">
-                            <Clock className="w-3 h-3 text-sand-600" />
-                            <span>Supplier Dispatch: Agra Master Artisan Guild</span>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleOpenExchangeModal(order)}
+                              className="px-3 py-1.5 bg-ivory-100 hover:bg-ivory-200 border border-ivory-300 text-charcoal-800 text-[11px] font-semibold rounded-xs flex items-center gap-1 transition-colors"
+                            >
+                              <RotateCcw className="w-3 h-3 text-sand-600" /> Request Size Exchange
+                            </button>
                           </div>
                         </div>
                       </div>
-
-                      <div className="flex flex-col sm:items-end gap-2 text-xs">
-                        <p className="text-charcoal-600">
-                          Tracking:{' '}
-                          <strong className="font-mono text-charcoal-900">
-                            {order.trackingNumber || 'BD-AGR-98231456IN'}
-                          </strong>{' '}
-                          ({order.carrier || 'BlueDart Air Express'})
-                        </p>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleOpenExchangeModal(order)}
-                            className="px-3 py-1.5 bg-ivory-100 hover:bg-ivory-200 border border-ivory-300 text-charcoal-800 text-[11px] font-semibold rounded-xs flex items-center gap-1 transition-colors"
-                          >
-                            <RotateCcw className="w-3 h-3 text-sand-600" /> Request Size Exchange
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                    )}
+                  </div>
+                );
+              })
+            )}
           </div>
         )}
 
@@ -482,21 +560,171 @@ export const AccountPage: React.FC = () => {
 
         {/* Tab 4: Addresses */}
         {activeTab === 'addresses' && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            <div className="bg-white p-6 rounded-xs border border-ivory-200 shadow-sm relative">
-              <span className="absolute top-4 right-4 bg-sand-100 text-sand-800 text-[10px] uppercase font-bold px-2 py-0.5 rounded-xs">
-                Default
-              </span>
-              <h3 className="font-serif text-base font-semibold text-charcoal-900">
-                {user ? user.name : 'Arjun Kapoor'}
-              </h3>
-              <p className="text-xs text-charcoal-600 mt-2 leading-relaxed">
-                42 Heritage Enclave, Civil Lines<br />
-                Agra, Uttar Pradesh 282001<br />
-                India
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-charcoal-600">
+                Saved destinations auto-fill seamlessly during Express Checkout.
               </p>
-              <p className="text-xs text-charcoal-500 mt-2">Mobile: {user?.phone || '+91 98765 43210'}</p>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => {
+                  setAddrForm((prev) => ({
+                    ...prev,
+                    name: prev.name || user?.name || '',
+                    phone: prev.phone || user?.phone || '',
+                  }));
+                  setIsAddAddressOpen(!isAddAddressOpen);
+                }}
+                className="gap-1.5 text-xs"
+              >
+                <Plus className="w-3.5 h-3.5" /> Add New Address
+              </Button>
             </div>
+
+            {isAddAddressOpen && (
+              <form
+                onSubmit={handleSaveAddress}
+                className="bg-white p-6 rounded-xs border border-ivory-300 shadow-sm space-y-4 text-xs animate-fade-in"
+              >
+                <h3 className="font-serif text-lg font-medium text-charcoal-950 border-b border-ivory-200 pb-2">
+                  New Delivery Destination
+                </h3>
+
+                {addrError && (
+                  <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xs">
+                    {addrError}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block font-semibold text-charcoal-700 mb-1">Recipient Name</label>
+                    <input
+                      type="text"
+                      required
+                      value={addrForm.name}
+                      onChange={(e) => setAddrForm({ ...addrForm, name: e.target.value })}
+                      className="w-full bg-ivory-50 border border-ivory-300 px-3 py-2 rounded-xs focus:outline-none focus:border-charcoal-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-charcoal-700 mb-1">Mobile Number</label>
+                    <input
+                      type="tel"
+                      required
+                      placeholder="+91 98765 43210"
+                      value={addrForm.phone}
+                      onChange={(e) => setAddrForm({ ...addrForm, phone: e.target.value })}
+                      className="w-full bg-ivory-50 border border-ivory-300 px-3 py-2 rounded-xs focus:outline-none focus:border-charcoal-900"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-charcoal-700 mb-1">Street Address & Apartment</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="42 Heritage Enclave, Civil Lines"
+                    value={addrForm.addressLine}
+                    onChange={(e) => setAddrForm({ ...addrForm, addressLine: e.target.value })}
+                    className="w-full bg-ivory-50 border border-ivory-300 px-3 py-2 rounded-xs focus:outline-none focus:border-charcoal-900"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block font-semibold text-charcoal-700 mb-1">City</label>
+                    <input
+                      type="text"
+                      required
+                      value={addrForm.city}
+                      onChange={(e) => setAddrForm({ ...addrForm, city: e.target.value })}
+                      className="w-full bg-ivory-50 border border-ivory-300 px-3 py-2 rounded-xs focus:outline-none focus:border-charcoal-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-charcoal-700 mb-1">State</label>
+                    <input
+                      type="text"
+                      required
+                      value={addrForm.state}
+                      onChange={(e) => setAddrForm({ ...addrForm, state: e.target.value })}
+                      className="w-full bg-ivory-50 border border-ivory-300 px-3 py-2 rounded-xs focus:outline-none focus:border-charcoal-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-charcoal-700 mb-1">6-Digit PIN Code</label>
+                    <input
+                      type="text"
+                      required
+                      pattern="\d{6}"
+                      placeholder="282001"
+                      value={addrForm.pincode}
+                      onChange={(e) => setAddrForm({ ...addrForm, pincode: e.target.value })}
+                      className="w-full bg-ivory-50 border border-ivory-300 px-3 py-2 rounded-xs focus:outline-none focus:border-charcoal-900"
+                    />
+                  </div>
+                </div>
+
+                <label className="flex items-center gap-2 cursor-pointer text-charcoal-700">
+                  <input
+                    type="checkbox"
+                    checked={addrForm.isDefault}
+                    onChange={(e) => setAddrForm({ ...addrForm, isDefault: e.target.checked })}
+                  />
+                  <span>Set as primary delivery address</span>
+                </label>
+
+                <div className="flex justify-end gap-2 pt-2">
+                  <Button type="button" variant="outline" size="sm" onClick={() => setIsAddAddressOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" variant="primary" size="sm" isLoading={isSavingAddr}>
+                    Save Address
+                  </Button>
+                </div>
+              </form>
+            )}
+
+            {!user?.addresses || user.addresses.length === 0 ? (
+              <div className="bg-white p-10 text-center rounded-xs border border-ivory-200 shadow-sm">
+                <MapPin className="w-9 h-9 text-charcoal-300 mx-auto mb-3" />
+                <h3 className="font-serif text-lg font-medium text-charcoal-900">
+                  No saved addresses yet
+                </h3>
+                <p className="text-xs text-charcoal-500 mt-1">
+                  Add a home or office delivery destination above for 1-click checkout.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                {user.addresses.map((addr, idx) => (
+                  <div
+                    key={addr._id || `${addr.pincode}-${idx}`}
+                    className="bg-white p-6 rounded-xs border border-ivory-200 shadow-sm relative"
+                  >
+                    {addr.isDefault && (
+                      <span className="absolute top-4 right-4 bg-sand-100 text-sand-800 text-[10px] uppercase font-bold px-2 py-0.5 rounded-xs">
+                        Default
+                      </span>
+                    )}
+                    <h3 className="font-serif text-base font-semibold text-charcoal-900">
+                      {addr.name}
+                    </h3>
+                    <p className="text-xs text-charcoal-600 mt-2 leading-relaxed">
+                      {addr.addressLine}
+                      <br />
+                      {addr.city}, {addr.state} {addr.pincode}
+                      <br />
+                      India
+                    </p>
+                    <p className="text-xs text-charcoal-500 mt-2">Mobile: {addr.phone}</p>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

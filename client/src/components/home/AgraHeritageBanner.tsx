@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/Button';
 
 export const AgraHeritageBanner: React.FC = () => {
   return (
-    <section className="py-20 md:py-28 bg-[#F4EFE6] relative overflow-hidden border-b border-ivory-300">
+    <section id="heritage" className="py-20 md:py-28 bg-[#F4EFE6] relative overflow-hidden border-b border-ivory-300">
       {/* Background Jaali pattern */}
       <div className="absolute inset-0 bg-agra-jaali opacity-30 pointer-events-none" />
 

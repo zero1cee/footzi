@@ -1,18 +1,18 @@
+import { parseApiJson } from '@/lib/utils';
+
 export const adminService = {
   async getAnalytics(token: string) {
     const res = await fetch('/api/admin/analytics', {
       headers: { Authorization: `Bearer ${token}` },
     });
-    if (!res.ok) throw new Error('Failed to retrieve admin analytics');
-    return res.json();
+    return parseApiJson(res, 'Failed to retrieve admin analytics');
   },
 
   async getSupplierOrders(token: string) {
     const res = await fetch('/api/admin/supplier-orders', {
       headers: { Authorization: `Bearer ${token}` },
     });
-    if (!res.ok) throw new Error('Failed to retrieve supplier orders');
-    return res.json();
+    return parseApiJson(res, 'Failed to retrieve supplier orders');
   },
 
   async fulfillSupplierOrder(id: string, status: string, note: string | undefined, token: string) {
@@ -25,17 +25,14 @@ export const adminService = {
       body: JSON.stringify({ status, note }),
     });
 
-    const body = await res.json();
-    if (!res.ok) throw new Error(body.error || 'Failed to update supplier status');
-    return body;
+    return parseApiJson(res, 'Failed to update supplier status');
   },
 
   async getInventory(token: string) {
     const res = await fetch('/api/admin/inventory', {
       headers: { Authorization: `Bearer ${token}` },
     });
-    if (!res.ok) throw new Error('Failed to retrieve inventory');
-    return res.json();
+    return parseApiJson(res, 'Failed to retrieve inventory');
   },
 
   async updateInventoryStock(sku: string, availableStock: number, token: string) {
@@ -47,17 +44,14 @@ export const adminService = {
       },
       body: JSON.stringify({ availableStock }),
     });
-    const body = await res.json();
-    if (!res.ok) throw new Error(body.error || 'Failed to update inventory stock');
-    return body;
+    return parseApiJson(res, 'Failed to update inventory stock');
   },
 
   async getReturns(token: string) {
     const res = await fetch('/api/admin/returns', {
       headers: { Authorization: `Bearer ${token}` },
     });
-    if (!res.ok) throw new Error('Failed to retrieve returns');
-    return res.json();
+    return parseApiJson(res, 'Failed to retrieve returns');
   },
 
   async updateReturnStatus(
@@ -75,9 +69,7 @@ export const adminService = {
       },
       body: JSON.stringify({ status, adminNotes, replacementTrackingNumber }),
     });
-    const body = await res.json();
-    if (!res.ok) throw new Error(body.error || 'Failed to update return request');
-    return body;
+    return parseApiJson(res, 'Failed to update return request');
   },
 
   async createProduct(productData: any, token: string) {
@@ -89,9 +81,7 @@ export const adminService = {
       },
       body: JSON.stringify(productData),
     });
-    const body = await res.json();
-    if (!res.ok) throw new Error(body.error || 'Failed to create product');
-    return body;
+    return parseApiJson(res, 'Failed to create product');
   },
 
   async toggleProductActive(id: string, token: string) {
@@ -99,9 +89,7 @@ export const adminService = {
       method: 'PATCH',
       headers: { Authorization: `Bearer ${token}` },
     });
-    const body = await res.json();
-    if (!res.ok) throw new Error(body.error || 'Failed to toggle product status');
-    return body;
+    return parseApiJson(res, 'Failed to toggle product status');
   },
 
   async uploadProductImage(image: string, token: string) {
@@ -113,8 +101,6 @@ export const adminService = {
       },
       body: JSON.stringify({ image, folder: 'footzi/products' }),
     });
-    const body = await res.json();
-    if (!res.ok) throw new Error(body.error || 'Failed to upload product image to Cloudinary');
-    return body;
+    return parseApiJson(res, 'Failed to upload product image to Cloudinary');
   },
 };

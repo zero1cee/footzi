@@ -32,64 +32,24 @@ export const AdminDashboardPage: React.FC = () => {
 
   const [analytics, setAnalytics] = useState<any>({
     metrics: {
-      totalRevenue: 428500,
-      totalPaidOrders: 142,
-      totalOrdersCount: 156,
-      totalProducts: 16,
-      lowStockCount: 3,
-      activeSupplierOrders: 4,
-      totalReturnsCount: 8,
-      pendingReturnsCount: 2,
-      returnRatePercent: 5.6,
+      totalRevenue: 0,
+      totalPaidOrders: 0,
+      totalOrdersCount: 0,
+      totalProducts: 0,
+      lowStockCount: 0,
+      activeSupplierOrders: 0,
+      totalReturnsCount: 0,
+      pendingReturnsCount: 0,
+      returnRatePercent: 0,
     },
     lowStockVariants: [],
     recentOrders: [],
   });
 
-  const [supplierOrders, setSupplierOrders] = useState<any[]>([
-    {
-      _id: 'sup_demo_1',
-      customerOrderNumber: 'FTZ-AGR-882194',
-      supplierOrderNumber: 'SUP-AGR-491022',
-      items: [{ name: 'Belgravia Penny Loafer', size: 'UK 8', color: 'Vintage Tan', costPerUnit: 2100 }],
-      totalWholesaleCost: 2100,
-      status: 'accepted',
-      trackingNumber: 'BD-AGR-98231456IN',
-      carrier: 'BlueDart Air Express',
-    },
-    {
-      _id: 'sup_demo_2',
-      customerOrderNumber: 'FTZ-AGR-882195',
-      supplierOrderNumber: 'SUP-AGR-491023',
-      items: [{ name: 'Taj Double Monk Strap', size: 'UK 9', color: 'Cognac Amber', costPerUnit: 2450 }],
-      totalWholesaleCost: 2450,
-      status: 'processing',
-      trackingNumber: 'BD-AGR-98231457IN',
-      carrier: 'BlueDart Air Express',
-    },
-  ]);
-
+  const [supplierOrders, setSupplierOrders] = useState<any[]>([]);
   const [inventoryList, setInventoryList] = useState<any[]>([]);
-  const [returnsList, setReturnsList] = useState<any[]>([
-    {
-      _id: 'ret_demo_1',
-      returnNumber: 'RET-AGR-882194-01',
-      type: 'exchange',
-      status: 'requested',
-      pickupTrackingNumber: 'BD-REV-98712345IN',
-      user: { name: 'Kabir Singhania', email: 'patron@footzi.in' },
-      order: { orderNumber: 'FTZ-AGR-882194', total: 3899 },
-      items: [
-        {
-          productName: 'The Agra Belgravia Penny Loafer',
-          size: 'UK 8',
-          replacementSize: 'UK 9',
-          color: 'Vintage Tan',
-          reason: 'Fit issue - too tight',
-        },
-      ],
-    },
-  ]);
+  const [returnsList, setReturnsList] = useState<any[]>([]);
+  const [isOfflineFallback, setIsOfflineFallback] = useState(false);
 
   // Product Management State
   const [productsList, setProductsList] = useState<any[]>(MOCK_PRODUCTS);
@@ -122,21 +82,26 @@ export const AdminDashboardPage: React.FC = () => {
         productService.getProducts({ limit: 100 }).catch(() => null),
       ]);
 
-      if (analyticsData) setAnalytics(analyticsData);
-      if (supplierData && Array.isArray(supplierData) && supplierData.length > 0) {
+      if (analyticsData) {
+        setAnalytics(analyticsData);
+        setIsOfflineFallback(false);
+      } else {
+        setIsOfflineFallback(true);
+      }
+      if (supplierData && Array.isArray(supplierData)) {
         setSupplierOrders(supplierData);
       }
-      if (invData && Array.isArray(invData) && invData.length > 0) {
+      if (invData && Array.isArray(invData)) {
         setInventoryList(invData);
       }
-      if (returnsData && Array.isArray(returnsData) && returnsData.length > 0) {
+      if (returnsData && Array.isArray(returnsData)) {
         setReturnsList(returnsData);
       }
       if (catalogData && Array.isArray(catalogData.products) && catalogData.products.length > 0) {
         setProductsList(catalogData.products);
       }
     } catch {
-      // Retain mock fallback
+      setIsOfflineFallback(true);
     } finally {
       setIsLoading(false);
     }
@@ -326,6 +291,17 @@ export const AdminDashboardPage: React.FC = () => {
           </div>
         )}
 
+        {isOfflineFallback && (
+          <div className="mb-6 p-3.5 bg-amber-50 border border-amber-300 text-amber-900 text-xs rounded-xs flex items-center justify-between gap-2">
+            <span>
+              Backend analytics unreachable — ensure the Footzi API server on port 5001 is running and refresh.
+            </span>
+            <Button variant="outline" size="sm" onClick={fetchAdminData}>
+              Retry
+            </Button>
+          </div>
+        )}
+
         {/* Navigation Tabs */}
         <div className="flex border-b border-ivory-300 mb-8 overflow-x-auto">
           <button
@@ -437,34 +413,114 @@ export const AdminDashboardPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Low stock alerts */}
+            {/* Low stock alerts (live from MongoDB Inventory) */}
+            <div className="bg-white p-6 rounded-xs border border-ivory-200 shadow-sm space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-ivory-200 pb-3">
+                <h3 className="font-serif text-lg font-medium text-charcoal-950">
+                  Variant Low Stock Watchlist ({analytics.metrics.lowStockCount || analytics.lowStockVariants?.length || 0})
+                </h3>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-amber-700 font-semibold flex items-center gap-1">
+                    <Clock className="w-3.5 h-3.5" /> Threshold: ≤ 5 pairs in Agra
+                  </span>
+                  <button
+                    onClick={() => setActiveTab('inventory')}
+                    className="text-[11px] uppercase tracking-wider font-semibold text-sand-700 hover:text-charcoal-950 underline"
+                  >
+                    Manage Stock
+                  </button>
+                </div>
+              </div>
+
+              {!analytics.lowStockVariants || analytics.lowStockVariants.length === 0 ? (
+                <div className="p-6 text-center bg-ivory-50 rounded-xs border border-ivory-200 text-xs text-charcoal-500">
+                  All footwear size variants currently exceed the low-stock reorder threshold.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
+                  {analytics.lowStockVariants.slice(0, 6).map((variant: any) => (
+                    <div
+                      key={variant._id || variant.variantSku}
+                      className="p-4 bg-amber-50/70 border border-amber-200 rounded-xs flex flex-col justify-between"
+                    >
+                      <div>
+                        <p className="font-semibold text-charcoal-900">
+                          {variant.product?.name || 'Footwear Silhouette'} — {variant.size} / {variant.color}
+                        </p>
+                        <p className="text-charcoal-500 text-[11px] mt-0.5 font-mono">
+                          SKU: {variant.variantSku}
+                        </p>
+                      </div>
+                      <p className="text-amber-800 font-bold mt-2">
+                        Only {variant.availableStock} {variant.availableStock === 1 ? 'pair' : 'pairs'} remaining in Agra
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Recent Customer Orders (live from MongoDB Orders) */}
             <div className="bg-white p-6 rounded-xs border border-ivory-200 shadow-sm space-y-4">
               <div className="flex items-center justify-between border-b border-ivory-200 pb-3">
                 <h3 className="font-serif text-lg font-medium text-charcoal-950">
-                  Variant Low Stock Watchlist
+                  Recent Customer Orders ({analytics.recentOrders?.length || 0})
                 </h3>
-                <span className="text-xs text-amber-700 font-semibold flex items-center gap-1">
-                  <Clock className="w-3.5 h-3.5" /> Reorder Trigger Active (Agra Master Suppliers)
-                </span>
+                <button
+                  onClick={() => setActiveTab('suppliers')}
+                  className="text-[11px] uppercase tracking-wider font-semibold text-sand-700 hover:text-charcoal-950 underline"
+                >
+                  Open Fulfillment Queue
+                </button>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
-                <div className="p-4 bg-amber-50/70 border border-amber-200 rounded-xs">
-                  <p className="font-semibold text-charcoal-900">Belgravia Loafer - UK 10 / Vintage Tan</p>
-                  <p className="text-charcoal-500 text-[11px] mt-0.5">SKU: FTZ-BLG-TAN-UK10</p>
-                  <p className="text-amber-800 font-bold mt-2">Only 5 pairs remaining in Agra</p>
+              {!analytics.recentOrders || analytics.recentOrders.length === 0 ? (
+                <div className="p-6 text-center bg-ivory-50 rounded-xs border border-ivory-200 text-xs text-charcoal-500">
+                  No customer orders placed yet. Complete a test checkout to observe real-time order metrics here.
                 </div>
-                <div className="p-4 bg-amber-50/70 border border-amber-200 rounded-xs">
-                  <p className="font-semibold text-charcoal-900">Taj Double Monk - UK 10 / Cognac</p>
-                  <p className="text-charcoal-500 text-[11px] mt-0.5">SKU: FTZ-TDM-COG-UK10</p>
-                  <p className="text-amber-800 font-bold mt-2">Only 4 pairs remaining in Agra</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-ivory-200 text-charcoal-500 uppercase tracking-wider text-[10px]">
+                        <th className="py-2.5 pr-3">Order #</th>
+                        <th className="py-2.5 px-3">Customer</th>
+                        <th className="py-2.5 px-3">Total</th>
+                        <th className="py-2.5 px-3">Payment</th>
+                        <th className="py-2.5 px-3">Fulfillment</th>
+                        <th className="py-2.5 pl-3 text-right">Tracking</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-ivory-100 text-charcoal-800">
+                      {analytics.recentOrders.map((ord: any) => (
+                        <tr key={ord._id || ord.orderNumber} className="hover:bg-ivory-50">
+                          <td className="py-3 pr-3 font-mono font-semibold text-charcoal-950">
+                            {ord.orderNumber}
+                          </td>
+                          <td className="py-3 px-3">
+                            <p className="font-medium text-charcoal-900">{ord.customerName}</p>
+                            <p className="text-[10px] text-charcoal-500">{ord.customerEmail}</p>
+                          </td>
+                          <td className="py-3 px-3 font-semibold text-charcoal-900">
+                            {formatINR(ord.total)}
+                          </td>
+                          <td className="py-3 px-3">
+                            <Badge variant={ord.paymentStatus === 'paid' ? 'default' : 'outline'}>
+                              {ord.paymentStatus}
+                            </Badge>
+                          </td>
+                          <td className="py-3 px-3">
+                            <Badge variant="sand">{ord.orderStatus}</Badge>
+                          </td>
+                          <td className="py-3 pl-3 text-right font-mono text-[11px] text-charcoal-600">
+                            {ord.trackingNumber || 'Pending'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-                <div className="p-4 bg-amber-50/70 border border-amber-200 rounded-xs">
-                  <p className="font-semibold text-charcoal-900">Fatehpur Chelsea - UK 7 / Desert Camel</p>
-                  <p className="text-charcoal-500 text-[11px] mt-0.5">SKU: FTZ-FTB-CAM-UK7</p>
-                  <p className="text-amber-800 font-bold mt-2">Only 5 pairs remaining in Agra</p>
-                </div>
-              </div>
+              )}
             </div>
           </div>
         )}
@@ -495,74 +551,82 @@ export const AdminDashboardPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-ivory-200 text-charcoal-800">
-                  {supplierOrders.map((sOrder) => (
-                    <tr key={sOrder._id} className="hover:bg-ivory-50/50">
-                      <td className="p-3 font-mono font-medium">{sOrder.customerOrderNumber}</td>
-                      <td className="p-3 font-mono text-sand-700">{sOrder.supplierOrderNumber}</td>
-                      <td className="p-3">
-                        {sOrder.items?.map((it: any, i: number) => (
-                          <div key={i} className="mb-0.5">
-                            <p className="font-medium">{it.name}</p>
-                            <p className="text-[10px] text-charcoal-500">{it.size} • {it.color}</p>
-                          </div>
-                        ))}
-                      </td>
-                      <td className="p-3 font-semibold text-charcoal-900">
-                        {formatINR(sOrder.totalWholesaleCost)}
-                      </td>
-                      <td className="p-3">
-                        <Badge
-                          variant={
-                            sOrder.status === 'delivered'
-                              ? 'default'
-                              : sOrder.status === 'shipped'
-                              ? 'sand'
-                              : 'outline'
-                          }
-                        >
-                          {sOrder.status}
-                        </Badge>
-                      </td>
-                      <td className="p-3">
-                        <p className="font-mono text-xs text-charcoal-900">{sOrder.trackingNumber || 'Pending'}</p>
-                        <p className="text-[10px] text-charcoal-500">{sOrder.carrier}</p>
-                      </td>
-                      <td className="p-3 text-right space-x-1.5 whitespace-nowrap">
-                        {sOrder.status === 'accepted' && (
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => handleSupplierTransition(sOrder._id, 'processing')}
-                          >
-                            Start Lasting
-                          </Button>
-                        )}
-                        {sOrder.status === 'processing' && (
-                          <Button
-                            variant="primary"
-                            size="sm"
-                            onClick={() => handleSupplierTransition(sOrder._id, 'shipped')}
-                          >
-                            Mark Shipped
-                          </Button>
-                        )}
-                        {sOrder.status === 'shipped' && (
-                          <Button
-                            variant="sand"
-                            size="sm"
-                            onClick={() => handleSupplierTransition(sOrder._id, 'delivered')}
-                          >
-                            Confirm Delivered
-                          </Button>
-                        )}
-                        {sOrder.status === 'delivered' && (
-                          <span className="text-[11px] text-emerald-700 font-semibold flex items-center justify-end gap-1">
-                            <CheckCircle2 className="w-3.5 h-3.5" /> Fulfillment Complete
-                          </span>
-                        )}
+                  {supplierOrders.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="p-8 text-center text-charcoal-500">
+                        No dropship supplier orders queued yet. Complete an order through Checkout to dispatch a job to Agra Guild `SUP-AGR-01`.
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    supplierOrders.map((sOrder) => (
+                      <tr key={sOrder._id} className="hover:bg-ivory-50/50">
+                        <td className="p-3 font-mono font-medium">{sOrder.customerOrderNumber}</td>
+                        <td className="p-3 font-mono text-sand-700">{sOrder.supplierOrderNumber}</td>
+                        <td className="p-3">
+                          {sOrder.items?.map((it: any, i: number) => (
+                            <div key={i} className="mb-0.5">
+                              <p className="font-medium">{it.name}</p>
+                              <p className="text-[10px] text-charcoal-500">{it.size} • {it.color}</p>
+                            </div>
+                          ))}
+                        </td>
+                        <td className="p-3 font-semibold text-charcoal-900">
+                          {formatINR(sOrder.totalWholesaleCost)}
+                        </td>
+                        <td className="p-3">
+                          <Badge
+                            variant={
+                              sOrder.status === 'delivered'
+                                ? 'default'
+                                : sOrder.status === 'shipped'
+                                ? 'sand'
+                                : 'outline'
+                            }
+                          >
+                            {sOrder.status}
+                          </Badge>
+                        </td>
+                        <td className="p-3">
+                          <p className="font-mono text-xs text-charcoal-900">{sOrder.trackingNumber || 'Pending'}</p>
+                          <p className="text-[10px] text-charcoal-500">{sOrder.carrier}</p>
+                        </td>
+                        <td className="p-3 text-right space-x-1.5 whitespace-nowrap">
+                          {sOrder.status === 'accepted' && (
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => handleSupplierTransition(sOrder._id, 'processing')}
+                            >
+                              Start Lasting
+                            </Button>
+                          )}
+                          {sOrder.status === 'processing' && (
+                            <Button
+                              variant="primary"
+                              size="sm"
+                              onClick={() => handleSupplierTransition(sOrder._id, 'shipped')}
+                            >
+                              Mark Shipped
+                            </Button>
+                          )}
+                          {sOrder.status === 'shipped' && (
+                            <Button
+                              variant="sand"
+                              size="sm"
+                              onClick={() => handleSupplierTransition(sOrder._id, 'delivered')}
+                            >
+                              Confirm Delivered
+                            </Button>
+                          )}
+                          {sOrder.status === 'delivered' && (
+                            <span className="text-[11px] text-emerald-700 font-semibold flex items-center justify-end gap-1">
+                              <CheckCircle2 className="w-3.5 h-3.5" /> Fulfillment Complete
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -808,67 +872,75 @@ export const AdminDashboardPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-ivory-200 text-charcoal-800">
-                  {returnsList.map((ret) => (
-                    <tr key={ret._id} className="hover:bg-ivory-50/50">
-                      <td className="p-3 font-mono font-medium">{ret.returnNumber}</td>
-                      <td className="p-3">
-                        <p className="font-semibold text-charcoal-900">{ret.user?.name || 'Footzi Patron'}</p>
-                        <p className="text-[10px] text-charcoal-500">{ret.user?.email || 'patron@footzi.in'}</p>
-                      </td>
-                      <td className="p-3">
-                        {ret.items?.map((it: any, i: number) => (
-                          <div key={i}>
-                            <p className="font-medium text-charcoal-900">{it.productName}</p>
-                            <p className="text-[10px] text-charcoal-600">
-                              Current: {it.size} → <strong className="text-sand-700">Swap to: {it.replacementSize || 'N/A'}</strong>
-                            </p>
-                          </div>
-                        ))}
-                      </td>
-                      <td className="p-3 text-[11px] text-charcoal-600">{ret.items?.[0]?.reason || 'Fit issue'}</td>
-                      <td className="p-3">
-                        <Badge
-                          variant={
-                            ret.status === 'replacement_dispatched' || ret.status === 'refund_processed'
-                              ? 'default'
-                              : ret.status === 'approved'
-                              ? 'sand'
-                              : 'outline'
-                          }
-                        >
-                          {ret.status}
-                        </Badge>
-                      </td>
-                      <td className="p-3 font-mono text-[11px]">
-                        {ret.pickupTrackingNumber || 'Pending'}
-                      </td>
-                      <td className="p-3 text-right space-x-1.5 whitespace-nowrap">
-                        {ret.status === 'requested' && (
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => handleReturnTransition(ret._id, 'approved')}
-                          >
-                            Approve Pickup
-                          </Button>
-                        )}
-                        {ret.status === 'approved' && (
-                          <Button
-                            variant="primary"
-                            size="sm"
-                            onClick={() => handleReturnTransition(ret._id, 'replacement_dispatched')}
-                          >
-                            Dispatch Replacement
-                          </Button>
-                        )}
-                        {ret.status === 'replacement_dispatched' && (
-                          <span className="text-[11px] text-emerald-700 font-semibold flex items-center justify-end gap-1">
-                            <CheckCircle2 className="w-3.5 h-3.5" /> Dispatched
-                          </span>
-                        )}
+                  {returnsList.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="p-8 text-center text-charcoal-500">
+                        No active size exchange or return requests.
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    returnsList.map((ret) => (
+                      <tr key={ret._id} className="hover:bg-ivory-50/50">
+                        <td className="p-3 font-mono font-medium">{ret.returnNumber}</td>
+                        <td className="p-3">
+                          <p className="font-semibold text-charcoal-900">{ret.user?.name || 'Footzi Patron'}</p>
+                          <p className="text-[10px] text-charcoal-500">{ret.user?.email || 'patron@footzi.in'}</p>
+                        </td>
+                        <td className="p-3">
+                          {ret.items?.map((it: any, i: number) => (
+                            <div key={i}>
+                              <p className="font-medium text-charcoal-900">{it.productName}</p>
+                              <p className="text-[10px] text-charcoal-600">
+                                Current: {it.size} → <strong className="text-sand-700">Swap to: {it.replacementSize || 'N/A'}</strong>
+                              </p>
+                            </div>
+                          ))}
+                        </td>
+                        <td className="p-3 text-[11px] text-charcoal-600">{ret.items?.[0]?.reason || 'Fit issue'}</td>
+                        <td className="p-3">
+                          <Badge
+                            variant={
+                              ret.status === 'replacement_dispatched' || ret.status === 'refund_processed'
+                                ? 'default'
+                                : ret.status === 'approved'
+                                ? 'sand'
+                                : 'outline'
+                            }
+                          >
+                            {ret.status}
+                          </Badge>
+                        </td>
+                        <td className="p-3 font-mono text-[11px]">
+                          {ret.pickupTrackingNumber || 'Pending'}
+                        </td>
+                        <td className="p-3 text-right space-x-1.5 whitespace-nowrap">
+                          {ret.status === 'requested' && (
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => handleReturnTransition(ret._id, 'approved')}
+                            >
+                              Approve Pickup
+                            </Button>
+                          )}
+                          {ret.status === 'approved' && (
+                            <Button
+                              variant="primary"
+                              size="sm"
+                              onClick={() => handleReturnTransition(ret._id, 'replacement_dispatched')}
+                            >
+                              Dispatch Replacement
+                            </Button>
+                          )}
+                          {ret.status === 'replacement_dispatched' && (
+                            <span className="text-[11px] text-emerald-700 font-semibold flex items-center justify-end gap-1">
+                              <CheckCircle2 className="w-3.5 h-3.5" /> Dispatched
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>

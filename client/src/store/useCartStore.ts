@@ -46,7 +46,7 @@ export const useCartStore = create<CartState>()(
     (set, get) => ({
       items: [],
       isOpen: false,
-      wishlist: ['prod-1', 'prod-3'], // default sample favorite items
+      wishlist: [],
       quickViewProduct: null,
       couponCode: null,
       discountRate: 0,

@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useAuthStore } from '@/store/useAuthStore';
+import { useCartStore } from '@/store/useCartStore';
 import { MainLayout } from '@/layouts/MainLayout';
 import { HomePage } from '@/pages/HomePage';
 import { ProductListingPage } from '@/pages/ProductListingPage';
@@ -11,12 +13,21 @@ import { AccountPage } from '@/pages/AccountPage';
 import { AdminDashboardPage } from '@/pages/AdminDashboardPage';
 import { LoginPage } from '@/pages/LoginPage';
 import { RegisterPage } from '@/pages/RegisterPage';
+import { WishlistPage } from '@/pages/WishlistPage';
+import { SizeGuidePage } from '@/pages/SizeGuidePage';
+import { LeatherCarePage } from '@/pages/LeatherCarePage';
 import { ProtectedRoute } from '@/components/common/ProtectedRoute';
 import { AdminRoute } from '@/components/common/AdminRoute';
 
 const queryClient = new QueryClient();
 
 export const App: React.FC = () => {
+  useEffect(() => {
+    useAuthStore.getState().checkAuth().then(() => {
+      useCartStore.getState().syncWithBackend();
+    });
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
@@ -35,7 +46,9 @@ export const App: React.FC = () => {
                 </ProtectedRoute>
               }
             />
-            <Route path="wishlist" element={<AccountPage />} />
+            <Route path="wishlist" element={<WishlistPage />} />
+            <Route path="size-guide" element={<SizeGuidePage />} />
+            <Route path="leather-care" element={<LeatherCarePage />} />
             <Route path="login" element={<LoginPage />} />
             <Route path="register" element={<RegisterPage />} />
             <Route path="brand-story" element={<Navigate to="/#heritage" replace />} />

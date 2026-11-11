@@ -1,3 +1,5 @@
+import { parseApiJson } from '@/lib/utils';
+
 export interface RequestReturnPayload {
   orderId: string;
   type: 'return' | 'exchange';
@@ -26,9 +28,7 @@ export const returnService = {
       body: JSON.stringify(payload),
     });
 
-    const body = await res.json();
-    if (!res.ok) throw new Error(body.error || 'Failed to submit size exchange / return request');
-    return body;
+    return parseApiJson(res, 'Failed to submit size exchange / return request');
   },
 
   async getMyReturns(token: string) {
@@ -38,8 +38,7 @@ export const returnService = {
       },
     });
 
-    if (!res.ok) throw new Error('Failed to retrieve return history');
-    return res.json();
+    return parseApiJson(res, 'Failed to retrieve return history');
   },
 
   async getReturnById(id: string, token: string) {
@@ -49,7 +48,6 @@ export const returnService = {
       },
     });
 
-    if (!res.ok) throw new Error('Failed to retrieve return details');
-    return res.json();
+    return parseApiJson(res, 'Failed to retrieve return details');
   },
 };

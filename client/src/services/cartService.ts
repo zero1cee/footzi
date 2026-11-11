@@ -1,3 +1,5 @@
+import { parseApiJson } from '@/lib/utils';
+
 export interface ServerCartItem {
   _id: string;
   product: {
@@ -30,8 +32,7 @@ export const cartService = {
     const res = await fetch('/api/cart', {
       headers: { Authorization: `Bearer ${token}` },
     });
-    if (!res.ok) throw new Error('Failed to fetch cart');
-    return res.json();
+    return parseApiJson<ServerCart>(res, 'Failed to fetch cart');
   },
 
   async addItem(
@@ -52,11 +53,7 @@ export const cartService = {
       },
       body: JSON.stringify(item),
     });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || 'Failed to add item to bag');
-    }
-    return res.json();
+    return parseApiJson(res, 'Failed to add item to bag');
   },
 
   async updateQuantity(itemId: string, quantity: number, token: string): Promise<{ message: string; cart: ServerCart }> {
@@ -68,8 +65,7 @@ export const cartService = {
       },
       body: JSON.stringify({ quantity }),
     });
-    if (!res.ok) throw new Error('Failed to update bag');
-    return res.json();
+    return parseApiJson(res, 'Failed to update bag');
   },
 
   async removeItem(itemId: string, token: string): Promise<{ message: string; cart: ServerCart }> {
@@ -77,8 +73,7 @@ export const cartService = {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${token}` },
     });
-    if (!res.ok) throw new Error('Failed to remove item');
-    return res.json();
+    return parseApiJson(res, 'Failed to remove item');
   },
 
   async clearCart(token: string): Promise<{ message: string; cart: ServerCart }> {
@@ -86,7 +81,6 @@ export const cartService = {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${token}` },
     });
-    if (!res.ok) throw new Error('Failed to clear bag');
-    return res.json();
+    return parseApiJson(res, 'Failed to clear bag');
   },
 };

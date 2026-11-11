@@ -1,10 +1,23 @@
+import { parseApiJson } from '@/lib/utils';
+
+export interface SavedAddress {
+  _id?: string;
+  name: string;
+  phone: string;
+  addressLine: string;
+  city: string;
+  state: string;
+  pincode: string;
+  isDefault?: boolean;
+}
+
 export interface AuthUser {
   _id: string;
   name: string;
   email: string;
   role: 'customer' | 'admin';
   phone?: string;
-  addresses?: any[];
+  addresses?: SavedAddress[];
 }
 
 export interface AuthResponse {
@@ -21,11 +34,7 @@ export const authService = {
       body: JSON.stringify(data),
     });
 
-    const body = await res.json();
-    if (!res.ok) {
-      throw new Error(body.error || body.message || 'Registration failed');
-    }
-    return body;
+    return parseApiJson<AuthResponse>(res, 'Registration failed');
   },
 
   async login(email: string, password: string): Promise<AuthResponse> {
@@ -35,11 +44,7 @@ export const authService = {
       body: JSON.stringify({ email, password }),
     });
 
-    const body = await res.json();
-    if (!res.ok) {
-      throw new Error(body.error || body.message || 'Invalid email or password');
-    }
-    return body;
+    return parseApiJson<AuthResponse>(res, 'Invalid email or password');
   },
 
   async getMe(token: string): Promise<AuthUser> {
@@ -47,10 +52,21 @@ export const authService = {
       headers: { Authorization: `Bearer ${token}` },
     });
 
-    const body = await res.json();
-    if (!res.ok) {
-      throw new Error(body.error || 'Failed to authenticate session');
-    }
+    const body = await parseApiJson<{ user: AuthUser }>(res, 'Failed to authenticate session');
+    return body.user;
+  },
+
+  async addAddress(address: SavedAddress, token: string): Promise<AuthUser> {
+    const res = await fetch('/api/auth/addresses', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(address),
+    });
+
+    const body = await parseApiJson<{ user: AuthUser }>(res, 'Failed to save address');
     return body.user;
   },
 

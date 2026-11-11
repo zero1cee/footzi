@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { authService, AuthUser } from '@/services/authService';
+import { authService, AuthUser, SavedAddress } from '@/services/authService';
 
 interface AuthState {
   user: AuthUser | null;
@@ -12,6 +12,7 @@ interface AuthState {
   login: (email: string, password: string) => Promise<boolean>;
   loginAsDemo: (role?: 'patron' | 'admin') => Promise<boolean>;
   register: (name: string, email: string, password: string, phone?: string) => Promise<boolean>;
+  addAddress: (address: SavedAddress) => Promise<boolean>;
   logout: () => void;
   checkAuth: () => Promise<void>;
   clearError: () => void;
@@ -95,6 +96,31 @@ export const useAuthStore = create<AuthState>()(
           return true;
         } catch (err: any) {
           set({ error: err.message || 'Registration failed', isLoading: false });
+          return false;
+        }
+      },
+
+      addAddress: async (address) => {
+        const { token, user } = get();
+        if (!token) return false;
+        set({ error: null });
+
+        try {
+          const updatedUser = await authService.addAddress(address, token);
+          set({ user: updatedUser });
+          return true;
+        } catch (err: any) {
+          // If backend offline in simulated demo mode, append locally
+          if (token.startsWith('demo-jwt-token') && user) {
+            const existing = user.addresses || [];
+            const next = address.isDefault
+              ? existing.map((a) => ({ ...a, isDefault: false }))
+              : [...existing];
+            next.push(address);
+            set({ user: { ...user, addresses: next } });
+            return true;
+          }
+          set({ error: err.message || 'Failed to save address' });
           return false;
         }
       },

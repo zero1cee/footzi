@@ -1,3 +1,5 @@
+import { parseApiJson } from '@/lib/utils';
+
 export interface CreateOrderPayload {
   customerName: string;
   customerEmail: string;
@@ -31,10 +33,7 @@ export const orderService = {
       body: JSON.stringify(payload),
     });
 
-    const body = await res.json();
-    if (!res.ok) {
-      throw new Error(body.error || 'Failed to place order');
-    }
+    const body = await parseApiJson(res, 'Failed to place order');
     return body.order;
   },
 
@@ -48,11 +47,7 @@ export const orderService = {
       body: JSON.stringify({ orderId }),
     });
 
-    const body = await res.json();
-    if (!res.ok) {
-      throw new Error(body.error || 'Failed to initiate payment');
-    }
-    return body;
+    return parseApiJson(res, 'Failed to initiate payment');
   },
 
   async verifyPayment(
@@ -73,27 +68,21 @@ export const orderService = {
       body: JSON.stringify(data),
     });
 
-    const body = await res.json();
-    if (!res.ok) {
-      throw new Error(body.message || body.error || 'Payment verification failed');
-    }
-    return body;
+    return parseApiJson(res, 'Payment verification failed', true);
   },
 
   async getMyOrders(token: string) {
     const res = await fetch('/api/orders/my-orders', {
       headers: { Authorization: `Bearer ${token}` },
     });
-    if (!res.ok) throw new Error('Failed to fetch orders');
-    return res.json();
+    return parseApiJson(res, 'Failed to fetch orders');
   },
 
   async getOrderById(id: string, token: string) {
     const res = await fetch(`/api/orders/${id}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
-    if (!res.ok) throw new Error('Order not found');
-    return res.json();
+    return parseApiJson(res, 'Order not found');
   },
 
   async cancelOrder(id: string, reason: string | undefined, token: string) {
@@ -105,8 +94,6 @@ export const orderService = {
       },
       body: JSON.stringify({ reason }),
     });
-    const body = await res.json();
-    if (!res.ok) throw new Error(body.error || 'Failed to cancel order');
-    return body;
+    return parseApiJson(res, 'Failed to cancel order');
   },
 };

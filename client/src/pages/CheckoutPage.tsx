@@ -4,7 +4,7 @@ import { Lock, CheckCircle2, ArrowRight, Truck, CreditCard, Sparkles, AlertCircl
 import { useCartStore } from '@/store/useCartStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { orderService } from '@/services/orderService';
-import { formatINR } from '@/lib/utils';
+import { formatINR, isBackendUnreachable } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 
 export const CheckoutPage: React.FC = () => {
@@ -41,12 +41,18 @@ export const CheckoutPage: React.FC = () => {
 
   useEffect(() => {
     if (user) {
+      const defaultAddr =
+        user.addresses?.find((a) => a.isDefault) || user.addresses?.[0];
       setFormData((prev) => ({
         ...prev,
-        firstName: user.name.split(' ')[0],
-        lastName: user.name.split(' ').slice(1).join(' ') || prev.lastName,
+        firstName: (defaultAddr?.name || user.name).split(' ')[0],
+        lastName: (defaultAddr?.name || user.name).split(' ').slice(1).join(' ') || prev.lastName,
         email: user.email,
-        phone: user.phone || prev.phone,
+        phone: defaultAddr?.phone || user.phone || prev.phone,
+        address: defaultAddr?.addressLine || prev.address,
+        city: defaultAddr?.city || prev.city,
+        state: defaultAddr?.state || prev.state,
+        pincode: defaultAddr?.pincode || prev.pincode,
       }));
     }
   }, [user]);
@@ -100,24 +106,35 @@ export const CheckoutPage: React.FC = () => {
       try {
         createdOrder = await orderService.createOrder(orderPayload, activeToken);
       } catch (err: any) {
-        console.warn('[Checkout] Order creation notice:', err.message);
-        // Fallback simulation if backend server offline
+        // A real rejection from the API (out of stock, validation, auth) must reach the patron
+        if (!isBackendUnreachable(err)) throw err;
+
+        console.warn('[Checkout] Backend offline, simulating order:', err.message);
         createdOrder = {
           _id: `ord_${Date.now()}`,
           orderNumber: `FTZ-AGR-${Math.floor(100000 + Math.random() * 900000)}`,
           total,
+          simulated: true,
         };
       }
 
       // 2. Initiate Razorpay Gateway Order
       let gatewayOrder: any = null;
-      try {
-        gatewayOrder = await orderService.createPaymentOrder(createdOrder._id, activeToken);
-      } catch {
+      if (createdOrder.simulated) {
         gatewayOrder = {
           gatewayOrderId: `order_${Date.now()}`,
           keyId: 'rzp_test_placeholder_key_id',
         };
+      } else {
+        try {
+          gatewayOrder = await orderService.createPaymentOrder(createdOrder._id, activeToken);
+        } catch (err) {
+          // The order exists and holds stock; release it before reporting the failure
+          await orderService
+            .cancelOrder(createdOrder._id, 'Payment could not be initiated', activeToken)
+            .catch(() => {});
+          throw err;
+        }
       }
 
       // Open interactive payment gateway modal for patron confirmation
@@ -142,26 +159,19 @@ export const CheckoutPage: React.FC = () => {
     const { createdOrder, gatewayOrder, activeToken } = pendingPayment;
 
     try {
-      let verifyResult: any = null;
-      try {
-        verifyResult = await orderService.verifyPayment(
-          {
-            orderId: createdOrder._id,
-            razorpayOrderId: gatewayOrder.gatewayOrderId,
-            razorpayPaymentId: `pay_test_${Date.now()}`,
-            razorpaySignature: 'mock_valid_signature_test_mode',
-          },
-          activeToken
-        );
-      } catch (err: any) {
-        console.warn('[Checkout] Payment verification offline fallback:', err.message);
-        verifyResult = {
-          verified: true,
-          supplierOrder: {
-            trackingNumber: `BD-AGR-${Math.floor(10000000 + Math.random() * 90000000)}IN`,
-          },
-        };
-      }
+      // Only an order that was simulated offline skips server verification.
+      // A real order is confirmed solely by the server's answer.
+      const verifyResult: any = createdOrder.simulated
+        ? { verified: true }
+        : await orderService.verifyPayment(
+            {
+              orderId: createdOrder._id,
+              razorpayOrderId: gatewayOrder.gatewayOrderId,
+              razorpayPaymentId: `pay_test_${Date.now()}`,
+              razorpaySignature: 'mock_valid_signature_test_mode',
+            },
+            activeToken
+          );
 
       const assignedTracking =
         verifyResult?.supplierOrder?.trackingNumber ||
@@ -176,7 +186,11 @@ export const CheckoutPage: React.FC = () => {
       setPendingPayment(null);
       clearCart();
     } catch (err: any) {
-      setErrorMessage(err.message || 'Signature verification failed.');
+      // Close the sheet so the message on the checkout form is visible; the bag is kept
+      setPendingPayment(null);
+      setErrorMessage(
+        `${err.message || 'Payment verification failed.'} Your order was not confirmed and your bag is unchanged.`
+      );
     } finally {
       setIsVerifyingPayment(false);
     }
@@ -188,7 +202,7 @@ export const CheckoutPage: React.FC = () => {
     const { createdOrder, activeToken } = pendingPayment;
 
     try {
-      if (createdOrder._id && !createdOrder._id.startsWith('ord_')) {
+      if (!createdOrder.simulated) {
         await orderService.cancelOrder(createdOrder._id, 'Customer aborted payment sheet', activeToken);
       }
     } catch {
@@ -349,6 +363,45 @@ export const CheckoutPage: React.FC = () => {
                 <Truck className="w-4 h-4 text-sand-600" />
                 1. Delivery Destination (India)
               </h2>
+
+              {user?.addresses && user.addresses.length > 0 && (
+                <div className="space-y-1.5">
+                  <span className="text-[10px] uppercase tracking-wider font-semibold text-charcoal-500 block">
+                    Saved Patron Addresses
+                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    {user.addresses.map((addr, idx) => {
+                      const isSelected =
+                        formData.address === addr.addressLine && formData.pincode === addr.pincode;
+                      return (
+                        <button
+                          key={addr._id || idx}
+                          type="button"
+                          onClick={() =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              firstName: addr.name.split(' ')[0],
+                              lastName: addr.name.split(' ').slice(1).join(' ') || prev.lastName,
+                              phone: addr.phone,
+                              address: addr.addressLine,
+                              city: addr.city,
+                              state: addr.state,
+                              pincode: addr.pincode,
+                            }))
+                          }
+                          className={`px-3 py-1.5 text-[11px] border rounded-xs text-left transition-all ${
+                            isSelected
+                              ? 'border-charcoal-900 bg-sand-50 text-charcoal-950 font-semibold'
+                              : 'border-ivory-300 bg-ivory-50 text-charcoal-700 hover:border-charcoal-500'
+                          }`}
+                        >
+                          {addr.city} ({addr.pincode}) {addr.isDefault ? '• Default' : ''}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
