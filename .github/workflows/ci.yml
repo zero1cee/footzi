@@ -50,6 +50,11 @@ jobs:
       - name: Build (same command as Render)
         run: npm run render:build
 
+      # The server build leaves tests out, so type-check them separately
+      - name: Type-check server (including tests)
+        run: npm run typecheck
+        working-directory: server
+
       - name: Seed the test database
         run: npm run seed --prefix server
 

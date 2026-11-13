@@ -5,12 +5,13 @@
   "private": true,
   "main": "dist/server.js",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc -p tsconfig.build.json",
     "start": "node dist/server.js",
     "dev": "tsx watch src/server.ts",
     "seed": "tsx src/scripts/seed.ts",
     "test": "vitest",
-    "seed:demo-admin": "tsx src/scripts/ensureDemoAdmin.ts"
+    "seed:demo-admin": "tsx src/scripts/ensureDemoAdmin.ts",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -39,6 +40,7 @@
     "supertest": "^7.0.0",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
-    "vitest": "^2.1.8"
+    "vite": "^6.4.6",
+    "vitest": "^5.1.0"
   }
 }
