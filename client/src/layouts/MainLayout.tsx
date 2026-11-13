@@ -33,8 +33,10 @@ export const MainLayout: React.FC = () => {
       >
         Skip to main content
       </a>
-      <AnnouncementBar />
-      <Navbar />
+      <div className="print:hidden">
+        <AnnouncementBar />
+        <Navbar />
+      </div>
 
       <main id="main-content" ref={mainRef} tabIndex={-1} className="flex-1 focus:outline-none">
         <RouteErrorBoundary resetKey={pathname}>
@@ -50,11 +52,15 @@ export const MainLayout: React.FC = () => {
         </RouteErrorBoundary>
       </main>
 
-      <Footer />
+      <div className="print:hidden">
+        <Footer />
+      </div>
 
       {/* Global Modals & Drawers */}
-      <CartDrawer />
-      <QuickViewModal />
+      <div className="print:hidden">
+        <CartDrawer />
+        <QuickViewModal />
+      </div>
     </div>
   );
 };

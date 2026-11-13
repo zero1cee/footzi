@@ -3,12 +3,12 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Search, ShoppingBag, Heart, User, Menu, X, ArrowRight, LogOut, Shield } from 'lucide-react';
 import { useCartStore } from '@/store/useCartStore';
 import { useAuthStore } from '@/store/useAuthStore';
+import { SearchSuggest } from '@/components/common/SearchSuggest';
 
 export const Navbar: React.FC = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   
   const location = useLocation();
@@ -35,13 +35,6 @@ export const Navbar: React.FC = () => {
     setSearchOpen(false);
   }, [location.pathname]);
 
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      navigate(`/shop?search=${encodeURIComponent(searchQuery.trim())}`);
-      setSearchOpen(false);
-    }
-  };
 
   const navLinks = [
     { name: 'Collections', href: '/shop' },
@@ -66,7 +59,7 @@ export const Navbar: React.FC = () => {
           <div className="flex items-center lg:hidden">
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 text-charcoal-800 hover:text-charcoal-950 focus:outline-none"
+              className="p-2.5 text-charcoal-800 hover:text-charcoal-950 focus:outline-none"
               aria-label="Open mobile menu"
             >
               {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -109,11 +102,11 @@ export const Navbar: React.FC = () => {
           </nav>
 
           {/* Action Icons */}
-          <div className="flex items-center space-x-3 sm:space-x-5">
+          <div className="flex items-center space-x-0 sm:space-x-3">
             {/* Search Toggle */}
             <button
               onClick={() => setSearchOpen(!searchOpen)}
-              className="p-1.5 text-charcoal-700 hover:text-charcoal-950 transition-colors"
+              className="p-3 sm:p-2.5 text-charcoal-700 hover:text-charcoal-950 transition-colors"
               aria-label="Search footwear"
             >
               <Search className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -122,7 +115,7 @@ export const Navbar: React.FC = () => {
             {/* Wishlist Icon */}
             <Link
               to="/wishlist"
-              className="p-1.5 text-charcoal-700 hover:text-charcoal-950 transition-colors relative"
+              className="p-3 sm:p-2.5 text-charcoal-700 hover:text-charcoal-950 transition-colors relative"
               aria-label="View Wishlist"
             >
               <Heart className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -138,7 +131,7 @@ export const Navbar: React.FC = () => {
               <div className="relative">
                 <button
                   onClick={() => setUserMenuOpen(!userMenuOpen)}
-                  className="flex items-center gap-1.5 p-1 text-charcoal-700 hover:text-charcoal-950 focus:outline-none"
+                  className="flex items-center gap-1.5 p-1.5 text-charcoal-700 hover:text-charcoal-950 focus:outline-none"
                   aria-label="User profile menu"
                 >
                   <div className="w-7 h-7 rounded-full bg-sand-200 text-charcoal-900 border border-sand-400/50 flex items-center justify-center text-[11px] font-bold">
@@ -195,7 +188,7 @@ export const Navbar: React.FC = () => {
             ) : (
               <Link
                 to="/login"
-                className="p-1.5 text-charcoal-700 hover:text-charcoal-950 transition-colors"
+                className="p-3 sm:p-2.5 text-charcoal-700 hover:text-charcoal-950 transition-colors"
                 aria-label="Sign In"
               >
                 <User className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -205,7 +198,7 @@ export const Navbar: React.FC = () => {
             {/* Cart Drawer Toggle */}
             <button
               onClick={toggleCart}
-              className="p-1.5 text-charcoal-900 hover:text-sand-600 transition-colors relative flex items-center gap-2 group"
+              className="p-3 sm:p-2.5 text-charcoal-900 hover:text-sand-600 transition-colors relative flex items-center gap-2 group"
               aria-label="Shopping Bag"
             >
               <div className="relative">
@@ -224,37 +217,7 @@ export const Navbar: React.FC = () => {
         </div>
 
         {/* Quick Search Slide-Down Bar */}
-        {searchOpen && (
-          <form
-            onSubmit={handleSearchSubmit}
-            className="mt-3 pt-3 border-t border-ivory-300 flex items-center gap-2 animate-fade-in"
-          >
-            <div className="relative flex-1">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search by model, style (e.g. Penny Loafer, Chelsea, Minimalist Court)..."
-                autoFocus
-                className="w-full bg-white border border-ivory-300 px-4 py-2.5 pl-10 text-xs text-charcoal-900 placeholder:text-charcoal-400 focus:outline-none focus:border-charcoal-800 rounded-xs"
-              />
-              <Search className="w-4 h-4 text-charcoal-400 absolute left-3.5 top-3" />
-            </div>
-            <button
-              type="submit"
-              className="px-4 py-2.5 bg-charcoal-900 text-ivory-50 text-xs uppercase tracking-wider font-medium rounded-xs hover:bg-charcoal-800"
-            >
-              Search
-            </button>
-            <button
-              type="button"
-              onClick={() => setSearchOpen(false)}
-              className="p-2 text-charcoal-500 hover:text-charcoal-800"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </form>
-        )}
+        {searchOpen && <SearchSuggest onDone={() => setSearchOpen(false)} />}
       </div>
 
       {/* Mobile Menu Drawer Overlay */}

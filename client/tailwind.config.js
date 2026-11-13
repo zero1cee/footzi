@@ -6,6 +6,10 @@ export default {
   ],
   theme: {
     extend: {
+      spacing: {
+        // Used by large buttons (h-13) and the wishlist button (w-13); Tailwind has no 13 by default
+        13: '3.25rem',
+      },
       colors: {
         ivory: {
           50: '#FDFBF7',

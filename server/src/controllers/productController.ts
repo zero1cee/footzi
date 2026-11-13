@@ -13,6 +13,16 @@ const num = (value: unknown): number | undefined => {
   return Number.isFinite(n) ? n : undefined;
 };
 
+export const suggestProducts = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const suggestions = await productService.suggest(str(req.query.q) ?? '');
+    res.setHeader('Cache-Control', 'public, max-age=60');
+    res.status(200).json({ suggestions });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
 export const getProducts = async (req: Request, res: Response): Promise<void> => {
   try {
     const {

@@ -4,6 +4,7 @@ import { CartItem, Product, ShoeSize } from '@/types';
 import { useAuthStore } from './useAuthStore';
 import { cartService } from '@/services/cartService';
 import { couponService, computeCouponDiscount, AppliedCoupon } from '@/services/couponService';
+import { wishlistService } from '@/services/wishlistService';
 import { isBackendUnreachable } from '@/lib/utils';
 
 interface CartState {
@@ -26,6 +27,8 @@ interface CartState {
   
   // Wishlist
   toggleWishlist: (productId: string) => void;
+  /** Signed in: folds this device's hearts into the account's list and adopts the result. */
+  syncWishlist: () => Promise<void>;
   isInWishlist: (productId: string) => boolean;
 
   // Quick View
@@ -194,12 +197,28 @@ export const useCartStore = create<CartState>()(
       closeCart: () => set({ isOpen: false }),
       toggleCart: () => set({ isOpen: !get().isOpen }),
 
+      // The heart answers instantly. When signed in, the change is also saved to the account, and
+      // if that fails the heart goes back to how it was, so it never claims something that was not saved.
       toggleWishlist: (productId) => {
-        const list = get().wishlist;
-        if (list.includes(productId)) {
-          set({ wishlist: list.filter((id) => id !== productId) });
-        } else {
-          set({ wishlist: [...list, productId] });
+        const before = get().wishlist;
+        const adding = !before.includes(productId);
+        set({ wishlist: adding ? [...before, productId] : before.filter((id) => id !== productId) });
+
+        const token = useAuthStore.getState().token;
+        if (!token || token.startsWith('demo-jwt-token')) return;
+        (adding ? wishlistService.add(productId, token) : wishlistService.remove(productId, token)).catch(() => {
+          const current = get().wishlist;
+          set({ wishlist: adding ? current.filter((id) => id !== productId) : current.includes(productId) ? current : [...current, productId] });
+        });
+      },
+
+      syncWishlist: async () => {
+        const token = useAuthStore.getState().token;
+        if (!token || token.startsWith('demo-jwt-token')) return;
+        try {
+          set({ wishlist: await wishlistService.merge(get().wishlist, token) });
+        } catch {
+          // Offline or the server is down: keep the local list and try again next time
         }
       },
 
@@ -279,9 +298,10 @@ useAuthStore.subscribe((state, previous) => {
   if (state.token === previous.token) return;
 
   if (previous.token) {
-    useCartStore.setState({ items: [], couponCode: null, coupon: null });
+    useCartStore.setState({ items: [], couponCode: null, coupon: null, wishlist: [] });
   }
   if (state.token) {
     void useCartStore.getState().syncWithBackend();
+    void useCartStore.getState().syncWishlist();
   }
 });

@@ -20,6 +20,7 @@ const CartPage = page(() => import('@/pages/CartPage'), 'CartPage');
 const CheckoutPage = page(() => import('@/pages/CheckoutPage'), 'CheckoutPage');
 const AccountPage = page(() => import('@/pages/AccountPage'), 'AccountPage');
 const OrderDetailPage = page(() => import('@/pages/OrderDetailPage'), 'OrderDetailPage');
+const OrderReceiptPage = page(() => import('@/pages/OrderReceiptPage'), 'OrderReceiptPage');
 const AdminDashboardPage = page(() => import('@/pages/AdminDashboardPage'), 'AdminDashboardPage');
 const LoginPage = page(() => import('@/pages/LoginPage'), 'LoginPage');
 const RegisterPage = page(() => import('@/pages/RegisterPage'), 'RegisterPage');
@@ -48,6 +49,7 @@ export const App: React.FC = () => {
   useEffect(() => {
     useAuthStore.getState().checkAuth().then(() => {
       useCartStore.getState().syncWithBackend();
+      void useCartStore.getState().syncWishlist();
     });
   }, []);
 
@@ -66,6 +68,14 @@ export const App: React.FC = () => {
               element={
                 <ProtectedRoute>
                   <OrderDetailPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="account/orders/:id/receipt"
+              element={
+                <ProtectedRoute>
+                  <OrderReceiptPage />
                 </ProtectedRoute>
               }
             />

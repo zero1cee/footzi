@@ -14,6 +14,7 @@ import paymentRoutes from './routes/paymentRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import returnRoutes from './routes/returnRoutes.js';
 import couponRoutes from './routes/couponRoutes.js';
+import wishlistRoutes from './routes/wishlistRoutes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { requestContext } from './middleware/requestContext.js';
 import { reportClientError } from './controllers/clientErrorController.js';
@@ -143,6 +144,7 @@ export const createApp = (): Express => {
   app.use('/api/payments', paymentRoutes);
   app.use('/api/returns', returnRoutes);
   app.use('/api/coupons', couponRoutes);
+  app.use('/api/wishlist', wishlistRoutes);
   app.use('/api/admin', adminRoutes);
 
   // Unknown API routes are always JSON 404s

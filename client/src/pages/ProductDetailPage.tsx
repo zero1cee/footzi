@@ -17,7 +17,7 @@ import {
   CheckCircle2,
   MessageSquare,
 } from 'lucide-react';
-import { useProductBySlug, useSubmitReview } from '@/hooks/useProducts';
+import { useProducts, useProductBySlug, useSubmitReview } from '@/hooks/useProducts';
 import { useDocumentMeta } from '@/hooks/useDocumentMeta';
 import { MOCK_PRODUCTS } from '@/data/mockProducts';
 import { useCartStore } from '@/store/useCartStore';
@@ -28,6 +28,8 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { ProductCard } from '@/components/ui/ProductCard';
 import { SizeGuideModal } from '@/components/common/SizeGuideModal';
+import { RecentlyViewed } from '@/components/ui/RecentlyViewed';
+import { useRecentStore } from '@/store/useRecentStore';
 
 const NotFound: React.FC = () => {
   useDocumentMeta({ title: 'Product not found — Footzi', noindex: true });
@@ -167,7 +169,16 @@ const ProductDetailContent: React.FC<{ product: Product }> = ({ product }) => {
     }
   };
 
-  const relatedProducts = MOCK_PRODUCTS.filter((p) => p.id !== product.id && p.category === product.category).slice(0, 3);
+  // Related styles come from the live catalogue (so prices and stock are current); the built-in
+  // list is only a fallback for when the server cannot be reached.
+  const { data: sameCategory } = useProducts({ category: product.category, limit: 6 });
+  const relatedPool = sameCategory?.products?.length ? sameCategory.products : MOCK_PRODUCTS.filter((p) => p.category === product.category);
+  const relatedProducts = relatedPool.filter((p) => p.id !== product.id).slice(0, 3);
+
+  const rememberViewed = useRecentStore((s) => s.add);
+  useEffect(() => {
+    rememberViewed({ id: product.id, slug: product.slug, name: product.name, image: product.images?.[0] ?? '', price: product.price });
+  }, [product.id, product.slug, product.name, product.price, rememberViewed]);
 
   return (
     <div className="py-8 md:py-12 bg-ivory-100">
@@ -313,7 +324,7 @@ const ProductDetailContent: React.FC<{ product: Product }> = ({ product }) => {
                 <button
                   type="button"
                   onClick={() => setSizeGuideOpen(true)}
-                  className="text-[11px] text-sand-600 underline flex items-center gap-1 hover:text-sand-800"
+                  className="text-[11px] text-sand-600 underline flex items-center gap-1 hover:text-sand-800 py-2"
                 >
                   <Ruler className="w-3 h-3" /> Indian Fit Guide
                 </button>
@@ -371,7 +382,7 @@ const ProductDetailContent: React.FC<{ product: Product }> = ({ product }) => {
                     type="button"
                     onClick={() => setQuantity(Math.max(1, quantity - 1))}
                     disabled={quantity <= 1}
-                    className="p-2 text-charcoal-600 hover:text-charcoal-950 disabled:opacity-30"
+                    className="p-3 text-charcoal-600 hover:text-charcoal-950 disabled:opacity-30"
                     aria-label="Decrease quantity"
                   >
                     <Minus className="w-3.5 h-3.5" />
@@ -383,7 +394,7 @@ const ProductDetailContent: React.FC<{ product: Product }> = ({ product }) => {
                     type="button"
                     onClick={() => setQuantity(Math.min(availableStock, quantity + 1))}
                     disabled={quantity >= availableStock}
-                    className="p-2 text-charcoal-600 hover:text-charcoal-950 disabled:opacity-30"
+                    className="p-3 text-charcoal-600 hover:text-charcoal-950 disabled:opacity-30"
                     aria-label="Increase quantity"
                   >
                     <Plus className="w-3.5 h-3.5" />
@@ -729,6 +740,7 @@ const ProductDetailContent: React.FC<{ product: Product }> = ({ product }) => {
           </div>
         )}
 
+        <RecentlyViewed excludeId={product.id} />
       </div>
 
       {/* Indian Shoe Size Conversion Guide Modal */}

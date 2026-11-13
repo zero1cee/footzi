@@ -45,7 +45,7 @@ export const NewArrivalsGrid: React.FC = () => {
               <button
                 key={cat}
                 onClick={() => setSelectedCategory(cat)}
-                className={`px-4 py-1.5 text-xs uppercase tracking-wider font-medium rounded-xs transition-all ${
+                className={`px-4 py-2.5 text-xs uppercase tracking-wider font-medium rounded-xs transition-all ${
                   selectedCategory === cat
                     ? 'bg-charcoal-900 text-ivory-50 shadow-sm'
                     : 'bg-ivory-200 text-charcoal-700 hover:bg-ivory-300 hover:text-charcoal-900'

@@ -10,7 +10,7 @@
 ![Express.js](https://img.shields.io/badge/Express.js-000000?style=for-the-badge&logo=express&logoColor=white)
 ![MongoDB](https://img.shields.io/badge/MongoDB-4EA94B?style=for-the-badge&logo=mongodb&logoColor=white)
 ![Razorpay](https://img.shields.io/badge/Razorpay_Sandbox-02042B?style=for-the-badge&logo=razorpay&logoColor=3395FF)
-![Vitest](https://img.shields.io/badge/Vitest-174_Tests_Passed-6E9F18?style=for-the-badge&logo=vitest&logoColor=white)
+![Vitest](https://img.shields.io/badge/Vitest-202_Tests_Passed-6E9F18?style=for-the-badge&logo=vitest&logoColor=white)
 [![CI](https://github.com/zero1cee/footzi/actions/workflows/ci.yml/badge.svg)](https://github.com/zero1cee/footzi/actions/workflows/ci.yml)
 
 <p align="center">
@@ -39,7 +39,8 @@ Built as a portfolio demonstration for **Software Development Engineer (SDE)** i
 ## 1. Core Platform Features
 
 **Shopping**
-- **Artisanal Footwear Catalog**: 16 handcrafted silhouettes across 5 categories: *Loafers*, *Sneakers*, *Oxfords*, *Boots* and *Slip-ons*, with filters, search, reviews and a wishlist.
+- **Artisanal Footwear Catalog**: 16 handcrafted silhouettes across 5 categories: *Loafers*, *Sneakers*, *Oxfords*, *Boots* and *Slip-ons*, with filters, reviews, a recently viewed row, and search with type-ahead suggestions (keyboard accessible).
+- **Wishlist that follows the account**: hearts are kept in the browser for guests and saved to the account when signed in. On sign-in the two lists are merged (a union, so nothing is lost), the heart reverts if the server refuses a change, and the list is cleared on sign-out.
 - **Indian Sizing Matrix**: `UK 6` to `UK 11` variants, each with its own SKU and live stock enforcement.
 - **Guest and signed-in bags**: a guest bag lives in the browser (Zustand). On sign-in it is merged into the saved bag in MongoDB (the larger quantity wins, so repeating it is safe), and it is cleared on sign-out so the next person on a shared device never sees it.
 - **Server-Authoritative Pricing**: subtotals, coupons and free delivery ($\ge ₹1,999$) are recalculated on the backend; prices sent by the browser are ignored. Coupons live in the database and are managed from the admin panel: percent or flat, minimum order, maximum discount, first-order-only, total and per-customer limits, and an expiry date. A cancelled or expired order gives its coupon use back.
@@ -48,7 +49,7 @@ Built as a portfolio demonstration for **Software Development Engineer (SDE)** i
 - **Razorpay**: gateway orders in paise, HMAC-SHA256 signature verification, an authenticated webhook for customers who close the tab before returning, and idempotent confirmation (a payment can only confirm an order once). With placeholder keys the app runs in **demo mode** with a sandbox payment sheet and simulated refunds; with real keys only a genuine signature is accepted.
 - **Stock safety**: stock is reserved atomically when an order is created, deducted on payment, and released when payment fails, the order is cancelled, or it goes unpaid for 30 minutes.
 - **Cancellation and refunds**: customers can cancel before dispatch for a full refund. Completing a return refunds through Razorpay. A genuine payment that arrives after an order expired is refunded automatically. Every refund is idempotent, so retries can never pay twice.
-- **Order pages and email**: an order detail page with tracking and history, and email for welcome, order confirmation, shipping, delivery, cancellation, refunds, return updates and password reset (Brevo or Resend).
+- **Order pages and email**: an order detail page with tracking and history, a printable receipt (print or save as PDF; it is a receipt, not a GST tax invoice), and email for welcome, order confirmation, shipping, delivery, cancellation, refunds, return updates and password reset (Brevo or Resend).
 - **Agra dropshipping simulation**: a paid order queues a supplier order for `SUP-AGR-01` with a BlueDart tracking number. The workshop pipeline moves one step at a time (*Accepted → Processing → Shipped → Delivered*); a workshop cancellation refunds the customer.
 - **7-Day Size Exchange & Returns**: delivered orders only, priced from the order itself, with stock held for the replacement pair and reverse-pickup tracking.
 
@@ -226,6 +227,7 @@ Passwords and profiles of the two shared demo accounts (`patron@footzi.in`, `dem
 | Method | Endpoint | Access | Description |
 | :--- | :--- | :--- | :--- |
 | `GET` | `/api/products` | Public | Paginated footwear list with filters (category, size, color, price) |
+| `GET` | `/api/products/suggest?q=` | Public | Up to six type-ahead suggestions (name, slug, image, price, category) for the search box; active styles only, two letters minimum |
 | `GET` | `/api/products/:slug` | Public | Retrieve single silhouette by slug with size variants |
 | `POST` | `/api/products/:id/reviews` | Authenticated | One review per customer; marked verified only if the customer has a paid order for the shoe |
 
@@ -248,6 +250,13 @@ Passwords and profiles of the two shared demo accounts (`patron@footzi.in`, `dem
 | `DELETE`| `/api/cart/items/:id`| Authenticated | Remove item from bag (`:id` is the line id or the variant SKU) |
 | `DELETE` | `/api/cart` | Authenticated | Empty the saved bag |
 | `POST` | `/api/cart/merge` | Authenticated | Fold a guest bag into the saved bag; the larger quantity wins, so it is safe to repeat |
+
+### Wishlist
+| Method | Endpoint | Access | Description |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/wishlist` | Authenticated | The customer's saved style ids |
+| `PUT` / `DELETE` | `/api/wishlist/:productId` | Authenticated | Add (idempotent, active styles only, 100 at most) or remove a style |
+| `POST` | `/api/wishlist/merge` | Authenticated | Union a guest list into the account; invalid or archived ids are dropped, so it is safe to repeat |
 
 ### Coupons
 | Method | Endpoint | Access | Description |
@@ -333,15 +342,15 @@ Open **[http://localhost:5173](http://localhost:5173)** in your browser.
 
 ### 4. Running Automated Tests
 
-Footzi includes **174 automated unit and integration tests** ensuring test-driven reliability:
+Footzi includes **202 automated unit and integration tests** ensuring test-driven reliability:
 
 ```bash
-# Client Vitest Suite (64 tests: Cart and server-checked coupons, bag merge on sign-in, password reset and order pages, admin panels, page titles and meta tags, dialog keyboard behaviour, automated accessibility checks with axe, browser error reporting, UI components, return service)
+# Client Vitest Suite (80 tests: Cart and server-checked coupons, bag merge on sign-in, password reset and order pages, admin panels, page titles and meta tags, dialog keyboard behaviour, automated accessibility checks with axe, browser error reporting, wishlist sync, search suggestions, receipts, recently viewed, UI components, return service)
 cd client
 npm test
 
-# Server Integration Suite (110 tests: Auth, Cart, Orders, Razorpay HMAC and webhook, Dropship Pipeline,
-# Returns, Reviews, Order expiry, Demo admin, Password reset, Refunds, Email providers, Coupons, Product editing, Workshop pipeline, SEO (page tags, sitemap, robots), Monitoring (health checks, request ids, error responses), Cloudinary, Inventory). Needs a seeded MongoDB; point
+# Server Integration Suite (122 tests: Auth, Cart, Orders, Razorpay HMAC and webhook, Dropship Pipeline,
+# Returns, Reviews, Order expiry, Demo admin, Password reset, Refunds, Email providers, Coupons, Product editing, Workshop pipeline, SEO (page tags, sitemap, robots), Monitoring (health checks, request ids, error responses), Wishlist, Search suggestions, Cloudinary, Inventory). Needs a seeded MongoDB; point
 # MONGODB_URI at a scratch database, because the tests create and delete orders.
 cd server
 npx vitest run
@@ -432,6 +441,7 @@ MONGODB_URI="<atlas connection string>" npm run seed:demo-admin
 - **Email reaches only verified senders and recipients** until you have a domain (see the table above).
 - **Sessions are JWTs kept in the browser's local storage**, the usual trade-off for a separately deployable front end: a cross-site-scripting bug would expose them. Content-Security-Policy and escaped output are the defences.
 - **Dependency advisories.** `npm audit` reports a `zod` advisory (server) and a `react-router` advisory (client) whose fixes are major-version upgrades. The `zod` risk (oversized lists exhausting memory) is mitigated by the 100 kB request cap; the `react-router` one concerns open redirects through user-controlled link targets, which this app does not use. Dependabot will propose the upgrades.
+- The order receipt is not a GST tax invoice. If you are GST-registered you will need proper invoices (with your GSTIN and tax breakdown) before selling for real.
 - The admin panel uses fixed demo supplier data; there is no real workshop integration.
 
 ---

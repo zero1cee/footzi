@@ -155,6 +155,25 @@ export class ProductService {
     }
   }
 
+  /**
+   * Type-ahead for the search box: styles whose name has a word starting with what was typed,
+   * or whose category starts with it. Only active styles, only the few fields a suggestion needs.
+   */
+  async suggest(query: string, limit = 6) {
+    const term = query.trim().slice(0, 40);
+    if (term.length < 2) return [];
+    const safe = escapeRegex(term);
+    const products = await Product.find({
+      isActive: true,
+      $or: [{ name: { $regex: `(^|\\s)${safe}`, $options: 'i' } }, { category: { $regex: `^${safe}`, $options: 'i' } }],
+    })
+      .select('name slug images price category')
+      .sort({ rating: -1, createdAt: -1 })
+      .limit(Math.min(limit, 10))
+      .lean();
+    return products.map((p) => ({ id: p._id.toString(), name: p.name, slug: p.slug, image: p.images?.[0] ?? '', price: p.price, category: p.category }));
+  }
+
   /** Every variant SKU is the key of an inventory record, so a SKU may belong to only one product. */
   private async assertSkusFree(skus: string[], exceptProductId?: unknown): Promise<void> {
     const unique = new Set(skus);

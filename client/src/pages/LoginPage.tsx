@@ -119,7 +119,7 @@ export const LoginPage: React.FC = () => {
                 <label className="block text-[11px] uppercase tracking-wider font-semibold text-charcoal-700">
                   Password
                 </label>
-                <Link to="/forgot-password" className="text-[11px] text-sand-600 hover:text-sand-800">
+                <Link to="/forgot-password" className="text-[11px] text-sand-600 hover:text-sand-800 inline-block py-2">
                   Forgot password?
                 </Link>
               </div>
@@ -138,7 +138,7 @@ export const LoginPage: React.FC = () => {
                   onClick={() => setShowPassword(!showPassword)}
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
                   aria-pressed={showPassword}
-                  className="absolute right-2.5 top-2.5 text-charcoal-400 hover:text-charcoal-700"
+                  className="absolute right-0 top-0 h-full w-10 flex items-center justify-center text-charcoal-400 hover:text-charcoal-700"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>

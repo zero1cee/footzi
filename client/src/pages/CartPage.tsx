@@ -146,7 +146,7 @@ export const CartPage: React.FC = () => {
                       <div className="flex items-center border border-ivory-300 rounded-xs bg-white">
                         <button
                           onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                          className="p-1.5 text-charcoal-600 hover:text-charcoal-950"
+                          className="p-2.5 text-charcoal-600 hover:text-charcoal-950"
                           aria-label="Decrease quantity"
                         >
                           <Minus className="w-3 h-3" />
@@ -157,7 +157,7 @@ export const CartPage: React.FC = () => {
                         <button
                           onClick={() => updateQuantity(item.id, item.quantity + 1)}
                           disabled={item.quantity >= item.stock}
-                          className="p-1.5 text-charcoal-600 hover:text-charcoal-950 disabled:opacity-30"
+                          className="p-2.5 text-charcoal-600 hover:text-charcoal-950 disabled:opacity-30"
                           aria-label="Increase quantity"
                         >
                           <Plus className="w-3 h-3" />

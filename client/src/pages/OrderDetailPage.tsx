@@ -244,6 +244,13 @@ export const OrderDetailPage: React.FC = () => {
 
           {/* Actions */}
           <div className="mt-8 pt-5 border-t border-ivory-200">
+            {(order.paymentStatus === 'paid' || order.paymentStatus === 'refunded') && (
+              <p className="text-xs text-charcoal-600 mb-3">
+                <Link to={`/account/orders/${order._id}/receipt`} className="font-semibold text-charcoal-900 underline">
+                  View or print your receipt
+                </Link>
+              </p>
+            )}
             {order.orderStatus === 'pending_payment' && (
               <p className="text-xs text-charcoal-500 mb-3">
                 This order is waiting for payment and is released automatically if it isn't paid within 30 minutes.

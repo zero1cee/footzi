@@ -21,6 +21,7 @@ export interface IUser extends Document {
   role: 'customer' | 'admin' | 'demo_admin';
   phone?: string;
   addresses: IUserAddress[];
+  wishlist: mongoose.Types.ObjectId[];
   passwordChangedAt?: Date;
   resetTokenHash?: string;
   resetTokenExpires?: Date;
@@ -75,6 +76,8 @@ const UserSchema = new Schema<IUser>(
       trim: true,
     },
     addresses: [AddressSchema],
+    // Product ids the customer has hearted; kept on the account so they follow the customer between devices
+    wishlist: [{ type: Schema.Types.ObjectId, ref: 'Product' }],
     // Tokens issued before this moment are rejected, so a password change signs out other devices
     passwordChangedAt: { type: Date },
     // Only a SHA-256 hash of the emailed reset token is stored
