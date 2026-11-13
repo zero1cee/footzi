@@ -43,9 +43,9 @@ describe('Admin reports', () => {
       subtotal: 1000, discount: 0, shippingFee: 0, total: 1000,
       paymentStatus: 'paid', orderStatus: 'delivered', refundedAmount: 0,
       ...over,
-    });
-    await Order.collection.updateOne({ _id: order._id }, { $set: { createdAt: paidAt, 'paymentDetails.paidAt': paidAt } });
-    ids.push(order._id as mongoose.Types.ObjectId);
+    } as any);
+    await Order.collection.updateOne({ _id: (order as any)._id }, { $set: { createdAt: paidAt, 'paymentDetails.paidAt': paidAt } });
+    ids.push((order as any)._id as mongoose.Types.ObjectId);
     return order;
   };
 

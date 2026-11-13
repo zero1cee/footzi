@@ -5,9 +5,9 @@ import { AuthRequest, isAdminRole } from '../middleware/auth.js';
 import { z } from 'zod';
 
 const createOrderSchema = z.object({
-  customerName: z.string().min(2),
+  customerName: z.string().min(2, 'Please enter your name'),
   customerEmail: z.string().trim().toLowerCase().email('Please enter a valid email address'),
-  customerPhone: z.string().min(10),
+  customerPhone: z.string().min(10, 'Enter a valid mobile number'),
   items: z.array(
     z.object({
       productId: z.string(),
@@ -19,12 +19,12 @@ const createOrderSchema = z.object({
   ).min(1, 'Your shopping bag contains no items to order.').max(50, 'An order can have at most 50 lines.'),
 
   shippingAddress: z.object({
-    name: z.string(),
-    phone: z.string(),
-    addressLine: z.string(),
-    city: z.string(),
-    state: z.string(),
-    pincode: z.string(),
+    name: z.string().min(1, 'Please complete the delivery address'),
+    phone: z.string().min(1, 'Please complete the delivery address'),
+    addressLine: z.string().min(1, 'Please complete the delivery address'),
+    city: z.string().min(1, 'Please complete the delivery address'),
+    state: z.string().min(1, 'Please complete the delivery address'),
+    pincode: z.string().min(1, 'Please complete the delivery address'),
   }),
   couponCode: z.string().optional(),
 });
@@ -48,7 +48,7 @@ export const createOrder = async (req: AuthRequest, res: Response): Promise<void
     });
   } catch (error: any) {
     if (error.name === 'ZodError') {
-      res.status(400).json({ error: 'Order validation failed', details: error.errors });
+      res.status(400).json({ error: 'Order validation failed', details: error.issues });
       return;
     }
     res.status(400).json({ error: error.message });
@@ -67,7 +67,7 @@ export const createGuestOrder = async (req: AuthRequest, res: Response): Promise
     });
   } catch (error: any) {
     if (error.name === 'ZodError') {
-      res.status(400).json({ error: error.errors[0]?.message || 'Order validation failed', details: error.errors });
+      res.status(400).json({ error: error.issues[0]?.message || 'Order validation failed', details: error.issues });
       return;
     }
     res.status(400).json({ error: error.message });

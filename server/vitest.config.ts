@@ -5,5 +5,8 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     testTimeout: 20000,
+    // Only the source tests: never the compiled copies in dist/
+    include: ['src/**/*.test.ts'],
+    exclude: ['dist/**', 'node_modules/**'],
   },
 });

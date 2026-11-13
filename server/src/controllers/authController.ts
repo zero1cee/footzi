@@ -24,7 +24,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     });
   } catch (error: any) {
     if (error.name === 'ZodError') {
-      res.status(400).json({ error: 'Validation failed', details: error.errors });
+      res.status(400).json({ error: 'Validation failed', details: error.issues });
       return;
     }
     res.status(400).json({ error: error.message });
@@ -43,7 +43,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     });
   } catch (error: any) {
     if (error.name === 'ZodError') {
-      res.status(400).json({ error: 'Validation failed', details: error.errors });
+      res.status(400).json({ error: 'Validation failed', details: error.issues });
       return;
     }
     res.status(401).json({ error: error.message });
@@ -75,7 +75,7 @@ export const addAddress = async (req: AuthRequest, res: Response): Promise<void>
     res.status(201).json({ message: 'Address added successfully', user: updatedUser });
   } catch (error: any) {
     if (error.name === 'ZodError') {
-      res.status(400).json({ error: 'Validation failed', details: error.errors });
+      res.status(400).json({ error: 'Validation failed', details: error.issues });
       return;
     }
     res.status(400).json({ error: error.message });
@@ -84,7 +84,7 @@ export const addAddress = async (req: AuthRequest, res: Response): Promise<void>
 
 const fail = (res: Response, error: any, status = 400): void => {
   if (error.name === 'ZodError') {
-    res.status(400).json({ error: error.errors[0]?.message || 'Validation failed', details: error.errors });
+    res.status(400).json({ error: error.issues[0]?.message || 'Validation failed', details: error.issues });
     return;
   }
   res.status(status).json({ error: error.message });

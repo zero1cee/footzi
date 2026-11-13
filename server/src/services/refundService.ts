@@ -36,7 +36,7 @@ export class RefundService {
     const { orderId, reference, reason, notify = true } = params;
 
     const payment = await Payment.findOne({
-      order: orderId,
+      order: orderId as any,
       status: { $in: ['captured', 'refunded'] },
       gatewayPaymentId: { $exists: true, $ne: null },
     }).sort({ createdAt: -1 });

@@ -246,7 +246,8 @@ export class OrderService {
     extraFilter: Record<string, unknown> = {}
   ): Promise<IOrder | null> {
     const order = await Order.findOneAndUpdate(
-      { _id: orderId, orderStatus: 'pending_payment', paymentStatus: { $ne: 'paid' }, ...extraFilter },
+      // Built from several optional pieces, so Mongoose 9's strict filter typing cannot check it statically
+      { _id: orderId, orderStatus: 'pending_payment', paymentStatus: { $ne: 'paid' }, ...extraFilter } as any,
       {
         $set: { orderStatus: 'cancelled' },
         $push: { statusHistory: { status: 'cancelled', timestamp: new Date(), note } },

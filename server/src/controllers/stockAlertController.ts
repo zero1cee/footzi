@@ -14,7 +14,7 @@ export const subscribeToStockAlert = async (req: Request, res: Response): Promis
     res.status(200).json({ message: "We'll email you once, as soon as this size is back in stock." });
   } catch (error: any) {
     if (error.name === 'ZodError') {
-      res.status(400).json({ error: error.errors[0]?.message || 'Please check the details and try again.' });
+      res.status(400).json({ error: error.issues[0]?.message || 'Please check the details and try again.' });
       return;
     }
     res.status(error instanceof StockAlertError ? error.status : 400).json({ error: error.message });

@@ -1,0 +1,5 @@
+{
+  // The deployed server does not need the tests, so they are left out of the build (but still type-checked by `npm run typecheck`)
+  "extends": "./tsconfig.json",
+  "exclude": ["src/tests", "node_modules", "dist"]
+}

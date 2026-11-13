@@ -127,7 +127,7 @@ export const getInventoryOverview = async (_req: AuthRequest, res: Response): Pr
 
 const sendProductError = (res: Response, error: any): void => {
   if (error.name === 'ZodError') {
-    res.status(400).json({ error: error.errors[0]?.message || 'Validation failed', details: error.errors });
+    res.status(400).json({ error: error.issues[0]?.message || 'Validation failed', details: error.issues });
     return;
   }
   res.status(400).json({ error: error.message });

@@ -1,29 +1,30 @@
 import { z } from 'zod';
+import { required } from './messages.js';
 
 export const registerSchema = z.object({
   name: z
-    .string({ required_error: 'Full name is required' })
+    .string(required('Full name is required'))
     .min(2, 'Name must be at least 2 characters')
     .max(60, 'Name must be under 60 characters'),
   email: z
-    .string({ required_error: 'Email is required' })
+    .string(required('Email is required'))
     .email('Please provide a valid email address')
     .toLowerCase()
     .trim(),
   password: z
-    .string({ required_error: 'Password is required' })
+    .string(required('Password is required'))
     .min(8, 'Password must be at least 8 characters long'),
   phone: z.string().optional(),
 });
 
 export const loginSchema = z.object({
   email: z
-    .string({ required_error: 'Email is required' })
+    .string(required('Email is required'))
     .email('Please provide a valid email address')
     .toLowerCase()
     .trim(),
   password: z
-    .string({ required_error: 'Password is required' })
+    .string(required('Password is required'))
     .min(1, 'Password cannot be empty'),
 });
 
@@ -38,21 +39,21 @@ export const addressSchema = z.object({
 });
 
 const newPassword = z
-  .string({ required_error: 'A new password is required' })
+  .string(required('A new password is required'))
   .min(8, 'Password must be at least 8 characters long')
   .max(128, 'Password is too long');
 
 export const changePasswordSchema = z.object({
-  currentPassword: z.string({ required_error: 'Your current password is required' }).min(1, 'Your current password is required'),
+  currentPassword: z.string(required('Your current password is required')).min(1, 'Your current password is required'),
   newPassword,
 });
 
 export const forgotPasswordSchema = z.object({
-  email: z.string({ required_error: 'Email is required' }).email('Please provide a valid email address').toLowerCase().trim(),
+  email: z.string(required('Email is required')).email('Please provide a valid email address').toLowerCase().trim(),
 });
 
 export const resetPasswordSchema = z.object({
-  token: z.string({ required_error: 'Reset token is required' }).min(32, 'This reset link is invalid').max(200),
+  token: z.string(required('Reset token is required')).min(32, 'This reset link is invalid').max(200),
   newPassword,
 });
 

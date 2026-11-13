@@ -107,7 +107,7 @@ export const addProductReview = async (req: AuthRequest, res: Response): Promise
     res.status(201).json({ message: 'Review successfully recorded', review: result.review, product: result.product });
   } catch (error: any) {
     if (error.name === 'ZodError') {
-      res.status(400).json({ error: error.errors[0]?.message || 'Invalid review', details: error.errors });
+      res.status(400).json({ error: error.issues[0]?.message || 'Invalid review', details: error.issues });
       return;
     }
     res.status(500).json({ error: 'Failed to record review', message: error.message });
