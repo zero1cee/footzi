@@ -71,6 +71,11 @@ export const createApp = (): Express => {
   // 100 kB, which also stops an oversized list from being used to exhaust the server's memory.
   app.use('/api/admin/products/upload-image', express.json({ limit: '8mb', verify: keepRawBody }));
   app.use(express.json({ limit: '100kb', verify: keepRawBody }));
+  // Express 5 leaves req.body undefined when a request carries no body; handlers expect an object
+  app.use((req: Request, _res: Response, next: NextFunction) => {
+    if (req.body === undefined) req.body = {};
+    next();
+  });
   app.use(express.urlencoded({ extended: true }));
   if (!isTest) {
     morgan.token('id', (req) => (req as Request).id || '-');
@@ -198,7 +203,8 @@ export const createApp = (): Express => {
 
     // Every page is served with its own title, description and share tags, so search engines and
     // link previews (WhatsApp, Slack) see the right product without running any JavaScript.
-    app.get('*', async (req: Request, res: Response, next: NextFunction) => {
+    // Express 5 writes a catch-all as a named wildcard (it also matches the home page)
+    app.get('/{*splat}', async (req: Request, res: Response, next: NextFunction) => {
       if (path.extname(req.path)) return next();
       res.setHeader('Cache-Control', 'no-cache');
       try {
