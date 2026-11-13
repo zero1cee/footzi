@@ -50,7 +50,7 @@ export const createReturn = async (req: AuthRequest, res: Response): Promise<voi
     });
   } catch (error: any) {
     if (error.name === 'ZodError') {
-      res.status(400).json({ error: error.errors[0]?.message || 'Invalid request', details: error.errors });
+      res.status(400).json({ error: error.issues[0]?.message || 'Invalid request', details: error.issues });
       return;
     }
     res.status(400).json({ error: error.message });
@@ -114,7 +114,7 @@ export const updateReturnStatusAdmin = async (req: AuthRequest, res: Response): 
     });
   } catch (error: any) {
     if (error.name === 'ZodError') {
-      res.status(400).json({ error: error.errors[0]?.message || 'Invalid status', details: error.errors });
+      res.status(400).json({ error: error.issues[0]?.message || 'Invalid status', details: error.issues });
       return;
     }
     res.status(400).json({ error: error.message });

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { wrongType } from './messages.js';
 
 const SIZES = ['UK 6', 'UK 7', 'UK 8', 'UK 9', 'UK 10', 'UK 11'] as const;
 const CATEGORIES = ['Loafers', 'Sneakers', 'Oxfords', 'Boots', 'Slip-ons'] as const;
@@ -24,9 +25,9 @@ const fields = {
   name: z.string().trim().min(2, 'Name must be at least 2 characters').max(120),
   subtitle: z.string().trim().max(160).optional(),
   description: z.string().trim().min(10, 'Describe the shoe in at least 10 characters').max(2000),
-  category: z.enum(CATEGORIES, { errorMap: () => ({ message: `Category must be one of ${CATEGORIES.join(', ')}` }) }),
-  price: z.number({ invalid_type_error: 'Price must be a number' }).positive('Price must be more than 0').max(1_000_000),
-  originalPrice: z.number({ invalid_type_error: 'Original price must be a number' }).positive().max(1_000_000),
+  category: z.enum(CATEGORIES, `Category must be one of ${CATEGORIES.join(', ')}`),
+  price: z.number(wrongType('Price must be a number')).positive('Price must be more than 0').max(1_000_000),
+  originalPrice: z.number(wrongType('Original price must be a number')).positive().max(1_000_000),
   images: z.array(imageUrl).min(1, 'Add at least one image').max(8, 'At most 8 images'),
   colors: z
     .array(z.object({ name: z.string().trim().min(1).max(40), hex: z.string().regex(/^#[0-9a-fA-F]{6}$/), imageIndex: z.number().int().min(0).default(0) }))

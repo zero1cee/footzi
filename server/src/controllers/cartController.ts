@@ -27,7 +27,7 @@ export const addItem = async (req: AuthRequest, res: Response): Promise<void> =>
     res.status(200).json({ message: 'Item added to bag', cart });
   } catch (error: any) {
     if (error.name === 'ZodError') {
-      res.status(400).json({ error: 'Validation failed', details: error.errors });
+      res.status(400).json({ error: 'Validation failed', details: error.issues });
       return;
     }
     res.status(400).json({ error: error.message });
@@ -45,7 +45,7 @@ export const mergeCart = async (req: AuthRequest, res: Response): Promise<void> 
     res.status(200).json({ message: 'Bag merged', cart });
   } catch (error: any) {
     if (error.name === 'ZodError') {
-      res.status(400).json({ error: 'Validation failed', details: error.errors });
+      res.status(400).json({ error: 'Validation failed', details: error.issues });
       return;
     }
     res.status(400).json({ error: error.message });
@@ -65,7 +65,7 @@ export const updateItemQuantity = async (req: AuthRequest, res: Response): Promi
     res.status(200).json({ message: 'Cart updated', cart });
   } catch (error: any) {
     if (error.name === 'ZodError') {
-      res.status(400).json({ error: 'Validation failed', details: error.errors });
+      res.status(400).json({ error: 'Validation failed', details: error.issues });
       return;
     }
     res.status(400).json({ error: error.message });

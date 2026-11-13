@@ -5,7 +5,7 @@ import { createCouponSchema, updateCouponSchema, validateCouponSchema } from '..
 
 const fail = (res: Response, error: any, status = 400): void => {
   if (error.name === 'ZodError') {
-    res.status(400).json({ error: error.errors[0]?.message || 'Validation failed', details: error.errors });
+    res.status(400).json({ error: error.issues[0]?.message || 'Validation failed', details: error.issues });
     return;
   }
   res.status(status).json({ error: error.message });

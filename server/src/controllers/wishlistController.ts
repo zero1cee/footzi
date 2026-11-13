@@ -28,7 +28,7 @@ export const mergeWishlist = async (req: AuthRequest, res: Response): Promise<vo
     res.status(200).json({ productIds: await wishlistService.merge(req.user!.id, productIds) });
   } catch (error: any) {
     if (error.name === 'ZodError') {
-      res.status(400).json({ error: error.errors[0]?.message || 'Validation failed' });
+      res.status(400).json({ error: error.issues[0]?.message || 'Validation failed' });
       return;
     }
     res.status(400).json({ error: error.message });
