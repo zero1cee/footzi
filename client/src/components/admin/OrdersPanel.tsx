@@ -127,7 +127,7 @@ export const OrdersPanel: React.FC<Props> = ({ token, isReadOnly, onMessage }) =
                     <h4 className="uppercase tracking-widest text-[10px] font-bold text-charcoal-700">Items</h4>
                     {order.items.map((item: any) => (
                       <div key={item.sku} className="flex items-center gap-2">
-                        <img src={item.image} alt="" className="w-9 h-9 object-cover rounded-xs border border-ivory-300" />
+                        <img decoding="async" loading="lazy" src={item.image} alt="" className="w-9 h-9 object-cover rounded-xs border border-ivory-300" />
                         <div className="flex-1 min-w-0">
                           <p className="font-semibold text-charcoal-900 truncate">{item.name}</p>
                           <p className="text-[11px] text-charcoal-500">{item.size} • {item.color} × {item.quantity}</p>

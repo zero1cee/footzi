@@ -164,6 +164,8 @@ export const productService = {
         const data = await res.json();
         return normalizeProduct(data);
       }
+      // The server answered: this style does not exist (or was retired), so do not invent one
+      if (res.status === 404) return null;
     } catch {
       // Backend not running, use mock
     }

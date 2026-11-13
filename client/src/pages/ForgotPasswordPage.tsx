@@ -3,8 +3,10 @@ import { Link } from 'react-router-dom';
 import { Mail, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { authService } from '@/services/authService';
 import { Button } from '@/components/ui/Button';
+import { useDocumentMeta } from '@/hooks/useDocumentMeta';
 
 export const ForgotPasswordPage: React.FC = () => {
+  useDocumentMeta({ title: 'Forgot password — Footzi', noindex: true });
   const [email, setEmail] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [sentMessage, setSentMessage] = useState<string | null>(null);

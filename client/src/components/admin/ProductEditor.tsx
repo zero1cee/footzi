@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import { Plus, Trash2, X } from 'lucide-react';
 import { adminService } from '@/services/adminService';
 import { Button } from '@/components/ui/Button';
+import { useDialogA11y } from '@/hooks/useDialogA11y';
 
 const CATEGORIES = ['Loafers', 'Sneakers', 'Oxfords', 'Boots', 'Slip-ons'];
 const BADGES = ['', 'New Arrival', 'Best Seller', 'Artisan Heritage', 'Limited Run'];
@@ -41,6 +42,7 @@ export const ProductEditor: React.FC<Props> = ({ product, token, onClose, onSave
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const dialogRef = useDialogA11y<HTMLFormElement>(true, onClose);
 
   const price = Number(form.price);
   const original = Number(form.originalPrice);
@@ -97,7 +99,7 @@ export const ProductEditor: React.FC<Props> = ({ product, token, onClose, onSave
 
   return (
     <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-4 bg-charcoal-950/60 overflow-y-auto" role="dialog" aria-modal="true" aria-label={`Edit ${product.name}`}>
-      <form onSubmit={save} className="bg-white w-full max-w-2xl rounded-xs shadow-2xl border border-ivory-300 p-6 sm:p-8 relative space-y-4 text-xs my-4">
+      <form ref={dialogRef} tabIndex={-1} onSubmit={save} className="focus:outline-none bg-white w-full max-w-2xl rounded-xs shadow-2xl border border-ivory-300 p-6 sm:p-8 relative space-y-4 text-xs my-4">
         <button type="button" onClick={onClose} aria-label="Close" className="absolute top-4 right-4 text-charcoal-400 hover:text-charcoal-900">
           <X className="w-5 h-5" />
         </button>
@@ -164,7 +166,7 @@ export const ProductEditor: React.FC<Props> = ({ product, token, onClose, onSave
           <span className="block font-semibold text-charcoal-700">Images (the first is the cover)</span>
           {images.map((url, i) => (
             <div key={i} className="flex items-center gap-2">
-              {url && <img src={url} alt="" className="w-9 h-9 object-cover rounded-xs border border-ivory-300" />}
+              {url && <img decoding="async" loading="lazy" src={url} alt="" className="w-9 h-9 object-cover rounded-xs border border-ivory-300" />}
               <input aria-label={`Image ${i + 1} link`} className={inputClass} value={url} placeholder="https://…" onChange={(e) => setImages((prev) => prev.map((p, j) => (j === i ? e.target.value : p)))} />
               <button type="button" aria-label={`Remove image ${i + 1}`} disabled={images.length === 1} onClick={() => setImages((prev) => prev.filter((_, j) => j !== i))} className="p-1.5 text-charcoal-500 hover:text-red-700 disabled:opacity-30">
                 <Trash2 className="w-4 h-4" />

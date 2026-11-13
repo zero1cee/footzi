@@ -7,6 +7,7 @@ import { couponService } from '@/services/couponService';
 import { orderService } from '@/services/orderService';
 import { formatINR, isBackendUnreachable } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
+import { useDocumentMeta } from '@/hooks/useDocumentMeta';
 
 interface PendingPayment {
   createdOrder: any;
@@ -27,6 +28,7 @@ const loadRazorpayScript = (): Promise<void> =>
   });
 
 export const CheckoutPage: React.FC = () => {
+  useDocumentMeta({ title: 'Checkout — Footzi', noindex: true });
   const { items, getSubtotal, getDiscountAmount, getShippingFee, getTotal, clearCart, couponCode, removeCoupon } = useCartStore();
   const { user, token, loginAsDemo } = useAuthStore();
 
@@ -430,7 +432,7 @@ export const CheckoutPage: React.FC = () => {
         )}
 
         {errorMessage && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xs flex items-center gap-2">
+          <div role="alert" className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xs flex items-center gap-2">
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{errorMessage}</span>
           </div>
@@ -639,7 +641,7 @@ export const CheckoutPage: React.FC = () => {
               <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
                 {items.map((item) => (
                   <div key={item.id} className="flex gap-3 text-xs">
-                    <img
+                    <img decoding="async" loading="lazy"
                       src={item.image}
                       alt={item.productName}
                       className="w-12 h-14 object-cover rounded-xs bg-ivory-200"

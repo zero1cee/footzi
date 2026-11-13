@@ -4,6 +4,7 @@ import { X, Trash2, Plus, Minus, ArrowRight, ShieldCheck, Tag, ShoppingBag } fro
 import { useCartStore } from '@/store/useCartStore';
 import { formatINR } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
+import { useDialogA11y } from '@/hooks/useDialogA11y';
 
 export const CartDrawer: React.FC = () => {
   const navigate = useNavigate();
@@ -25,6 +26,8 @@ export const CartDrawer: React.FC = () => {
 
   const [inputCoupon, setInputCoupon] = useState('');
   const [couponFeedback, setCouponFeedback] = useState<{ success: boolean; text: string } | null>(null);
+
+  const dialogRef = useDialogA11y<HTMLDivElement>(isOpen, closeCart);
 
   if (!isOpen) return null;
 
@@ -51,12 +54,20 @@ export const CartDrawer: React.FC = () => {
     <div className="fixed inset-0 z-50 overflow-hidden">
       {/* Backdrop */}
       <div
+        aria-hidden="true"
         className="absolute inset-0 bg-charcoal-950/60 backdrop-blur-sm transition-opacity"
         onClick={closeCart}
       />
 
       <div className="fixed inset-y-0 right-0 max-w-full flex pl-10">
-        <div className="w-screen max-w-md bg-ivory-100 flex flex-col shadow-2xl animate-fade-in border-l border-ivory-300">
+        <div
+          ref={dialogRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Shopping bag"
+          tabIndex={-1}
+          className="w-screen max-w-md bg-ivory-100 flex flex-col shadow-2xl animate-fade-in border-l border-ivory-300 focus:outline-none"
+        >
           {/* Header */}
           <div className="p-5 border-b border-ivory-300 flex items-center justify-between bg-ivory-50">
             <div className="flex items-center gap-2">
@@ -127,7 +138,7 @@ export const CartDrawer: React.FC = () => {
                   className="flex gap-4 p-3 bg-white border border-ivory-200 rounded-sm hover:border-sand-300 transition-colors"
                 >
                   {/* Thumbnail */}
-                  <img
+                  <img decoding="async" loading="lazy"
                     src={item.image}
                     alt={item.productName}
                     className="w-20 h-24 object-cover object-center rounded-xs bg-ivory-200"

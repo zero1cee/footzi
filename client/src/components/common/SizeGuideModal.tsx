@@ -1,6 +1,7 @@
 import React from 'react';
 import { X, Ruler, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { useDialogA11y } from '@/hooks/useDialogA11y';
 
 interface SizeGuideModalProps {
   isOpen: boolean;
@@ -8,6 +9,8 @@ interface SizeGuideModalProps {
 }
 
 export const SizeGuideModal: React.FC<SizeGuideModalProps> = ({ isOpen, onClose }) => {
+  const dialogRef = useDialogA11y<HTMLDivElement>(isOpen, onClose);
+
   if (!isOpen) return null;
 
   const sizeChart = [
@@ -22,10 +25,17 @@ export const SizeGuideModal: React.FC<SizeGuideModalProps> = ({ isOpen, onClose 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4 sm:p-6">
       {/* Backdrop */}
-      <div className="fixed inset-0 bg-charcoal-950/70 backdrop-blur-sm transition-opacity" onClick={onClose} />
+      <div aria-hidden="true" className="fixed inset-0 bg-charcoal-950/70 backdrop-blur-sm transition-opacity" onClick={onClose} />
 
       {/* Modal Dialog */}
-      <div className="relative bg-ivory-50 max-w-xl w-full rounded-xs shadow-2xl border border-ivory-300 p-6 sm:p-8 z-10 animate-fade-in">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Indian shoe size conversion and fit guide"
+        tabIndex={-1}
+        className="relative bg-ivory-50 max-w-xl w-full rounded-xs shadow-2xl border border-ivory-300 p-6 sm:p-8 z-10 animate-fade-in focus:outline-none"
+      >
         <div className="flex items-center justify-between pb-4 border-b border-ivory-200">
           <div className="flex items-center gap-2">
             <Ruler className="w-5 h-5 text-sand-600" />

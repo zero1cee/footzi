@@ -23,7 +23,7 @@ export const Footer: React.FC = () => {
             <div className="flex items-start gap-3.5">
               <Award className="w-6 h-6 text-sand-400 shrink-0 mt-0.5" />
               <div>
-                <h4 className="font-serif text-base font-medium text-ivory-50">Agra Artisanal Heritage</h4>
+                <p className="font-serif text-base font-medium text-ivory-50">Agra Artisanal Heritage</p>
                 <p className="text-xs text-charcoal-400 mt-1 leading-relaxed">
                   Generational shoemakers crafting each pair with architectural balance.
                 </p>
@@ -33,7 +33,7 @@ export const Footer: React.FC = () => {
             <div className="flex items-start gap-3.5">
               <Shield className="w-6 h-6 text-sand-400 shrink-0 mt-0.5" />
               <div>
-                <h4 className="font-serif text-base font-medium text-ivory-50">100% Genuine Leathers</h4>
+                <p className="font-serif text-base font-medium text-ivory-50">100% Genuine Leathers</p>
                 <p className="text-xs text-charcoal-400 mt-1 leading-relaxed">
                   Certified full-grain, veg-tan calfskin and butter-soft Italian nappa.
                 </p>
@@ -43,7 +43,7 @@ export const Footer: React.FC = () => {
             <div className="flex items-start gap-3.5">
               <Truck className="w-6 h-6 text-sand-400 shrink-0 mt-0.5" />
               <div>
-                <h4 className="font-serif text-base font-medium text-ivory-50">Pan-India Express</h4>
+                <p className="font-serif text-base font-medium text-ivory-50">Pan-India Express</p>
                 <p className="text-xs text-charcoal-400 mt-1 leading-relaxed">
                   Dispatched in 24 hours with end-to-end simulated tracking.
                 </p>
@@ -53,7 +53,7 @@ export const Footer: React.FC = () => {
             <div className="flex items-start gap-3.5">
               <RefreshCw className="w-6 h-6 text-sand-400 shrink-0 mt-0.5" />
               <div>
-                <h4 className="font-serif text-base font-medium text-ivory-50">Hassle-Free Exchanges</h4>
+                <p className="font-serif text-base font-medium text-ivory-50">Hassle-Free Exchanges</p>
                 <p className="text-xs text-charcoal-400 mt-1 leading-relaxed">
                   Complimentary 7-day doorstep size replacement across all pincodes.
                 </p>
@@ -87,9 +87,9 @@ export const Footer: React.FC = () => {
 
           {/* Footwear Categories */}
           <div>
-            <h4 className="text-xs font-semibold uppercase tracking-widest text-sand-400 mb-4">
+            <h2 className="text-xs font-semibold uppercase tracking-widest text-sand-400 mb-4">
               Collections
-            </h4>
+            </h2>
             <ul className="space-y-2.5 text-xs text-charcoal-400">
               <li>
                 <Link to="/shop?category=Loafers" className="hover:text-ivory-100 transition-colors">
@@ -121,9 +121,9 @@ export const Footer: React.FC = () => {
 
           {/* Customer Concierge */}
           <div>
-            <h4 className="text-xs font-semibold uppercase tracking-widest text-sand-400 mb-4">
+            <h2 className="text-xs font-semibold uppercase tracking-widest text-sand-400 mb-4">
               Concierge & Care
-            </h4>
+            </h2>
             <ul className="space-y-2.5 text-xs text-charcoal-400">
               <li>
                 <Link to="/account/orders" className="hover:text-ivory-100 transition-colors">
@@ -155,9 +155,9 @@ export const Footer: React.FC = () => {
 
           {/* Newsletter Signup */}
           <div>
-            <h4 className="text-xs font-semibold uppercase tracking-widest text-sand-400 mb-4">
+            <h2 className="text-xs font-semibold uppercase tracking-widest text-sand-400 mb-4">
               The Footzi Journal
-            </h4>
+            </h2>
             <p className="text-xs text-charcoal-400 leading-relaxed mb-4">
               Receive private invitations to limited artisan batch releases and footwear care chronicles.
             </p>

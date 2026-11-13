@@ -13,6 +13,7 @@ import { useProducts } from '@/hooks/useProducts';
 import { ProductCard } from '@/components/ui/ProductCard';
 import { ShoeSize } from '@/types';
 import { Button } from '@/components/ui/Button';
+import { useDocumentMeta } from '@/hooks/useDocumentMeta';
 
 const CATEGORIES = ['All', 'Loafers', 'Sneakers', 'Oxfords', 'Boots', 'Slip-ons'];
 const BRANDS = ['All', 'Footzi Atelier', 'Footzi Studio', 'Footzi Performance'];
@@ -42,6 +43,14 @@ export const ProductListingPage: React.FC = () => {
   const minPrice = searchParams.get('minPrice') ? Number(searchParams.get('minPrice')) : undefined;
   const maxPrice = searchParams.get('maxPrice') ? Number(searchParams.get('maxPrice')) : undefined;
   const currentPage = Number(searchParams.get('page')) || 1;
+
+  useDocumentMeta({
+    title: selectedCategory !== 'All' ? `${selectedCategory} — Handcrafted in Agra | Footzi` : 'Shop Handcrafted Leather Footwear — Footzi',
+    description:
+      'Loafers, sneakers, oxfords, boots and slip-ons handcrafted in Agra from full-grain leather. Free delivery over ₹1,999 and 7-day size exchange.',
+    // Internal search results are not worth indexing
+    noindex: Boolean(searchQuery),
+  });
 
   // React Query Hook
   const { data, isLoading } = useProducts({

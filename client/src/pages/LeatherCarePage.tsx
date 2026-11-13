@@ -2,8 +2,13 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Sparkles, Droplets, Shield, Wind, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { useDocumentMeta } from '@/hooks/useDocumentMeta';
 
 export const LeatherCarePage: React.FC = () => {
+  useDocumentMeta({
+    title: 'Leather Care Guide — Footzi',
+    description: 'How to clean, condition and store full-grain leather footwear so your Footzi pair keeps its patina for years.',
+  });
   const rituals = [
     {
       title: 'Full-Grain & Burnished Calfskin',

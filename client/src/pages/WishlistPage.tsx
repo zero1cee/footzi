@@ -6,8 +6,10 @@ import { useProducts } from '@/hooks/useProducts';
 import { MOCK_PRODUCTS } from '@/data/mockProducts';
 import { ProductCard } from '@/components/ui/ProductCard';
 import { Button } from '@/components/ui/Button';
+import { useDocumentMeta } from '@/hooks/useDocumentMeta';
 
 export const WishlistPage: React.FC = () => {
+  useDocumentMeta({ title: 'Your Wishlist — Footzi', noindex: true });
   const { wishlist } = useCartStore();
   const { data, isLoading } = useProducts({ limit: 100 });
 

@@ -18,23 +18,75 @@ import {
   MessageSquare,
 } from 'lucide-react';
 import { useProductBySlug, useSubmitReview } from '@/hooks/useProducts';
+import { useDocumentMeta } from '@/hooks/useDocumentMeta';
 import { MOCK_PRODUCTS } from '@/data/mockProducts';
 import { useCartStore } from '@/store/useCartStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { formatINR } from '@/lib/utils';
-import { ShoeSize, ProductReview } from '@/types';
+import { Product, ShoeSize, ProductReview } from '@/types';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { ProductCard } from '@/components/ui/ProductCard';
 import { SizeGuideModal } from '@/components/common/SizeGuideModal';
 
+const NotFound: React.FC = () => {
+  useDocumentMeta({ title: 'Product not found — Footzi', noindex: true });
+  return (
+    <div className="py-24 text-center bg-ivory-100 min-h-[60vh]">
+      <h1 className="font-serif text-3xl font-medium text-charcoal-900">This style is no longer available</h1>
+      <p className="text-xs text-charcoal-500 mt-2">It may have been retired from the collection, or the link is mistyped.</p>
+      <Link to="/shop" className="mt-4 inline-block text-xs uppercase tracking-widest font-semibold text-sand-600 underline">
+        Browse the collection
+      </Link>
+    </div>
+  );
+};
+
+/** Loads the product, and only then renders the page, so its form state starts from the real product. */
 export const ProductDetailPage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
+  const { data: product, isLoading } = useProductBySlug(slug);
+
+  if (isLoading) {
+    return (
+      <div role="status" aria-label="Loading product" className="py-20 text-center bg-ivory-100 min-h-[70vh] flex items-center justify-center">
+        <div className="w-10 h-10 border-4 border-charcoal-900 border-t-transparent rounded-full animate-spin mx-auto" />
+      </div>
+    );
+  }
+  if (!product) return <NotFound />;
+  return <ProductDetailContent key={product.id} product={product} />;
+};
+
+const ProductDetailContent: React.FC<{ product: Product }> = ({ product }) => {
   const navigate = useNavigate();
   const { addItem, toggleWishlist, isInWishlist } = useCartStore();
 
-  const { data: fetchedProduct, isLoading } = useProductBySlug(slug);
-  const product = fetchedProduct || MOCK_PRODUCTS.find((p) => p.slug === slug) || MOCK_PRODUCTS[0];
+  useDocumentMeta({
+    title: `${product.name} — Footzi`,
+    description: `${product.name}. ${product.description}`.replace(/\s+/g, ' ').slice(0, 160),
+    image: product.images?.[0] ? new URL(product.images[0], window.location.origin).href : undefined,
+    type: 'product',
+    jsonLd: {
+      '@context': 'https://schema.org',
+      '@type': 'Product',
+      name: product.name,
+      description: product.description,
+      image: (product.images || []).map((i) => new URL(i, window.location.origin).href),
+      sku: product.variants?.[0]?.sku,
+      category: product.category,
+      brand: { '@type': 'Brand', name: product.brand || 'Footzi Atelier' },
+      offers: {
+        '@type': 'Offer',
+        url: `${window.location.origin}/product/${product.slug}`,
+        priceCurrency: 'INR',
+        price: product.price,
+        availability: (product.variants || []).some((v) => v.stock > 0) ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+        itemCondition: 'https://schema.org/NewCondition',
+      },
+      ...(product.reviewCount > 0 ? { aggregateRating: { '@type': 'AggregateRating', ratingValue: product.rating, reviewCount: product.reviewCount } } : {}),
+    },
+  });
 
   const wishlisted = isInWishlist(product.id);
 
@@ -117,14 +169,6 @@ export const ProductDetailPage: React.FC = () => {
 
   const relatedProducts = MOCK_PRODUCTS.filter((p) => p.id !== product.id && p.category === product.category).slice(0, 3);
 
-  if (isLoading) {
-    return (
-      <div className="py-20 text-center bg-ivory-100 min-h-[70vh] flex items-center justify-center">
-        <div className="w-10 h-10 border-4 border-charcoal-900 border-t-transparent rounded-full animate-spin mx-auto" />
-      </div>
-    );
-  }
-
   return (
     <div className="py-8 md:py-12 bg-ivory-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -147,7 +191,7 @@ export const ProductDetailPage: React.FC = () => {
           <div className="lg:col-span-7 space-y-4">
             {/* Primary High-Res Display */}
             <div className="aspect-[4/5] rounded-xs overflow-hidden bg-ivory-200 border border-ivory-300 shadow-sm relative group">
-              <img
+              <img decoding="async" ref={(el) => el?.setAttribute("fetchpriority", "high")}
                 src={product.images[activeImageIndex] || product.images[0]}
                 alt={product.name}
                 className="w-full h-full object-cover object-center transition-transform duration-500 group-hover:scale-105"
@@ -174,7 +218,7 @@ export const ProductDetailPage: React.FC = () => {
                         : 'border-ivory-300 opacity-70 hover:opacity-100'
                     }`}
                   >
-                    <img src={img} alt="Thumbnail" className="w-full h-full object-cover" />
+                    <img decoding="async" loading="lazy" src={img} alt={`${product.name}, view ${idx + 1}`} className="w-full h-full object-cover" />
                   </button>
                 ))}
               </div>
@@ -583,7 +627,9 @@ export const ProductDetailPage: React.FC = () => {
                           key={s}
                           type="button"
                           onClick={() => setReviewRating(s)}
-                          className="p-1 focus:outline-none"
+                          aria-label={`${s} star${s === 1 ? '' : 's'}`}
+                          aria-pressed={s === reviewRating}
+                          className="p-1 rounded-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-charcoal-900"
                         >
                           <Star
                             className={`w-4 h-4 ${
@@ -646,7 +692,7 @@ export const ProductDetailPage: React.FC = () => {
                   </div>
 
                   {reviewError && (
-                    <p className="text-[11px] text-red-700 bg-red-50 border border-red-200 rounded-xs p-2">{reviewError}</p>
+                    <p role="alert" className="text-[11px] text-red-700 bg-red-50 border border-red-200 rounded-xs p-2">{reviewError}</p>
                   )}
 
                   <Button type="submit" variant="primary" size="md" isLoading={submitReviewMutation.isPending}>

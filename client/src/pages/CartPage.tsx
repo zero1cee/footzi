@@ -4,8 +4,10 @@ import { Trash2, Plus, Minus, ArrowRight, ShieldCheck, Tag, ShoppingBag, ArrowLe
 import { useCartStore } from '@/store/useCartStore';
 import { formatINR } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
+import { useDocumentMeta } from '@/hooks/useDocumentMeta';
 
 export const CartPage: React.FC = () => {
+  useDocumentMeta({ title: 'Your Bag — Footzi', noindex: true });
   const navigate = useNavigate();
   const {
     items,
@@ -99,7 +101,7 @@ export const CartPage: React.FC = () => {
                   <div key={item.id} className="p-4 sm:p-5 flex flex-col sm:grid sm:grid-cols-12 gap-4 items-center">
                     {/* Item Info */}
                     <div className="w-full sm:col-span-6 flex gap-4 items-center">
-                      <img
+                      <img decoding="async" loading="lazy"
                         src={item.image}
                         alt={item.productName}
                         className="w-20 h-24 object-cover object-center rounded-xs bg-ivory-200"

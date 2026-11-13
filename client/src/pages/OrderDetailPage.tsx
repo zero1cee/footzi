@@ -6,6 +6,7 @@ import { orderService } from '@/services/orderService';
 import { formatINR } from '@/lib/utils';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { useDocumentMeta } from '@/hooks/useDocumentMeta';
 
 const STATUS_LABELS: Record<string, string> = {
   pending_payment: 'Awaiting payment',
@@ -29,6 +30,7 @@ const canCancel = (order: any) =>
   (order.paymentStatus === 'paid' && ['confirmed', 'processing'].includes(order.orderStatus));
 
 export const OrderDetailPage: React.FC = () => {
+  useDocumentMeta({ title: 'Order details — Footzi', noindex: true });
   const { id } = useParams<{ id: string }>();
   const token = useAuthStore((s) => s.token);
 
@@ -132,7 +134,7 @@ export const OrderDetailPage: React.FC = () => {
           <div className="py-5 border-b border-ivory-200 space-y-4">
             {order.items.map((item: any) => (
               <div key={`${item.sku}`} className="flex items-center gap-4">
-                <img src={item.image} alt={item.name} className="w-16 h-16 object-cover rounded-xs border border-ivory-300" />
+                <img decoding="async" loading="lazy" src={item.image} alt={item.name} className="w-16 h-16 object-cover rounded-xs border border-ivory-300" />
                 <div className="flex-1 min-w-0">
                   <p className="font-serif text-sm font-semibold text-charcoal-900">{item.name}</p>
                   <p className="text-xs text-charcoal-500">

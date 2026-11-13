@@ -3,8 +3,10 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Lock } from 'lucide-react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { Button } from '@/components/ui/Button';
+import { useDocumentMeta } from '@/hooks/useDocumentMeta';
 
 export const ResetPasswordPage: React.FC = () => {
+  useDocumentMeta({ title: 'Choose a new password — Footzi', noindex: true });
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const token = params.get('token') || '';

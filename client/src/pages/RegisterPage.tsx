@@ -3,8 +3,10 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Lock, Mail, User, Phone, ShieldCheck, ArrowRight, Sparkles } from 'lucide-react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { Button } from '@/components/ui/Button';
+import { useDocumentMeta } from '@/hooks/useDocumentMeta';
 
 export const RegisterPage: React.FC = () => {
+  useDocumentMeta({ title: 'Create your account — Footzi', noindex: true });
   const navigate = useNavigate();
   const { register, isLoading, error, clearError } = useAuthStore();
 
@@ -51,7 +53,7 @@ export const RegisterPage: React.FC = () => {
 
           {/* Error Banner */}
           {error && (
-            <div className="mb-6 p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xs">
+            <div role="alert" className="mb-6 p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xs">
               {error}
             </div>
           )}

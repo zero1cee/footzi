@@ -26,6 +26,8 @@ import { orderService } from '@/services/orderService';
 import { returnService } from '@/services/returnService';
 import { ShoeSize } from '@/types';
 import { ProfileSettings } from '@/components/account/ProfileSettings';
+import { useDialogA11y } from '@/hooks/useDialogA11y';
+import { useDocumentMeta } from '@/hooks/useDocumentMeta';
 
 type AccountTab = 'orders' | 'wishlist' | 'addresses' | 'returns' | 'profile';
 
@@ -53,6 +55,7 @@ const returnEligibility = (order: any): { eligible: boolean; note: string } => {
 };
 
 export const AccountPage: React.FC = () => {
+  useDocumentMeta({ title: 'My Account — Footzi', noindex: true });
   const navigate = useNavigate();
   const location = useLocation();
   const [activeTab, setActiveTab] = useState<AccountTab>(() => resolveTabFromPath(location.pathname));
@@ -234,6 +237,8 @@ export const AccountPage: React.FC = () => {
     setAddrForm(emptyAddress());
     flash(wasEditing ? 'Address updated.' : 'Delivery address saved to your Footzi profile.');
   };
+
+  const returnDialogRef = useDialogA11y<HTMLDivElement>(isModalOpen && Boolean(selectedOrder), () => setIsModalOpen(false));
 
   const modalItem = selectedOrder?.items?.[selectedItemIdx] ?? selectedOrder?.items?.[0];
 
@@ -470,7 +475,7 @@ export const AccountPage: React.FC = () => {
                     {firstItem && (
                       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                         <div className="flex items-center gap-4">
-                          <img
+                          <img decoding="async" loading="lazy"
                             src={firstItem.image}
                             alt={firstItem.name}
                             className="w-16 h-16 object-cover rounded-xs border border-ivory-300"
@@ -682,7 +687,7 @@ export const AccountPage: React.FC = () => {
                 </h3>
 
                 {addrError && (
-                  <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xs">
+                  <div role="alert" className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xs">
                     {addrError}
                   </div>
                 )}
@@ -847,11 +852,19 @@ export const AccountPage: React.FC = () => {
       {/* Size Exchange / Return Modal */}
       {isModalOpen && selectedOrder && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-charcoal-950/60 backdrop-blur-xs">
-          <div className="bg-white max-w-lg w-full rounded-xs shadow-2xl border border-ivory-300 p-6 sm:p-8 relative">
+          <div
+            ref={returnDialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Size exchange or return"
+            tabIndex={-1}
+            className="bg-white max-w-lg w-full rounded-xs shadow-2xl border border-ivory-300 p-6 sm:p-8 relative focus:outline-none"
+          >
             <button
               onClick={() => setIsModalOpen(false)}
               className="absolute top-4 right-4 text-charcoal-400 hover:text-charcoal-900"
-            >
+          aria-label="Close"
+        >
               <X className="w-5 h-5" />
             </button>
 
@@ -994,7 +1007,7 @@ export const AccountPage: React.FC = () => {
               </div>
 
               {returnError && (
-                <p className="text-[11px] text-red-700 bg-red-50 border border-red-200 rounded-xs p-2">{returnError}</p>
+                <p role="alert" className="text-[11px] text-red-700 bg-red-50 border border-red-200 rounded-xs p-2">{returnError}</p>
               )}
 
               <div className="flex items-center justify-end gap-3 pt-3">

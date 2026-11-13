@@ -10,7 +10,7 @@
 ![Express.js](https://img.shields.io/badge/Express.js-000000?style=for-the-badge&logo=express&logoColor=white)
 ![MongoDB](https://img.shields.io/badge/MongoDB-4EA94B?style=for-the-badge&logo=mongodb&logoColor=white)
 ![Razorpay](https://img.shields.io/badge/Razorpay_Sandbox-02042B?style=for-the-badge&logo=razorpay&logoColor=3395FF)
-![Vitest](https://img.shields.io/badge/Vitest-127_Tests_Passed-6E9F18?style=for-the-badge&logo=vitest&logoColor=white)
+![Vitest](https://img.shields.io/badge/Vitest-156_Tests_Passed-6E9F18?style=for-the-badge&logo=vitest&logoColor=white)
 
 <p align="center">
   <strong>Architectural footwear inspired by the generational leathercraft of Agra, engineered for modern Indian luxury.</strong>
@@ -329,15 +329,15 @@ Open **[http://localhost:5173](http://localhost:5173)** in your browser.
 
 ### 4. Running Automated Tests
 
-Footzi includes **127 automated unit and integration tests** ensuring test-driven reliability:
+Footzi includes **156 automated unit and integration tests** ensuring test-driven reliability:
 
 ```bash
-# Client Vitest Suite (39 tests: Cart and server-checked coupons, bag merge on sign-in, password reset and order pages, admin panels, UI components, return service)
+# Client Vitest Suite (58 tests: Cart and server-checked coupons, bag merge on sign-in, password reset and order pages, admin panels, page titles and meta tags, dialog keyboard behaviour, automated accessibility checks with axe, UI components, return service)
 cd client
 npm test
 
-# Server Integration Suite (88 tests: Auth, Cart, Orders, Razorpay HMAC and webhook, Dropship Pipeline,
-# Returns, Reviews, Order expiry, Demo admin, Password reset, Refunds, Email providers, Coupons, Product editing, Workshop pipeline, Cloudinary, Inventory). Needs a seeded MongoDB; point
+# Server Integration Suite (98 tests: Auth, Cart, Orders, Razorpay HMAC and webhook, Dropship Pipeline,
+# Returns, Reviews, Order expiry, Demo admin, Password reset, Refunds, Email providers, Coupons, Product editing, Workshop pipeline, SEO (page tags, sitemap, robots), Cloudinary, Inventory). Needs a seeded MongoDB; point
 # MONGODB_URI at a scratch database, because the tests create and delete orders.
 cd server
 npx vitest run
@@ -398,10 +398,15 @@ MONGODB_URI="<atlas connection string>" npm run seed:demo-admin
 | `BREVO_API_KEY` | no | Sends order, shipping, refund and password-reset emails through [Brevo](https://www.brevo.com) (free: 300/day). Needs `EMAIL_FROM` set to a sender you verified in Brevo, which can be a plain Gmail address. Used first when both keys are set |
 | `RESEND_API_KEY` | no | Same emails through [Resend](https://resend.com). Resend can only mail your own address until you verify a domain |
 | `EMAIL_FROM` | with Brevo | Sender, e.g. `Footzi <you@gmail.com>`. Required for Brevo; optional for Resend. With neither key set, emails are only written to the server log, so **password reset cannot reach customers** |
-| `APP_URL` | no | Public site URL used in email links (defaults to Render's `RENDER_EXTERNAL_URL`) |
+| `APP_URL` | no | Public site URL used in email links, canonical links, the sitemap and share previews. Set it to your real domain once you have one (defaults to Render's `RENDER_EXTERNAL_URL`) |
 | `CLOUDINARY_*` | no | Real image uploads; unset = uploads are simulated |
 | `CORS_ORIGIN` | no | Only if a separately hosted frontend calls this API |
 | `ORDER_EXPIRY_MINUTES` | no | Unpaid orders are cancelled and their stock released after this long (default 30) |
+
+### Performance, SEO and accessibility
+- **Fast first load:** only the home page and shared code ship up front. Every other screen (admin, checkout, account...) is fetched when opened. The first load fell from 555 kB to 353 kB (145 kB to 107 kB compressed), the server compresses text responses (the shared React file goes from 165 kB to 54 kB), and images below the fold load lazily.
+- **Search and sharing:** the server sends every page with its own title, description, canonical link and Open Graph/Twitter tags in the very first response, plus schema.org `Product` data (price, stock, rating) on product pages, so Google and link previews (WhatsApp, Slack) do not depend on running JavaScript. `/sitemap.xml` is built from the live catalogue, and `/robots.txt` keeps the API, cart, checkout, account and admin pages out of search. Retired or unknown products return a real 404.
+- **Accessibility:** skip-to-content link, focus moves to the new page on navigation, the bag, quick view and size guide are proper dialogs (focus trapped inside, Escape closes, focus returns), form errors are announced, icon buttons have names, and animations stop for visitors who ask for reduced motion. Automated axe checks run in the test suite. They cannot judge colour contrast or screen reader wording, so a manual pass with a screen reader is still worth doing.
 
 ### Production behaviour
 - The server exits at startup if `MONGODB_URI` is missing, `JWT_SECRET` is weak, or the database is unreachable.

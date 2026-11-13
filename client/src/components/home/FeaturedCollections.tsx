@@ -62,7 +62,7 @@ export const FeaturedCollections: React.FC = () => {
               className="group relative flex flex-col h-96 rounded-xs overflow-hidden border border-ivory-300 bg-charcoal-900 shadow-sm"
             >
               {/* Background Image */}
-              <img
+              <img decoding="async" loading="lazy"
                 src={cat.image}
                 alt={cat.name}
                 className="w-full h-full object-cover object-center opacity-85 group-hover:scale-105 group-hover:opacity-95 transition-all duration-700 ease-out"

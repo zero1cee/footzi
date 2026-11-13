@@ -28,6 +28,7 @@ import { MOCK_PRODUCTS } from '@/data/mockProducts';
 import { OrdersPanel } from '@/components/admin/OrdersPanel';
 import { CouponsPanel } from '@/components/admin/CouponsPanel';
 import { ProductEditor } from '@/components/admin/ProductEditor';
+import { useDocumentMeta } from '@/hooks/useDocumentMeta';
 
 // The next admin actions for a return, following the order the server enforces
 const returnActions = (ret: any) => {
@@ -49,6 +50,7 @@ const returnActions = (ret: any) => {
 };
 
 export const AdminDashboardPage: React.FC = () => {
+  useDocumentMeta({ title: 'Admin — Footzi', noindex: true });
   const { token, user } = useAuthStore();
   const isReadOnly = user?.role === 'demo_admin';
   const activeToken = token || '';
@@ -863,7 +865,7 @@ export const AdminDashboardPage: React.FC = () => {
                   {productsList.map((product) => (
                     <tr key={product.id || product._id} className="hover:bg-ivory-50/50">
                       <td className="p-3 flex items-center gap-3">
-                        <img
+                        <img decoding="async" loading="lazy"
                           src={product.images ? product.images[0] : ''}
                           alt={product.name}
                           className="w-10 h-10 object-cover rounded-xs border border-ivory-300"

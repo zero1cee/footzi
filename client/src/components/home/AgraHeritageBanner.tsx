@@ -17,7 +17,7 @@ export const AgraHeritageBanner: React.FC = () => {
             <div className="relative mx-auto max-w-sm lg:max-w-none">
               {/* Primary Image with Agra Arch silhouette border */}
               <div className="aspect-[3/4] rounded-sm overflow-hidden shadow-2xl border-2 border-white/60 relative">
-                <img
+                <img decoding="async" loading="lazy"
                   src="https://images.unsplash.com/photo-1549298916-b41d501d3772?auto=format&fit=crop&w=1000&q=80"
                   alt="Agra Handcrafted Leather Finishing"
                   className="w-full h-full object-cover object-center"

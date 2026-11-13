@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Ruler, CheckCircle2, ShieldCheck, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { useDocumentMeta } from '@/hooks/useDocumentMeta';
 
 const SIZE_CHART = [
   { uk: 'UK 6', eu: 'EU 40', us: 'US 7', cm: 24.5 },
@@ -13,6 +14,10 @@ const SIZE_CHART = [
 ];
 
 export const SizeGuidePage: React.FC = () => {
+  useDocumentMeta({
+    title: 'Size Guide — Footzi',
+    description: 'Find your UK size with the Footzi size guide: foot length chart, fit notes for every silhouette and how to measure at home.',
+  });
   const [footLengthCm, setFootLengthCm] = useState<string>('');
 
   const parsedCm = parseFloat(footLengthCm);

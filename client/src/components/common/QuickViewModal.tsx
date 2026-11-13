@@ -5,6 +5,7 @@ import { useCartStore } from '@/store/useCartStore';
 import { formatINR } from '@/lib/utils';
 import { ShoeSize } from '@/types';
 import { Button } from '@/components/ui/Button';
+import { useDialogA11y } from '@/hooks/useDialogA11y';
 
 export const QuickViewModal: React.FC = () => {
   const { quickViewProduct, setQuickViewProduct, addItem } = useCartStore();
@@ -26,6 +27,8 @@ export const QuickViewModal: React.FC = () => {
       setIsAdded(false);
     }
   }, [quickViewProduct]);
+
+  const dialogRef = useDialogA11y<HTMLDivElement>(Boolean(quickViewProduct), () => setQuickViewProduct(null));
 
   if (!quickViewProduct) return null;
 
@@ -50,12 +53,20 @@ export const QuickViewModal: React.FC = () => {
     <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4 sm:p-6 lg:p-8">
       {/* Backdrop */}
       <div
+        aria-hidden="true"
         className="fixed inset-0 bg-charcoal-950/70 backdrop-blur-sm transition-opacity"
         onClick={() => setQuickViewProduct(null)}
       />
 
       {/* Modal Dialog */}
-      <div className="relative bg-ivory-100 max-w-3xl w-full rounded-sm shadow-2xl border border-ivory-300 overflow-hidden z-10 animate-fade-in">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Quick view: ${quickViewProduct.name}`}
+        tabIndex={-1}
+        className="relative bg-ivory-100 max-w-3xl w-full rounded-sm shadow-2xl border border-ivory-300 overflow-hidden z-10 animate-fade-in focus:outline-none"
+      >
         {/* Close Button */}
         <button
           onClick={() => setQuickViewProduct(null)}
@@ -69,7 +80,7 @@ export const QuickViewModal: React.FC = () => {
           {/* Product Gallery */}
           <div className="bg-ivory-200/60 p-6 flex flex-col justify-between">
             <div className="aspect-[4/5] w-full rounded-xs overflow-hidden bg-white shadow-inner">
-              <img
+              <img decoding="async" loading="lazy"
                 src={quickViewProduct.images[selectedImageIndex] || quickViewProduct.images[0]}
                 alt={quickViewProduct.name}
                 className="w-full h-full object-cover object-center transition-all duration-300"
@@ -88,7 +99,7 @@ export const QuickViewModal: React.FC = () => {
                         : 'border-transparent opacity-60 hover:opacity-100'
                     }`}
                   >
-                    <img src={img} alt="Thumbnail" className="w-full h-full object-cover" />
+                    <img decoding="async" loading="lazy" src={img} alt="Thumbnail" className="w-full h-full object-cover" />
                   </button>
                 ))}
               </div>

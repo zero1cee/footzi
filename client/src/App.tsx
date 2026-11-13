@@ -1,26 +1,46 @@
-import React, { useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import React, { lazy, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useCartStore } from '@/store/useCartStore';
 import { MainLayout } from '@/layouts/MainLayout';
 import { HomePage } from '@/pages/HomePage';
-import { ProductListingPage } from '@/pages/ProductListingPage';
-import { ProductDetailPage } from '@/pages/ProductDetailPage';
-import { CartPage } from '@/pages/CartPage';
-import { CheckoutPage } from '@/pages/CheckoutPage';
-import { AccountPage } from '@/pages/AccountPage';
-import { AdminDashboardPage } from '@/pages/AdminDashboardPage';
-import { LoginPage } from '@/pages/LoginPage';
-import { RegisterPage } from '@/pages/RegisterPage';
-import { ForgotPasswordPage } from '@/pages/ForgotPasswordPage';
-import { ResetPasswordPage } from '@/pages/ResetPasswordPage';
-import { OrderDetailPage } from '@/pages/OrderDetailPage';
-import { WishlistPage } from '@/pages/WishlistPage';
-import { SizeGuidePage } from '@/pages/SizeGuidePage';
-import { LeatherCarePage } from '@/pages/LeatherCarePage';
+import { useDocumentMeta } from '@/hooks/useDocumentMeta';
 import { ProtectedRoute } from '@/components/common/ProtectedRoute';
 import { AdminRoute } from '@/components/common/AdminRoute';
+
+// Only the home page ships with the first load; every other screen is fetched when it is
+// opened, so a shopper never downloads the admin panel or checkout code just to browse.
+const page = <T extends Record<string, React.ComponentType<any>>>(load: () => Promise<T>, name: keyof T) =>
+  lazy(async () => ({ default: (await load())[name] }));
+
+const ProductListingPage = page(() => import('@/pages/ProductListingPage'), 'ProductListingPage');
+const ProductDetailPage = page(() => import('@/pages/ProductDetailPage'), 'ProductDetailPage');
+const CartPage = page(() => import('@/pages/CartPage'), 'CartPage');
+const CheckoutPage = page(() => import('@/pages/CheckoutPage'), 'CheckoutPage');
+const AccountPage = page(() => import('@/pages/AccountPage'), 'AccountPage');
+const OrderDetailPage = page(() => import('@/pages/OrderDetailPage'), 'OrderDetailPage');
+const AdminDashboardPage = page(() => import('@/pages/AdminDashboardPage'), 'AdminDashboardPage');
+const LoginPage = page(() => import('@/pages/LoginPage'), 'LoginPage');
+const RegisterPage = page(() => import('@/pages/RegisterPage'), 'RegisterPage');
+const ForgotPasswordPage = page(() => import('@/pages/ForgotPasswordPage'), 'ForgotPasswordPage');
+const ResetPasswordPage = page(() => import('@/pages/ResetPasswordPage'), 'ResetPasswordPage');
+const WishlistPage = page(() => import('@/pages/WishlistPage'), 'WishlistPage');
+const SizeGuidePage = page(() => import('@/pages/SizeGuidePage'), 'SizeGuidePage');
+const LeatherCarePage = page(() => import('@/pages/LeatherCarePage'), 'LeatherCarePage');
+
+const NotFoundPage: React.FC = () => {
+  useDocumentMeta({ title: 'Page not found — Footzi', noindex: true });
+  return (
+    <div className="py-24 text-center">
+      <h1 className="font-serif text-3xl font-medium text-charcoal-900">404 — Silhouette Not Found</h1>
+      <p className="text-xs text-charcoal-500 mt-2">The page you were seeking has walked away.</p>
+      <Link to="/" className="mt-4 inline-block text-xs uppercase tracking-widest font-semibold text-sand-600 underline">
+        Return to Footzi Atelier
+      </Link>
+    </div>
+  );
+};
 
 const queryClient = new QueryClient();
 
@@ -73,18 +93,7 @@ export const App: React.FC = () => {
                 </AdminRoute>
               }
             />
-            <Route
-              path="*"
-              element={
-                <div className="py-24 text-center">
-                  <h1 className="font-serif text-3xl font-medium text-charcoal-900">404 — Silhouette Not Found</h1>
-                  <p className="text-xs text-charcoal-500 mt-2">The page you were seeking has walked away.</p>
-                  <a href="/" className="mt-4 inline-block text-xs uppercase tracking-widest font-semibold text-sand-600 underline">
-                    Return to Footzi Atelier
-                  </a>
-                </div>
-              }
-            />
+            <Route path="*" element={<NotFoundPage />} />
           </Route>
         </Routes>
       </BrowserRouter>

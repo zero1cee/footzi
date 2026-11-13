@@ -3,8 +3,10 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Lock, Mail, Eye, EyeOff, ShieldCheck, ArrowRight, Sparkles } from 'lucide-react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { Button } from '@/components/ui/Button';
+import { useDocumentMeta } from '@/hooks/useDocumentMeta';
 
 export const LoginPage: React.FC = () => {
+  useDocumentMeta({ title: 'Sign in — Footzi', noindex: true });
   const navigate = useNavigate();
   const location = useLocation();
   const { login, isLoading, error, clearError } = useAuthStore();
@@ -88,7 +90,7 @@ export const LoginPage: React.FC = () => {
 
           {/* Error Banner */}
           {error && (
-            <div className="mb-6 p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xs">
+            <div role="alert" className="mb-6 p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xs">
               {error}
             </div>
           )}
@@ -134,6 +136,8 @@ export const LoginPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  aria-pressed={showPassword}
                   className="absolute right-2.5 top-2.5 text-charcoal-400 hover:text-charcoal-700"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}

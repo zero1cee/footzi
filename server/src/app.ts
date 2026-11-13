@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import cors from 'cors';
 import helmet from 'helmet';
+import compression from 'compression';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 import productRoutes from './routes/productRoutes.js';
@@ -15,6 +16,7 @@ import returnRoutes from './routes/returnRoutes.js';
 import couponRoutes from './routes/couponRoutes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { getCorsOrigins, isProduction } from './config/env.js';
+import { buildSitemap, injectSeo, publicBaseUrl, robotsTxt, seoForPath } from './services/seoService.js';
 
 // Resolved from this file rather than process.cwd(), so the server works
 // whichever directory it is started from (src/ in dev, dist/ in production).
@@ -46,6 +48,8 @@ export const createApp = (): Express => {
       },
     })
   );
+  // Text responses (the app's JavaScript and CSS, JSON, HTML) shrink to a quarter of their size on the wire
+  app.use(compression());
   app.use(
     cors({
       origin: getCorsOrigins(),
@@ -122,6 +126,18 @@ export const createApp = (): Express => {
     res.status(404).json({ error: 'Endpoint route not found' });
   });
 
+  app.get('/robots.txt', (req: Request, res: Response) => {
+    res.type('text/plain').set('Cache-Control', 'public, max-age=3600').send(robotsTxt(publicBaseUrl(req)));
+  });
+
+  app.get('/sitemap.xml', async (req: Request, res: Response) => {
+    try {
+      res.type('application/xml').set('Cache-Control', 'public, max-age=3600').send(await buildSitemap(publicBaseUrl(req)));
+    } catch {
+      res.status(503).type('text/plain').send('Sitemap temporarily unavailable');
+    }
+  });
+
   // Serve the built React client from the same origin when it exists, with an
   // SPA fallback so deep links such as /product/:slug survive a page refresh.
   if (fs.existsSync(path.join(CLIENT_DIST, 'index.html'))) {
@@ -136,10 +152,21 @@ export const createApp = (): Express => {
         },
       })
     );
-    app.get('*', (req: Request, res: Response, next: NextFunction) => {
-      if (req.method !== 'GET' || path.extname(req.path)) return next();
+    const indexPath = path.join(CLIENT_DIST, 'index.html');
+    const template = fs.readFileSync(indexPath, 'utf8');
+
+    // Every page is served with its own title, description and share tags, so search engines and
+    // link previews (WhatsApp, Slack) see the right product without running any JavaScript.
+    app.get('*', async (req: Request, res: Response, next: NextFunction) => {
+      if (path.extname(req.path)) return next();
       res.setHeader('Cache-Control', 'no-cache');
-      res.sendFile(path.join(CLIENT_DIST, 'index.html'));
+      try {
+        const { seo, status } = await seoForPath(req.path, publicBaseUrl(req));
+        res.status(status).type('html').send(injectSeo(template, seo));
+      } catch {
+        // If the database is unavailable the plain page still loads
+        res.sendFile(indexPath);
+      }
     });
   }
 

@@ -64,7 +64,7 @@ export const HeroSection: React.FC = () => {
             <div className="relative mx-auto max-w-md lg:max-w-none">
               {/* Primary Main Image with architectural framing */}
               <div className="aspect-[4/5] rounded-sm overflow-hidden bg-ivory-300 shadow-elevated border border-ivory-200 relative group">
-                <img
+                <img decoding="async" ref={(el) => el?.setAttribute("fetchpriority", "high")}
                   src="https://images.unsplash.com/photo-1614252235316-8c857d38b5f4?auto=format&fit=crop&w=1200&q=85"
                   alt="The Agra Belgravia Penny Loafer"
                   className="w-full h-full object-cover object-center group-hover:scale-102 transition-transform duration-700"
@@ -76,9 +76,9 @@ export const HeroSection: React.FC = () => {
                     <span className="text-[10px] uppercase tracking-widest text-sand-600 font-semibold block">
                       Featured Masterpiece
                     </span>
-                    <h3 className="font-serif text-base font-medium text-charcoal-900">
+                    <p className="font-serif text-base font-medium text-charcoal-900">
                       The Belgravia Penny Loafer
-                    </h3>
+                    </p>
                     <p className="text-xs text-charcoal-500 font-sans">
                       Hand-Burnished Calfskin • ₹3,899
                     </p>
@@ -95,7 +95,7 @@ export const HeroSection: React.FC = () => {
 
               {/* Secondary Offset Architectural Card */}
               <div className="hidden sm:block absolute -bottom-6 -left-8 w-44 bg-ivory-50 p-2 rounded-xs shadow-xl border border-ivory-300">
-                <img
+                <img decoding="async" loading="lazy"
                   src="https://images.unsplash.com/photo-1560769629-975ec94e6a86?auto=format&fit=crop&w=500&q=80"
                   alt="Minimal Court Sneaker"
                   className="w-full aspect-square object-cover rounded-xs"
