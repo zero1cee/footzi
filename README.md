@@ -10,7 +10,7 @@
 ![Express.js](https://img.shields.io/badge/Express.js-000000?style=for-the-badge&logo=express&logoColor=white)
 ![MongoDB](https://img.shields.io/badge/MongoDB-4EA94B?style=for-the-badge&logo=mongodb&logoColor=white)
 ![Razorpay](https://img.shields.io/badge/Razorpay_Sandbox-02042B?style=for-the-badge&logo=razorpay&logoColor=3395FF)
-![Vitest](https://img.shields.io/badge/Vitest-88_Tests_Passed-6E9F18?style=for-the-badge&logo=vitest&logoColor=white)
+![Vitest](https://img.shields.io/badge/Vitest-95_Tests_Passed-6E9F18?style=for-the-badge&logo=vitest&logoColor=white)
 
 <p align="center">
   <strong>Architectural footwear inspired by the generational leathercraft of Agra, engineered for modern Indian luxury.</strong>
@@ -319,15 +319,15 @@ Open **[http://localhost:5173](http://localhost:5173)** in your browser.
 
 ### 4. Running Automated Tests
 
-Footzi includes **88 automated unit and integration tests** ensuring test-driven reliability:
+Footzi includes **95 automated unit and integration tests** ensuring test-driven reliability:
 
 ```bash
 # Client Vitest Suite (24 tests: Cart calculations, coupon math, bag merge on sign-in, password reset and order pages, UI components, return service)
 cd client
 npm test
 
-# Server Integration Suite (64 tests: Auth, Cart, Orders, Razorpay HMAC and webhook, Dropship Pipeline,
-# Returns, Reviews, Order expiry, Demo admin, Password reset, Refunds, Email, Cloudinary, Inventory). Needs a seeded MongoDB; point
+# Server Integration Suite (71 tests: Auth, Cart, Orders, Razorpay HMAC and webhook, Dropship Pipeline,
+# Returns, Reviews, Order expiry, Demo admin, Password reset, Refunds, Email providers, Cloudinary, Inventory). Needs a seeded MongoDB; point
 # MONGODB_URI at a scratch database, because the tests create and delete orders.
 cd server
 npx vitest run
@@ -385,8 +385,9 @@ MONGODB_URI="<atlas connection string>" npm run seed:demo-admin
 | `JWT_SECRET` | yes | At least 32 random characters; the server refuses to start otherwise |
 | `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` | no | Real Razorpay keys (use `rzp_test_...` to try it with test money). Unset = demo mode: the sandbox payment sheet, and refunds are simulated |
 | `RAZORPAY_WEBHOOK_SECRET` | with real keys | Webhook URL: `https://<service>.onrender.com/api/payments/webhook` |
-| `RESEND_API_KEY` | no | Sends order, shipping, refund and password-reset emails through [Resend](https://resend.com). Unset = emails are only written to the server log, so **password reset cannot reach customers** until this is set |
-| `EMAIL_FROM` | with Resend | Sender, e.g. `Footzi <orders@yourdomain.com>`. Resend's default sender can only mail your own address until you verify a domain |
+| `BREVO_API_KEY` | no | Sends order, shipping, refund and password-reset emails through [Brevo](https://www.brevo.com) (free: 300/day). Needs `EMAIL_FROM` set to a sender you verified in Brevo, which can be a plain Gmail address. Used first when both keys are set |
+| `RESEND_API_KEY` | no | Same emails through [Resend](https://resend.com). Resend can only mail your own address until you verify a domain |
+| `EMAIL_FROM` | with Brevo | Sender, e.g. `Footzi <you@gmail.com>`. Required for Brevo; optional for Resend. With neither key set, emails are only written to the server log, so **password reset cannot reach customers** |
 | `APP_URL` | no | Public site URL used in email links (defaults to Render's `RENDER_EXTERNAL_URL`) |
 | `CLOUDINARY_*` | no | Real image uploads; unset = uploads are simulated |
 | `CORS_ORIGIN` | no | Only if a separately hosted frontend calls this API |

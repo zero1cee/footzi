@@ -22,5 +22,5 @@ services:
         sync: false
       # Optional, add later in the dashboard to leave demo mode:
       #   RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, RAZORPAY_WEBHOOK_SECRET
-      #   RESEND_API_KEY, EMAIL_FROM   (order and password-reset emails)
+      #   BREVO_API_KEY or RESEND_API_KEY, plus EMAIL_FROM   (order and password-reset emails)
       #   CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET

@@ -1,9 +1,9 @@
 import { getCorsOrigins } from '../config/env.js';
 
 /**
- * Transactional email through Resend's HTTP API. Render's free tier blocks SMTP
- * ports, so an HTTP provider is the one that works there. With no RESEND_API_KEY
- * the message is only logged, so local development and demos never need email.
+ * Transactional email through an HTTP API (Brevo or Resend). Render's free tier blocks
+ * SMTP ports, so an HTTP provider is the one that works there. With no API key the
+ * message is only logged, so local development and demos never need email.
  * Sending never throws: a mail problem must not fail an order or a password reset.
  */
 
@@ -43,23 +43,50 @@ const layout = (title: string, bodyHtml: string): string => `<!doctype html>
 const button = (href: string, label: string): string =>
   `<p style="margin:24px 0"><a href="${esc(href)}" style="background:#1f1d1a;color:#ffffff;text-decoration:none;padding:12px 24px;font-size:13px;letter-spacing:2px;text-transform:uppercase">${esc(label)}</a></p>`;
 
-export const emailService = {
-  async send(message: OutgoingEmail): Promise<boolean> {
-    if (isTest()) {
-      testOutbox.push(message);
-      return true;
-    }
+/** Splits "Footzi <orders@example.com>" into its name and address; a bare address has no name. */
+export const parseSender = (from: string): { name?: string; email: string } => {
+  const match = from.match(/^\s*"?([^"<]*?)"?\s*<([^>]+)>\s*$/);
+  return match ? { name: match[1].trim() || undefined, email: match[2].trim() } : { email: from.trim() };
+};
 
-    const apiKey = process.env.RESEND_API_KEY;
-    if (!apiKey) {
-      console.log(`[Footzi Email] (no RESEND_API_KEY, not sent) To: ${message.to} | ${message.subject}\n${message.text}`);
-      return false;
-    }
+type Provider = 'brevo' | 'resend' | 'none';
 
-    try {
-      const res = await fetch('https://api.resend.com/emails', {
+/** Brevo wins when both keys are set; with neither, emails are only logged. */
+export const activeProvider = (): Provider =>
+  process.env.BREVO_API_KEY ? 'brevo' : process.env.RESEND_API_KEY ? 'resend' : 'none';
+
+/** Hands one message to the configured provider. Never throws. */
+export const deliver = async (message: OutgoingEmail): Promise<boolean> => {
+  const provider = activeProvider();
+
+  if (provider === 'none') {
+    console.log(`[Footzi Email] (no BREVO_API_KEY or RESEND_API_KEY, not sent) To: ${message.to} | ${message.subject}\n${message.text}`);
+    return false;
+  }
+
+  try {
+    let res: Response;
+    if (provider === 'brevo') {
+      // Brevo only sends from a sender address you verified in its dashboard
+      if (!process.env.EMAIL_FROM) {
+        console.error('[Footzi Email] EMAIL_FROM is not set. With Brevo it must be a sender you verified there, e.g. Footzi <you@gmail.com>.');
+        return false;
+      }
+      res = await fetch('https://api.brevo.com/v3/smtp/email', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        headers: { 'api-key': process.env.BREVO_API_KEY!, 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({
+          sender: parseSender(process.env.EMAIL_FROM),
+          to: [{ email: message.to }],
+          subject: message.subject,
+          htmlContent: message.html,
+          textContent: message.text,
+        }),
+      });
+    } else {
+      res = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           from: process.env.EMAIL_FROM || 'Footzi <onboarding@resend.dev>',
           to: [message.to],
@@ -68,15 +95,26 @@ export const emailService = {
           text: message.text,
         }),
       });
-      if (!res.ok) {
-        console.error(`[Footzi Email] Provider rejected "${message.subject}" (${res.status}): ${await res.text()}`);
-        return false;
-      }
-      return true;
-    } catch (error: any) {
-      console.error(`[Footzi Email] Could not send "${message.subject}":`, error.message);
+    }
+
+    if (!res.ok) {
+      console.error(`[Footzi Email] ${provider} rejected "${message.subject}" (${res.status}): ${await res.text()}`);
       return false;
     }
+    return true;
+  } catch (error: any) {
+    console.error(`[Footzi Email] Could not send "${message.subject}":`, error.message);
+    return false;
+  }
+};
+
+export const emailService = {
+  async send(message: OutgoingEmail): Promise<boolean> {
+    if (isTest()) {
+      testOutbox.push(message);
+      return true;
+    }
+    return deliver(message);
   },
 
   welcome(user: { name: string; email: string }) {
