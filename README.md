@@ -10,7 +10,8 @@
 ![Express.js](https://img.shields.io/badge/Express.js-000000?style=for-the-badge&logo=express&logoColor=white)
 ![MongoDB](https://img.shields.io/badge/MongoDB-4EA94B?style=for-the-badge&logo=mongodb&logoColor=white)
 ![Razorpay](https://img.shields.io/badge/Razorpay_Sandbox-02042B?style=for-the-badge&logo=razorpay&logoColor=3395FF)
-![Vitest](https://img.shields.io/badge/Vitest-156_Tests_Passed-6E9F18?style=for-the-badge&logo=vitest&logoColor=white)
+![Vitest](https://img.shields.io/badge/Vitest-174_Tests_Passed-6E9F18?style=for-the-badge&logo=vitest&logoColor=white)
+[![CI](https://github.com/zero1cee/footzi/actions/workflows/ci.yml/badge.svg)](https://github.com/zero1cee/footzi/actions/workflows/ci.yml)
 
 <p align="center">
   <strong>Architectural footwear inspired by the generational leathercraft of Agra, engineered for modern Indian luxury.</strong>
@@ -37,29 +38,28 @@ Built as a portfolio demonstration for **Software Development Engineer (SDE)** i
 
 ## 1. Core Platform Features
 
-- **Artisanal Footwear Catalog**: 16 handcrafted silhouettes across 5 core categories: *Loafers*, *Sneakers*, *Oxfords*, *Boots*, and *Slip-ons*.
-- **Indian Sizing Matrix**: Full variant system supporting sizes `UK 6` through `UK 11` with individual SKU tracking and live stock enforcement.
-- **Dual-Mode Shopping Cart**:
-  - Local client storage (Zustand) for instant guest browsing.
-  - Automatic synchronization with MongoDB `/api/cart` upon customer login.
-- **Server-Authoritative Pricing**: Subtotals, coupons and free delivery thresholds ($\ge ₹1,999$) are strictly recalculated and verified on the backend. Coupons live in the database and are managed from the admin panel: percent or flat, minimum order, maximum discount, first-order-only, total and per-customer limits, and an expiry date. A cancelled or expired order gives its coupon use back.
-- **Razorpay Payment Gateway Integration**:
-  - Razorpay gateway order generation in paise.
-  - Interactive Sandbox Checkout Sheet with HMAC-SHA256 signature verification.
-  - Automated inventory release upon payment cancellation.
-- **Agra Dropshipping Supplier Fulfillment Simulation**:
-  - Successful checkout automatically queues a wholesale supplier order linked to `SUP-AGR-01` (*Agra Master Artisan Guild Ltd.*).
-  - BlueDart Air Express tracking number allocation (`BD-AGR-XXXXXXXXIN`).
-  - Multi-step status progression (*Accepted → Processing/Lasting → Shipped → Delivered*).
-- **7-Day Size Exchange & Returns Workflow**:
-  - Customers can initiate size exchanges with database stock reservation for the replacement size.
-  - Automated reverse-logistics tracking code generation (`BD-REV-XXXXXXXXIN`).
-- **Administrative Operations Deck**:
-  - Real-time business analytics (Total Revenue, Paid Orders, Low-Stock Alerts, Return Rates).
-  - Size-level stock adjustment with direct inventory patching.
-  - Catalog management: Create styles, toggle catalog visibility, and upload images.
-- **Role-Based Access Control**:
-  - Protected routes for patron accounts (`/account/*`) and admin operations (`/admin`).
+**Shopping**
+- **Artisanal Footwear Catalog**: 16 handcrafted silhouettes across 5 categories: *Loafers*, *Sneakers*, *Oxfords*, *Boots* and *Slip-ons*, with filters, search, reviews and a wishlist.
+- **Indian Sizing Matrix**: `UK 6` to `UK 11` variants, each with its own SKU and live stock enforcement.
+- **Guest and signed-in bags**: a guest bag lives in the browser (Zustand). On sign-in it is merged into the saved bag in MongoDB (the larger quantity wins, so repeating it is safe), and it is cleared on sign-out so the next person on a shared device never sees it.
+- **Server-Authoritative Pricing**: subtotals, coupons and free delivery ($\ge ₹1,999$) are recalculated on the backend; prices sent by the browser are ignored. Coupons live in the database and are managed from the admin panel: percent or flat, minimum order, maximum discount, first-order-only, total and per-customer limits, and an expiry date. A cancelled or expired order gives its coupon use back.
+
+**Payments and orders**
+- **Razorpay**: gateway orders in paise, HMAC-SHA256 signature verification, an authenticated webhook for customers who close the tab before returning, and idempotent confirmation (a payment can only confirm an order once). With placeholder keys the app runs in **demo mode** with a sandbox payment sheet and simulated refunds; with real keys only a genuine signature is accepted.
+- **Stock safety**: stock is reserved atomically when an order is created, deducted on payment, and released when payment fails, the order is cancelled, or it goes unpaid for 30 minutes.
+- **Cancellation and refunds**: customers can cancel before dispatch for a full refund. Completing a return refunds through Razorpay. A genuine payment that arrives after an order expired is refunded automatically. Every refund is idempotent, so retries can never pay twice.
+- **Order pages and email**: an order detail page with tracking and history, and email for welcome, order confirmation, shipping, delivery, cancellation, refunds, return updates and password reset (Brevo or Resend).
+- **Agra dropshipping simulation**: a paid order queues a supplier order for `SUP-AGR-01` with a BlueDart tracking number. The workshop pipeline moves one step at a time (*Accepted → Processing → Shipped → Delivered*); a workshop cancellation refunds the customer.
+- **7-Day Size Exchange & Returns**: delivered orders only, priced from the order itself, with stock held for the replacement pair and reverse-pickup tracking.
+
+**Accounts**
+- Registration, sign-in, forgot and reset password (single-use emailed link), change password (signs out other devices), profile and address management, and role-based access (`customer`, `admin`, and a read-only `demo_admin` with customer contact details masked).
+
+**Operations deck (`/admin`)**
+- Analytics, an orders screen (search, filters, detail, refund retry), the workshop pipeline, a catalogue editor (create, edit, archive and restore styles, images), size-level inventory, coupons, and returns.
+
+**Quality**
+- Fast first load (lazy-loaded screens, compression), search and link-preview tags served by the server, a sitemap, keyboard-accessible dialogs, and a continuous-integration pipeline that builds and tests every change.
 
 ---
 
@@ -78,14 +78,14 @@ flowchart TD
 
     subgraph Server ["Backend (Node.js + Express REST API)"]
         Middleware["Security Middleware (Helmet, CORS, Rate Limit, Auth JWT)"]
-        Controllers["Express Controllers (Auth, Product, Cart, Order, Payment, Admin)"]
-        Services["Business Services (Inventory, Pricing, SupplierDropship, Cloudinary)"]
+        Controllers["Express Controllers (Auth, Product, Cart, Order, Payment, Coupon, Return, Admin)"]
+        Services["Business Services (Order, Payment, Refund, Coupon, Return, Supplier, Email, SEO, Cloudinary)"]
         Validators["Zod Schema Validation Layer"]
     end
 
     subgraph DataStore ["Database & External Services"]
-        Mongo[("MongoDB Database\n(Users, Products, Inventories, Orders, Carts)")]
-        Razorpay["Razorpay Payment Gateway\n(Order Creation & Webhooks)"]
+        Mongo[("MongoDB Database\n(Users, Products, Inventories, Orders, Payments, Carts, Coupons, Returns)")]
+        Razorpay["Razorpay Payment Gateway\n(Orders, Webhooks, Refunds)"]
         AgraSupplier["Agra Artisan Supplier Guild\n(Dropshipping Simulation & BlueDart API)"]
     end
 
@@ -107,37 +107,26 @@ flowchart TD
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Cart: Customer adds UK size & colorway
-    Cart --> Checkout: Proceed to checkout
-    Checkout --> OrderCreated: POST /api/orders (Server recalculates total)
-    
-    state OrderCreated {
-        [*] --> StockReserved: Atomic Inventory.reserveStock(qty)
-    }
+    [*] --> PendingPayment: POST /api/orders (server prices the bag, applies the coupon, reserves stock atomically)
 
-    OrderCreated --> RazorpayGateway: POST /api/payments/create-order
-    RazorpayGateway --> SignatureVerification: Patron completes payment in modal
-    
-    state SignatureVerification {
-        [*] --> CheckHMAC: HMAC_SHA256(order_id + '|' + payment_id, secret)
-    }
+    PendingPayment --> Confirmed: Payment verified (browser call or webhook), stock deducted, supplier order queued
+    PendingPayment --> Cancelled: Signature mismatch, customer cancels, or 30 minutes unpaid (stock released once)
 
-    CheckHMAC --> PaymentPaid: Signature match verified
-    CheckHMAC --> PaymentFailed: Tampered or invalid signature
-    
-    PaymentFailed --> StockReleased: Inventory.releaseStock(qty)
-    PaymentFailed --> [*]
+    Confirmed --> Processing: Workshop starts lasting
+    Confirmed --> Cancelled: Customer or workshop cancels (full refund, stock restocked)
+    Processing --> Shipped: BlueDart dispatch
+    Processing --> Cancelled: Customer or workshop cancels (full refund, stock restocked)
+    Shipped --> Delivered
+    Delivered --> ReturnWindow: 7 days to request a return or size exchange
+    ReturnWindow --> Refunded: Return completed (Razorpay refund, pair restocked)
+    ReturnWindow --> Exchanged: Replacement dispatched (original pair restocked)
 
-    PaymentPaid --> StockDeducted: Inventory.confirmFulfillment(qty)
-    PaymentPaid --> SupplierQueued: Trigger dropship order for SUP-AGR-01
-    
-    state SupplierQueued {
-        Submitted --> Accepted
-        Accepted --> Processing_Lasting
-        Processing_Lasting --> Dispatched_BlueDart
-        Dispatched_BlueDart --> Delivered
-    }
+    Cancelled --> [*]
+    Refunded --> [*]
+    Exchanged --> [*]
 ```
+
+Payment verification computes `HMAC_SHA256(order_id + '|' + payment_id, secret)` and compares it in constant time. Every state change above is a single conditional database update, so two racing requests (a customer, the webhook, the expiry job) cannot both win.
 
 ---
 
@@ -158,8 +147,9 @@ sequenceDiagram
     API->>DB: Query User & Verify bcrypt password hash
     DB-->>API: User record verified
     API-->>Client: Returns signed JWT + Patron profile
-    Client->>API: POST /api/cart/items (Sync local items to server)
-    API->>DB: Persist items into Cart collection
+    Client->>API: POST /api/cart/merge (guest bag, larger quantity wins)
+    API->>DB: Merge into the saved Cart and return the server's prices
+    Note over Client: Signing out clears the bag, so the next person on the device never sees it
     Client->>API: POST /api/orders (Bearer token)
     API->>DB: Atomically reserve size-level inventory
     API-->>Client: 201 Created (Order FTZ-AGR-XXXXXX)
@@ -173,22 +163,20 @@ sequenceDiagram
 > **Answer**: Concurrency bugs occur when two patrons attempt to purchase the last pair of shoe size `UK 9` simultaneously. 
 > Footzi prevents this at the database engine level using **atomic document queries** rather than read-then-write loops:
 > ```ts
-> const result = await Inventory.findOneAndUpdate(
->   { variantSku: sku, availableStock: { $gte: quantity } },
->   { 
->     $inc: { availableStock: -quantity, reservedStock: quantity } 
->   },
->   { new: true }
+> // Inventory.reserveStock(qty): the check and the decrement are one operation
+> const result = await Inventory.updateOne(
+>   { _id: this._id, availableStock: { $gte: qty } },
+>   { $inc: { availableStock: -qty, reservedStock: qty } }
 > );
-> if (!result) throw new Error("Insufficient stock");
+> return result.modifiedCount === 1; // false = someone else took the last pair
 > ```
-> If two requests arrive at the same millisecond, MongoDB's document-level locking ensures that only the transaction satisfying `{ availableStock: { $gte: quantity } }` succeeds; the second receives `null` and is immediately notified of unavailability.
+> If two requests arrive at the same millisecond, MongoDB's document-level locking ensures that only the transaction satisfying `{ availableStock: { $gte: quantity } }` succeeds; the second matches nothing (`modifiedCount === 0`) and is told the pair is unavailable. The same pattern guards releasing stock, confirming a sale, claiming a payment, and moving a return or workshop order to its next status, so each of those happens exactly once however many requests race.
 
 ### Q2: Why JWT Bearer Tokens over Server-Side Sessions with Cookies?
 > **Answer**: Footzi utilizes stateless **JSON Web Tokens (JWT)** for multiple reasons:
 > 1. **Horizontal Scalability**: Stateless verification removes the requirement for a shared Redis session store, allowing multi-instance cloud deployments (e.g., Render, Railway, Kubernetes) with zero sticky-session overhead.
 > 2. **Cross-Origin Client Decoupling**: Vite frontend and Express backend can run on independent domains without encountering Third-Party Cookie blocking (Safari ITP / Chrome Privacy Sandbox).
-> 3. **Mitigating Revocation Tradeoffs**: While JWTs are stateless, Footzi's `authenticate` middleware loads the user from MongoDB on every request, so a deleted account loses access immediately instead of when its token expires.
+> 3. **Mitigating Revocation Tradeoffs**: While JWTs are stateless, Footzi's `authenticate` middleware loads the user from MongoDB on every request, so a deleted account loses access immediately instead of when its token expires. Changing or resetting a password records a timestamp, and any token issued before it is rejected, so a stolen session ends with the password change.
 
 ### Q3: How is payment tampering prevented?
 > **Answer**: The frontend is treated as completely untrusted:
@@ -197,13 +185,15 @@ sequenceDiagram
 > - Upon payment completion, the backend cryptographically reconstructs the signature:
 >   $$\text{Signature} = \text{HMAC-SHA256}(\text{razorpay\_order\_id} \mathbin{\Vert} \text{razorpay\_payment\_id}, \text{secret})$$
 >   The comparison uses `crypto.timingSafeEqual` to safeguard against timing side-channel attacks.
+> - The mock signature used by the demo checkout is honoured **only** while the server runs on placeholder Razorpay keys. With real keys nothing but a genuine HMAC is accepted.
+> - Webhooks are verified against the raw request bytes and are trusted to confirm an order only when a real webhook secret is configured, and only if the captured amount equals the order total.
 
 ### Q4: How is the Agra dropshipping supplier fulfillment simulated?
 > **Answer**: In real-world ecommerce, footwear brands rarely warehouse every single variant directly; fulfillment is delegated to regional manufacturing workshops. In Footzi:
 > - Verification of payment triggers an automated `SupplierOrder` document mapped to Agra craftsman guild `SUP-AGR-01`.
 > - Wholesale cost is calculated dynamically ($55\%$ of retail price).
 > - An algorithmic BlueDart Air tracking number is generated (`BD-AGR-XXXXXXXXIN`).
-> - Administrators can transition the order through an industrial pipeline: *Accepted $\to$ Lasting $\to$ Shipped $\to$ Delivered*.
+> - Administrators can transition the order through an industrial pipeline: *Accepted $\to$ Lasting $\to$ Shipped $\to$ Delivered*; steps cannot be skipped or reversed, and cancelling before dispatch refunds the customer and restocks the pairs.
 
 ---
 
@@ -217,9 +207,20 @@ For evaluation, three pre-configured accounts are seeded into MongoDB. The patro
 | **Demo Admin (read-only)** | `demo-admin@footzi.in` | `Footzi@2026` | Browse the whole operations deck. Every change is refused and customer contact details are masked |
 | **Admin (Operations)** | `admin@footzi.in` | `Footzi@2026` locally; the `SEED_ADMIN_PASSWORD` you set on a deployment | Full control: fulfillment pipeline, returns, catalog creator, inventory adjustment |
 
+Passwords and profiles of the two shared demo accounts (`patron@footzi.in`, `demo-admin@footzi.in`) cannot be changed, so nobody can lock others out.
+
 ---
 
 ## 5. API Reference Summary
+
+### Platform
+| Method | Endpoint | Access | Description |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/health` | Public | Liveness: the process is up (Render's health check uses this) |
+| `GET` | `/api/ready` | Public | Readiness: answers 503 when the database is unreachable. Point your uptime monitor here |
+| `POST` | `/api/client-errors` | Public | Browsers report crashes here; written to the server log. Rate limited, 204 always |
+| `POST` | `/api/payments/webhook` | Razorpay | Signed webhook (raw-body HMAC) that confirms payments when the customer never returns |
+| `GET` | `/robots.txt`, `/sitemap.xml` | Public | Built from the live catalogue |
 
 ### Catalog & Reviews
 | Method | Endpoint | Access | Description |
@@ -240,10 +241,12 @@ For evaluation, three pre-configured accounts are seeded into MongoDB. The patro
 | `POST` | `/api/auth/change-password` | Authenticated | Needs the current password; signs out every other device and returns a fresh token |
 | `POST` | `/api/auth/forgot-password` | Public | Emails a single-use link valid for 60 minutes. Always answers the same, so it never reveals which emails have accounts |
 | `POST` | `/api/auth/reset-password` | Public | Sets a new password from the emailed token, signs the user in, and voids older sessions |
+| `POST` | `/api/auth/logout` | Public | Acknowledges sign-out (tokens are cleared by the client) |
 | `GET` | `/api/cart` | Authenticated | Fetch server-persisted shopping bag |
 | `POST` | `/api/cart/items` | Authenticated | Add variant to bag with stock check |
 | `PATCH` | `/api/cart/items/:id`| Authenticated | Update item quantity in bag |
 | `DELETE`| `/api/cart/items/:id`| Authenticated | Remove item from bag (`:id` is the line id or the variant SKU) |
+| `DELETE` | `/api/cart` | Authenticated | Empty the saved bag |
 | `POST` | `/api/cart/merge` | Authenticated | Fold a guest bag into the saved bag; the larger quantity wins, so it is safe to repeat |
 
 ### Coupons
@@ -294,7 +297,7 @@ Requests move one step at a time (`requested → approved → pickup_scheduled �
 ## 6. Local Setup & Verification
 
 ### Prerequisites
-- **Node.js**: v18 or later
+- **Node.js**: v20 or later (Render and CI use v22)
 - **MongoDB**: Running locally on `mongodb://localhost:27017` (or provide `MONGODB_URI` in `server/.env`)
 
 ### 1. Install Dependencies
@@ -304,6 +307,7 @@ cd client && npm install
 
 # In server/
 cd ../server && npm install
+cp .env.example .env   # local settings; the defaults work with a local MongoDB
 ```
 
 ### 2. Seed Database
@@ -329,21 +333,23 @@ Open **[http://localhost:5173](http://localhost:5173)** in your browser.
 
 ### 4. Running Automated Tests
 
-Footzi includes **156 automated unit and integration tests** ensuring test-driven reliability:
+Footzi includes **174 automated unit and integration tests** ensuring test-driven reliability:
 
 ```bash
-# Client Vitest Suite (58 tests: Cart and server-checked coupons, bag merge on sign-in, password reset and order pages, admin panels, page titles and meta tags, dialog keyboard behaviour, automated accessibility checks with axe, UI components, return service)
+# Client Vitest Suite (64 tests: Cart and server-checked coupons, bag merge on sign-in, password reset and order pages, admin panels, page titles and meta tags, dialog keyboard behaviour, automated accessibility checks with axe, browser error reporting, UI components, return service)
 cd client
 npm test
 
-# Server Integration Suite (98 tests: Auth, Cart, Orders, Razorpay HMAC and webhook, Dropship Pipeline,
-# Returns, Reviews, Order expiry, Demo admin, Password reset, Refunds, Email providers, Coupons, Product editing, Workshop pipeline, SEO (page tags, sitemap, robots), Cloudinary, Inventory). Needs a seeded MongoDB; point
+# Server Integration Suite (110 tests: Auth, Cart, Orders, Razorpay HMAC and webhook, Dropship Pipeline,
+# Returns, Reviews, Order expiry, Demo admin, Password reset, Refunds, Email providers, Coupons, Product editing, Workshop pipeline, SEO (page tags, sitemap, robots), Monitoring (health checks, request ids, error responses), Cloudinary, Inventory). Needs a seeded MongoDB; point
 # MONGODB_URI at a scratch database, because the tests create and delete orders.
 cd server
 npx vitest run
 ```
 
 ---
+
+Every push and pull request also runs the same build and both test suites on GitHub Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)), using the exact command Render builds with, so a broken build or an out-of-sync lockfile fails there first. Dependabot opens weekly update pull requests.
 
 ### 5. Production Build Verification
 
@@ -410,8 +416,23 @@ MONGODB_URI="<atlas connection string>" npm run seed:demo-admin
 
 ### Production behaviour
 - The server exits at startup if `MONGODB_URI` is missing, `JWT_SECRET` is weak, or the database is unreachable.
-- Rate limits: 600 requests / 15 min per IP on `/api`, 20 / 15 min on login and register.
+- **Rate limits** (per IP, per 15 minutes): 600 requests on `/api`; 20 on login, register, forgot, reset and change password; 40 on coupon checks; 30 on crash reports.
+- **Request size:** 100 kB for every route except the admin image upload (8 MB).
+- **Errors and logs:** every response carries an `X-Request-Id`, the access log prints it, and failures are logged as one JSON line each (`"level":"error"`, the request id, route, message and stack). In production a 500 never shows its internals to the caller; it returns a generic message plus the request id, so a customer can quote the id and you can find the exact lines. Unhandled rejections are logged, and an uncaught exception logs and exits so Render restarts a clean process. Browser crashes arrive in the same log as `"event":"client_error"`.
 - Free Render services sleep after 15 minutes idle; the first request afterwards takes up to a minute.
+
+### Monitoring (free)
+1. **Uptime:** create a free monitor at [UptimeRobot](https://uptimerobot.com) (HTTP, every 5 minutes) on `https://<service>.onrender.com/api/ready`. It alerts you by email when the site or the database is down, and its pings also keep the free instance from sleeping.
+2. **Deploys:** in Render, open the service's **Settings** (or your account's notification settings) and turn on failed-deploy emails.
+3. **Errors:** in Render's **Logs** tab, search `"level":"error"` for failures or `client_error` for browser crashes.
+
+### Known limitations
+- **Refunds and real payments are only proven in demo mode.** The real Razorpay refund call compiles and is tested against a stand-in, but it has not been run against Razorpay's servers. Try one small order with `rzp_test_` keys before relying on it.
+- **Atlas M0 has no automated backups.** Before real customers arrive, upgrade the cluster or schedule your own `mongodump`.
+- **Email reaches only verified senders and recipients** until you have a domain (see the table above).
+- **Sessions are JWTs kept in the browser's local storage**, the usual trade-off for a separately deployable front end: a cross-site-scripting bug would expose them. Content-Security-Policy and escaped output are the defences.
+- **Dependency advisories.** `npm audit` reports a `zod` advisory (server) and a `react-router` advisory (client) whose fixes are major-version upgrades. The `zod` risk (oversized lists exhausting memory) is mitigated by the 100 kB request cap; the `react-router` one concerns open redirects through user-controlled link targets, which this app does not use. Dependabot will propose the upgrades.
+- The admin panel uses fixed demo supplier data; there is no real workshop integration.
 
 ---
 

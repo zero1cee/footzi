@@ -6,6 +6,7 @@ import { createApp } from './app.js';
 import { connectDB } from './config/db.js';
 import { validateEnv } from './config/env.js';
 import { orderService } from './services/orderService.js';
+import { logEvent } from './middleware/errorHandler.js';
 
 const PORT = process.env.PORT || 5001;
 
@@ -48,5 +49,15 @@ const startServer = async () => {
 
 startServer().catch((error) => {
   console.error('[Footzi Server] Failed to start:', error);
+  process.exit(1);
+});
+
+// A promise nobody handled is a bug worth knowing about, but not worth dropping every customer's request.
+// An uncaught exception leaves the process in an unknown state, so it is logged and the host restarts a clean one.
+process.on('unhandledRejection', (reason: any) => {
+  logEvent('error', 'unhandled_rejection', { message: reason?.message ?? String(reason), stack: reason?.stack });
+});
+process.on('uncaughtException', (error) => {
+  logEvent('error', 'uncaught_exception', { message: error.message, stack: error.stack });
   process.exit(1);
 });

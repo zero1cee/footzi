@@ -15,7 +15,8 @@ const createOrderSchema = z.object({
       color: z.string(),
       quantity: z.number().int().min(1).max(10),
     })
-  ),
+  ).min(1, 'Your shopping bag contains no items to order.').max(50, 'An order can have at most 50 lines.'),
+
   shippingAddress: z.object({
     name: z.string(),
     phone: z.string(),

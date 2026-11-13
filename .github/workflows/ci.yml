@@ -1,0 +1,68 @@
+name: CI
+
+# Runs on every push to main and on every pull request. It uses the same build command as Render
+# (`npm run render:build`), so a broken build or an out-of-sync lockfile fails here, before it can fail a deploy.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A newer push to the same branch cancels the run that is still going
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ ping: 1 }).ok'"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # A throwaway database: the server tests create and delete orders, users and products
+      MONGODB_URI: mongodb://localhost:27017/footzi_ci
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22 # the version Render runs
+          cache: npm
+          cache-dependency-path: |
+            server/package-lock.json
+            client/package-lock.json
+
+      # Installs both apps and compiles them (tsc for the server, tsc + vite for the client)
+      - name: Build (same command as Render)
+        run: npm run render:build
+
+      - name: Seed the test database
+        run: npm run seed --prefix server
+
+      - name: Server tests
+        run: npx vitest run
+        working-directory: server
+
+      - name: Client tests
+        run: npm test
+        working-directory: client
+
+      - name: Dependency audit (production dependencies)
+        # Informational: it reports known advisories without blocking, because some fixes need a major upgrade
+        run: |
+          npm audit --omit=dev --prefix server || true
+          npm audit --omit=dev --prefix client || true

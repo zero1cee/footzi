@@ -15,6 +15,9 @@ import adminRoutes from './routes/adminRoutes.js';
 import returnRoutes from './routes/returnRoutes.js';
 import couponRoutes from './routes/couponRoutes.js';
 import { errorHandler } from './middleware/errorHandler.js';
+import { requestContext } from './middleware/requestContext.js';
+import { reportClientError } from './controllers/clientErrorController.js';
+import mongoose from 'mongoose';
 import { getCorsOrigins, isProduction } from './config/env.js';
 import { buildSitemap, injectSeo, publicBaseUrl, robotsTxt, seoForPath } from './services/seoService.js';
 
@@ -30,6 +33,8 @@ export const createApp = (): Express => {
   // Render (and most hosts) terminate TLS at a proxy; trust it so rate limiting
   // and logging see the real client IP.
   app.set('trust proxy', 1);
+
+  app.use(requestContext);
 
   // Security & Utility Middlewares
   app.use(
@@ -57,28 +62,42 @@ export const createApp = (): Express => {
     })
   );
   // rawBody is kept so the Razorpay webhook can verify its signature over the exact bytes sent
-  app.use(
-    express.json({
-      limit: '8mb', // admin image upload sends base64 data
-      verify: (req, _res, buf) => {
-        (req as any).rawBody = buf;
-      },
-    })
-  );
+  const keepRawBody = (req: any, _res: any, buf: Buffer) => {
+    req.rawBody = buf;
+  };
+  // Only the admin image upload needs a large body (a base64 photo). Everything else is capped at
+  // 100 kB, which also stops an oversized list from being used to exhaust the server's memory.
+  app.use('/api/admin/products/upload-image', express.json({ limit: '8mb', verify: keepRawBody }));
+  app.use(express.json({ limit: '100kb', verify: keepRawBody }));
   app.use(express.urlencoded({ extended: true }));
   if (!isTest) {
-    app.use(morgan(isProduction ? 'combined' : 'dev'));
+    morgan.token('id', (req) => (req as Request).id || '-');
+    app.use(
+      morgan(isProduction ? ':id :remote-addr :method :url :status :res[content-length] :response-time ms ":user-agent"' : 'dev')
+    );
   }
   app.use('/images', express.static(path.join(SERVER_ROOT, 'public/images'), { maxAge: '7d' }));
 
-  // Healthcheck Endpoint (not rate limited; used by the host's health probe)
+  // Liveness: the process is up. Render's health check uses this, so a database blip never restarts the server.
   app.get('/api/health', (_req: Request, res: Response) => {
     res.status(200).json({
       status: 'online',
       service: 'Footzi Luxury Footwear API',
       timestamp: new Date().toISOString(),
       environment: process.env.NODE_ENV || 'development',
+      uptimeSeconds: Math.round(process.uptime()),
     });
+  });
+
+  // Readiness: the shop can actually take orders, i.e. the database answers. Point your uptime monitor here.
+  app.get('/api/ready', async (_req: Request, res: Response) => {
+    try {
+      if (mongoose.connection.readyState !== 1) throw new Error('database not connected');
+      await mongoose.connection.db!.admin().ping();
+      res.status(200).json({ status: 'ready', database: 'connected', timestamp: new Date().toISOString() });
+    } catch {
+      res.status(503).json({ status: 'unavailable', database: 'unreachable', timestamp: new Date().toISOString() });
+    }
   });
 
   // Rate limiting: a general ceiling for the API and a strict one for credential endpoints
@@ -104,6 +123,10 @@ export const createApp = (): Express => {
       '/api/coupons',
       rateLimit({ ...limiterDefaults, windowMs: 15 * 60 * 1000, limit: 40, message: { error: 'Too many coupon attempts. Please try again later.' } })
     );
+    app.use(
+      '/api/client-errors',
+      rateLimit({ ...limiterDefaults, windowMs: 15 * 60 * 1000, limit: 30, message: { error: 'Too many reports.' } })
+    );
     app.use('/api/auth/login', authLimiter);
     app.use('/api/auth/register', authLimiter);
     app.use('/api/auth/forgot-password', authLimiter);
@@ -112,6 +135,7 @@ export const createApp = (): Express => {
   }
 
   // REST API Routes
+  app.post('/api/client-errors', reportClientError);
   app.use('/api/products', productRoutes);
   app.use('/api/auth', authRoutes);
   app.use('/api/cart', cartRoutes);

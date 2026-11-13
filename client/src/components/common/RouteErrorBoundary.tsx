@@ -1,4 +1,5 @@
 import React from 'react';
+import { reportError } from '@/lib/errorReporting';
 
 interface State {
   error: Error | null;
@@ -22,6 +23,7 @@ export class RouteErrorBoundary extends React.Component<{ children: React.ReactN
 
   componentDidCatch(error: Error) {
     console.error('[Footzi] Screen failed to render:', error);
+    reportError(error, 'react');
   }
 
   render() {
