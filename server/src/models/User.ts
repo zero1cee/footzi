@@ -15,6 +15,8 @@ export interface IUserAddress {
 }
 
 export interface IUser extends Document {
+  /** The string form of _id (Mongoose provides it at runtime). */
+  id: string;
   name: string;
   email: string;
   passwordHash: string;

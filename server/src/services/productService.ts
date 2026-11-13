@@ -180,7 +180,7 @@ export class ProductService {
     if (unique.size !== skus.length) throw new Error('Each variant needs its own SKU; one is repeated.');
     const taken = await Product.findOne({
       'variants.sku': { $in: skus },
-      ...(exceptProductId ? { _id: { $ne: exceptProductId } } : {}),
+      ...(exceptProductId ? { _id: { $ne: exceptProductId as any } } : {}),
     }).select('name variants.sku');
     if (taken) {
       const clash = taken.variants.find((v) => skus.includes(v.sku));
