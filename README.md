@@ -78,7 +78,7 @@ Built as a portfolio demonstration for **Software Development Engineer (SDE)** i
 flowchart TD
     subgraph Client ["Frontend (React 18 + Vite + TypeScript)"]
         UI["Tailwind CSS UI / Editorial Presentation"]
-        Router["React Router v6 (Protected & Admin Route Guards)"]
+        Router["React Router v7 (Protected & Admin Route Guards)"]
         State["Zustand Stores (Cart, Wishlist, Auth)"]
         Query["TanStack Query (Product Caching & Deduplication)"]
     end
@@ -325,7 +325,7 @@ Requests move one step at a time (`requested → approved → pickup_scheduled �
 ## 6. Local Setup & Verification
 
 ### Prerequisites
-- **Node.js**: v20 or later (Render and CI use v22)
+- **Node.js**: v22.12 or later (Render and CI use v22; Vite 8 and Vitest 5 need at least 22.12)
 - **MongoDB**: Running locally on `mongodb://localhost:27017` (or provide `MONGODB_URI` in `server/.env`)
 
 ### 1. Install Dependencies
@@ -459,7 +459,7 @@ MONGODB_URI="<atlas connection string>" npm run seed:demo-admin
 - **Atlas M0 has no automated backups.** Before real customers arrive, upgrade the cluster or schedule your own `mongodump`.
 - **Email reaches only verified senders and recipients** until you have a domain (see the table above).
 - **Sessions are JWTs kept in the browser's local storage**, the usual trade-off for a separately deployable front end: a cross-site-scripting bug would expose them. Content-Security-Policy and escaped output are the defences.
-- **Dependency advisories.** `npm audit` reports a `zod` advisory (server) and a `react-router` advisory (client) whose fixes are major-version upgrades. The `zod` risk (oversized lists exhausting memory) is mitigated by the 100 kB request cap; the `react-router` one concerns open redirects through user-controlled link targets, which this app does not use. Dependabot will propose the upgrades.
+- **Dependencies are current, with two deliberate exceptions.** `npm audit` is clean for production dependencies. React stays on 18, because React 19 added about 22 kB (gzip) to every first load for nothing this site needs, and Tailwind stays on 3 (version 4 is a rewrite of the styling setup). Dependabot proposes minor and patch updates only; major upgrades are done on purpose, one at a time.
 - **Guest checkout has no CAPTCHA.** It is limited per connection and per email, but a determined attacker could still tie up stock for the 30 minutes an unpaid order holds it. Add a CAPTCHA (for example Cloudflare Turnstile) if you see abuse.
 - With no email provider set, the server log prints each email's text, including guest order links and password-reset links. That is only meant for development.
 - The order receipt is not a GST tax invoice. If you are GST-registered you will need proper invoices (with your GSTIN and tax breakdown) before selling for real.

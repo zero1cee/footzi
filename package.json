@@ -1,7 +1,7 @@
 {
   "name": "footzi-monorepo",
   "version": "1.0.0",
-  "description": "Footzi — Premium Footwear Ecommerce Platform inspired by modern minimalism and Agra architectural heritage",
+  "description": "Footzi \u2014 Premium Footwear Ecommerce Platform inspired by modern minimalism and Agra architectural heritage",
   "private": true,
   "scripts": {
     "dev": "trap 'kill 0' SIGINT SIGTERM; npm run dev --prefix server & npm run dev --prefix client & wait",
@@ -27,6 +27,6 @@
   "author": "Footzi Team",
   "license": "MIT",
   "engines": {
-    "node": ">=20"
+    "node": ">=22.12"
   }
 }
