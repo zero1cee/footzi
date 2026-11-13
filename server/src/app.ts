@@ -12,6 +12,7 @@ import orderRoutes from './routes/orderRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import returnRoutes from './routes/returnRoutes.js';
+import couponRoutes from './routes/couponRoutes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { getCorsOrigins, isProduction } from './config/env.js';
 
@@ -94,6 +95,11 @@ export const createApp = (): Express => {
       limit: 20,
       message: { error: 'Too many sign-in attempts. Please try again in 15 minutes.' },
     });
+    // Codes can be guessed, so checking one is limited much more tightly than the rest of the API
+    app.use(
+      '/api/coupons',
+      rateLimit({ ...limiterDefaults, windowMs: 15 * 60 * 1000, limit: 40, message: { error: 'Too many coupon attempts. Please try again later.' } })
+    );
     app.use('/api/auth/login', authLimiter);
     app.use('/api/auth/register', authLimiter);
     app.use('/api/auth/forgot-password', authLimiter);
@@ -108,6 +114,7 @@ export const createApp = (): Express => {
   app.use('/api/orders', orderRoutes);
   app.use('/api/payments', paymentRoutes);
   app.use('/api/returns', returnRoutes);
+  app.use('/api/coupons', couponRoutes);
   app.use('/api/admin', adminRoutes);
 
   // Unknown API routes are always JSON 404s

@@ -14,14 +14,20 @@ import {
   Eye,
   EyeOff,
   ShieldAlert,
+  Tag,
+  Pencil,
+  Receipt,
 } from 'lucide-react';
 import { formatINR } from '@/lib/utils';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { adminService } from '@/services/adminService';
-import { productService, normalizeProduct } from '@/services/productService';
+import { normalizeProduct } from '@/services/productService';
 import { useAuthStore } from '@/store/useAuthStore';
 import { MOCK_PRODUCTS } from '@/data/mockProducts';
+import { OrdersPanel } from '@/components/admin/OrdersPanel';
+import { CouponsPanel } from '@/components/admin/CouponsPanel';
+import { ProductEditor } from '@/components/admin/ProductEditor';
 
 // The next admin actions for a return, following the order the server enforces
 const returnActions = (ret: any) => {
@@ -48,8 +54,10 @@ export const AdminDashboardPage: React.FC = () => {
   const activeToken = token || '';
 
   const [activeTab, setActiveTab] = useState<
-    'overview' | 'suppliers' | 'products' | 'returns' | 'inventory'
+    'overview' | 'orders' | 'suppliers' | 'products' | 'coupons' | 'returns' | 'inventory'
   >('overview');
+  const [editingProduct, setEditingProduct] = useState<any | null>(null);
+  const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null);
 
   const [analytics, setAnalytics] = useState<any>({
     metrics: {
@@ -100,7 +108,7 @@ export const AdminDashboardPage: React.FC = () => {
         adminService.getSupplierOrders(activeToken).catch(() => null),
         adminService.getInventory(activeToken).catch(() => null),
         adminService.getReturns(activeToken).catch(() => null),
-        productService.getProducts({ limit: 100 }).catch(() => null),
+        adminService.getAllProducts(activeToken).catch(() => null),
       ]);
 
       if (analyticsData) {
@@ -118,8 +126,8 @@ export const AdminDashboardPage: React.FC = () => {
       if (returnsData && Array.isArray(returnsData)) {
         setReturnsList(returnsData);
       }
-      if (catalogData && Array.isArray(catalogData.products) && catalogData.products.length > 0) {
-        setProductsList(catalogData.products);
+      if (catalogData && Array.isArray(catalogData.products)) {
+        setProductsList(catalogData.products.map(normalizeProduct));
       }
     } catch {
       setIsOfflineFallback(true);
@@ -141,10 +149,17 @@ export const AdminDashboardPage: React.FC = () => {
   const handleSupplierTransition = async (orderId: string, nextStatus: string) => {
     try {
       await adminService.fulfillSupplierOrder(orderId, nextStatus, undefined, activeToken);
+      setConfirmCancelId(null);
       setSupplierOrders((prev) =>
         prev.map((o) => (o._id === orderId ? { ...o, status: nextStatus } : o))
       );
-      flash(`Supplier Order transitioned to ${nextStatus.toUpperCase()}`);
+      flash(
+        nextStatus === 'cancelled'
+          ? 'Supplier order cancelled. The customer was refunded and the stock returned.'
+          : `Supplier Order transitioned to ${nextStatus.toUpperCase()}`,
+        4500
+      );
+      if (nextStatus === 'cancelled') void fetchAdminData();
     } catch (err: any) {
       flash(err.message || 'Could not update the supplier order');
     }
@@ -204,7 +219,7 @@ export const AdminDashboardPage: React.FC = () => {
       ((newProductOriginalPrice - newProductPrice) / newProductOriginalPrice) * 100
     );
 
-    const baseSku = `FTZ-${newProductName.slice(0, 3).toUpperCase()}-BLK-UK8`;
+    const baseSku = `FTZ-${newProductName.replace(/[^a-z0-9]/gi, '').slice(0, 3).toUpperCase().padEnd(3, 'X')}-${Date.now().toString(36).toUpperCase()}-UK8`;
 
     const productPayload = {
       name: newProductName,
@@ -320,6 +335,17 @@ export const AdminDashboardPage: React.FC = () => {
           </button>
 
           <button
+            onClick={() => setActiveTab('orders')}
+            className={`pb-3 px-4 text-xs uppercase tracking-wider font-semibold transition-all border-b-2 flex items-center gap-2 whitespace-nowrap ${
+              activeTab === 'orders'
+                ? 'border-charcoal-900 text-charcoal-950'
+                : 'border-transparent text-charcoal-500 hover:text-charcoal-800'
+            }`}
+          >
+            <Receipt className="w-4 h-4" /> Orders
+          </button>
+
+          <button
             onClick={() => setActiveTab('suppliers')}
             className={`pb-3 px-4 text-xs uppercase tracking-wider font-semibold transition-all border-b-2 flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'suppliers'
@@ -339,6 +365,17 @@ export const AdminDashboardPage: React.FC = () => {
             }`}
           >
             <Layers className="w-4 h-4" /> Catalog ({productsList.length})
+          </button>
+
+          <button
+            onClick={() => setActiveTab('coupons')}
+            className={`pb-3 px-4 text-xs uppercase tracking-wider font-semibold transition-all border-b-2 flex items-center gap-2 whitespace-nowrap ${
+              activeTab === 'coupons'
+                ? 'border-charcoal-900 text-charcoal-950'
+                : 'border-transparent text-charcoal-500 hover:text-charcoal-800'
+            }`}
+          >
+            <Tag className="w-4 h-4" /> Coupons
           </button>
 
           <button
@@ -622,6 +659,21 @@ export const AdminDashboardPage: React.FC = () => {
                               Confirm Delivered
                             </Button>
                           )}
+                          {['accepted', 'processing'].includes(sOrder.status) &&
+                            (confirmCancelId === sOrder._id ? (
+                              <span className="inline-flex items-center gap-1.5 text-[11px] text-red-700">
+                                Refund the customer and cancel?
+                                <button onClick={() => handleSupplierTransition(sOrder._id, 'cancelled')} className="font-semibold underline">Yes, cancel</button>
+                                <button onClick={() => setConfirmCancelId(null)} className="text-charcoal-600 underline">Keep</button>
+                              </span>
+                            ) : (
+                              <Button variant="outline" size="sm" disabled={isReadOnly} onClick={() => setConfirmCancelId(sOrder._id)}>
+                                Cancel & Refund
+                              </Button>
+                            ))}
+                          {sOrder.status === 'cancelled' && (
+                            <span className="text-[11px] text-charcoal-500 font-semibold">Cancelled</span>
+                          )}
                           {sOrder.status === 'delivered' && (
                             <span className="text-[11px] text-emerald-700 font-semibold flex items-center justify-end gap-1">
                               <CheckCircle2 className="w-3.5 h-3.5" /> Fulfillment Complete
@@ -636,6 +688,9 @@ export const AdminDashboardPage: React.FC = () => {
             </div>
           </div>
         )}
+
+        {activeTab === 'orders' && <OrdersPanel token={activeToken} isReadOnly={isReadOnly} onMessage={flash} />}
+        {activeTab === 'coupons' && <CouponsPanel token={activeToken} isReadOnly={isReadOnly} onMessage={flash} />}
 
         {/* Tab 3: Footwear Catalog Management */}
         {activeTab === 'products' && (
@@ -830,10 +885,19 @@ export const AdminDashboardPage: React.FC = () => {
                       </td>
                       <td className="p-3">
                         <Badge variant={product.isActive !== false ? 'default' : 'outline'}>
-                          {product.isActive !== false ? 'Active' : 'Hidden'}
+                          {product.isActive !== false ? 'Active' : 'Archived'}
                         </Badge>
                       </td>
-                      <td className="p-3 text-right">
+                      <td className="p-3 text-right whitespace-nowrap">
+                        <button
+                          onClick={() => setEditingProduct(product)}
+                          disabled={isReadOnly}
+                          className="p-1.5 hover:bg-ivory-200 text-charcoal-600 hover:text-charcoal-900 rounded-xs transition-colors disabled:opacity-40"
+                          title="Edit product"
+                          aria-label={`Edit ${product.name}`}
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
                         <button
                           onClick={() => handleToggleProductActive(product.id || product._id)}
                           className="p-1.5 hover:bg-ivory-200 text-charcoal-600 hover:text-charcoal-900 rounded-xs transition-colors"
@@ -1046,6 +1110,20 @@ export const AdminDashboardPage: React.FC = () => {
         )}
 
       </div>
+
+      {editingProduct && (
+        <ProductEditor
+          product={editingProduct}
+          token={activeToken}
+          onClose={() => setEditingProduct(null)}
+          onSaved={(saved) => {
+            const updated = normalizeProduct(saved);
+            setProductsList((prev) => prev.map((p) => ((p.id || p._id) === updated.id ? updated : p)));
+            setEditingProduct(null);
+            flash(`"${updated.name}" updated`);
+          }}
+        />
+      )}
     </div>
   );
 };

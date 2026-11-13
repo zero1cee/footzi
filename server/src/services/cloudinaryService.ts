@@ -8,6 +8,12 @@ cloudinary.config({
   secure: true,
 });
 
+export class UploadError extends Error {
+  constructor(message: string, public status = 400) {
+    super(message);
+  }
+}
+
 export interface UploadResult {
   publicId: string;
   url: string;
@@ -34,30 +40,30 @@ export class CloudinaryService {
   }
 
   /**
-   * Upload an image (base64 string, data URI, or remote HTTP URL) to Cloudinary.
-   * If Cloudinary credentials are mock/test values, returns an optimized CDN representation.
+   * Uploads an image (a base64 data URI or an https link) to Cloudinary. Without real
+   * credentials only an existing https link can be used; a file upload is refused.
    */
   async uploadProductImage(
     fileData: string,
     folder: string = 'footzi/products'
   ): Promise<UploadResult> {
-    if (!this.isConfigured()) {
-      // Mock / Offline fallback for development & CI testing without active cloud credits
-      const mockPublicId = `footzi_prod_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-      
-      // If client passed a full image URL (e.g. Unsplash or existing CDN), keep it while wrapping
-      const isRemoteUrl = fileData.startsWith('http://') || fileData.startsWith('https://');
-      const secureUrl = isRemoteUrl
-        ? fileData
-        : `https://res.cloudinary.com/footzi-atelier/image/upload/v1/products/${mockPublicId}.jpg`;
+    const isRemoteUrl = /^https:\/\/\S+$/.test(fileData);
+    const isImageData = /^data:image\/(png|jpe?g|webp|avif);base64,[A-Za-z0-9+/=]+$/.test(fileData);
+    if (!isRemoteUrl && !isImageData) {
+      throw new UploadError('Send a PNG, JPG, WebP or AVIF image, or an https:// image link.');
+    }
 
-      return {
-        publicId: mockPublicId,
-        url: secureUrl,
-        secureUrl,
-        optimizedUrl: secureUrl,
-        thumbnailUrl: secureUrl,
-      };
+    if (!this.isConfigured()) {
+      // Without Cloudinary there is nowhere to store a file, and inventing a link would leave
+      // a broken image in the catalog. An existing https image link is simply reused.
+      if (!isRemoteUrl) {
+        throw new UploadError(
+          'Image uploads are not set up on this server. Paste an https:// image link instead, or add the CLOUDINARY_* settings to enable uploads.',
+          501
+        );
+      }
+      const mockPublicId = `footzi_link_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      return { publicId: mockPublicId, url: fileData, secureUrl: fileData, optimizedUrl: fileData, thumbnailUrl: fileData };
     }
 
     try {

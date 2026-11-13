@@ -3,6 +3,8 @@ import { persist } from 'zustand/middleware';
 import { CartItem, Product, ShoeSize } from '@/types';
 import { useAuthStore } from './useAuthStore';
 import { cartService } from '@/services/cartService';
+import { couponService, computeCouponDiscount, AppliedCoupon } from '@/services/couponService';
+import { isBackendUnreachable } from '@/lib/utils';
 
 interface CartState {
   items: CartItem[];
@@ -10,7 +12,7 @@ interface CartState {
   wishlist: string[]; // product IDs
   quickViewProduct: Product | null;
   couponCode: string | null;
-  discountRate: number; // e.g. 0.10 for 10%
+  coupon: AppliedCoupon | null;
 
   // Actions
   addItem: (product: Product, size: ShoeSize, color: string, colorHex: string, quantity?: number) => void;
@@ -30,8 +32,10 @@ interface CartState {
   setQuickViewProduct: (product: Product | null) => void;
 
   // Coupon
-  applyCoupon: (code: string) => { success: boolean; message: string };
+  applyCoupon: (code: string) => Promise<{ success: boolean; message: string }>;
   removeCoupon: () => void;
+  /** Rupees still needed before the applied coupon starts to apply (0 when it already does). */
+  getCouponShortfall: () => number;
 
   // Calculations
   getSubtotal: () => number;
@@ -49,7 +53,7 @@ export const useCartStore = create<CartState>()(
       wishlist: [],
       quickViewProduct: null,
       couponCode: null,
-      discountRate: 0,
+      coupon: null,
 
       addItem: (product, size, color, colorHex, quantity = 1) => {
         const prodId = product.id || (product as any)._id || 'prod-default';
@@ -203,27 +207,36 @@ export const useCartStore = create<CartState>()(
 
       setQuickViewProduct: (product) => set({ quickViewProduct: product }),
 
-      applyCoupon: (code) => {
-        const cleanCode = code.trim().toUpperCase();
-        if (cleanCode === 'FOOTZI10') {
-          set({ couponCode: 'FOOTZI10', discountRate: 0.1 });
-          return { success: true, message: 'Coupon applied! 10% discount on order.' };
-        } else if (cleanCode === 'AGRAFIRST') {
-          set({ couponCode: 'AGRAFIRST', discountRate: 0.15 });
-          return { success: true, message: 'Special Welcome Offer: 15% discount applied!' };
+      // The server owns the rules (expiry, limits, first-order); the bag only shows the result
+      applyCoupon: async (code) => {
+        const subtotal = get().getSubtotal();
+        if (subtotal <= 0) return { success: false, message: 'Add something to your bag first.' };
+        try {
+          const { discount: _preview, ...coupon } = await couponService.validate(code, subtotal, useAuthStore.getState().token);
+          set({ couponCode: coupon.code, coupon });
+          return { success: true, message: `${coupon.code} applied${coupon.description ? `: ${coupon.description}` : ''}.` };
+        } catch (err: any) {
+          return {
+            success: false,
+            message: isBackendUnreachable(err) ? "We couldn't check that code right now. Please try again." : err.message,
+          };
         }
-        return { success: false, message: 'Invalid or expired coupon code. Try FOOTZI10.' };
       },
 
-      removeCoupon: () => set({ couponCode: null, discountRate: 0 }),
+      removeCoupon: () => set({ couponCode: null, coupon: null }),
+
+      getCouponShortfall: () => {
+        const { coupon } = get();
+        const subtotal = get().getSubtotal();
+        return coupon && subtotal > 0 ? Math.max(0, coupon.minOrderValue - subtotal) : 0;
+      },
 
       getSubtotal: () => {
         return get().items.reduce((acc, item) => acc + item.price * item.quantity, 0);
       },
 
       getDiscountAmount: () => {
-        const subtotal = get().getSubtotal();
-        return Math.round(subtotal * get().discountRate);
+        return computeCouponDiscount(get().coupon, get().getSubtotal());
       },
 
       getShippingFee: () => {
@@ -250,8 +263,11 @@ export const useCartStore = create<CartState>()(
         items: state.items,
         wishlist: state.wishlist,
         couponCode: state.couponCode,
-        discountRate: state.discountRate,
+        coupon: state.coupon,
       }),
+      version: 2,
+      // Version 1 stored a hard-coded percentage; those coupons are dropped and can be re-applied
+      migrate: (persisted: any) => ({ ...persisted, couponCode: null, coupon: null }),
     }
   )
 );
@@ -263,7 +279,7 @@ useAuthStore.subscribe((state, previous) => {
   if (state.token === previous.token) return;
 
   if (previous.token) {
-    useCartStore.setState({ items: [], couponCode: null, discountRate: 0 });
+    useCartStore.setState({ items: [], couponCode: null, coupon: null });
   }
   if (state.token) {
     void useCartStore.getState().syncWithBackend();

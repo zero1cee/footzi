@@ -19,6 +19,7 @@ export const CartPage: React.FC = () => {
     couponCode,
     applyCoupon,
     removeCoupon,
+    getCouponShortfall,
   } = useCartStore();
 
   const [inputCoupon, setInputCoupon] = useState('');
@@ -29,10 +30,10 @@ export const CartPage: React.FC = () => {
   const shipping = getShippingFee();
   const total = getTotal();
 
-  const handleApplyCoupon = (e: React.FormEvent) => {
+  const handleApplyCoupon = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputCoupon.trim()) return;
-    const res = applyCoupon(inputCoupon);
+    const res = await applyCoupon(inputCoupon);
     setCouponFeedback({ success: res.success, text: res.message });
     if (res.success) {
       setInputCoupon('');
@@ -207,13 +208,18 @@ export const CartPage: React.FC = () => {
                       type="text"
                       value={inputCoupon}
                       onChange={(e) => setInputCoupon(e.target.value)}
-                      placeholder="Try: FOOTZI10 or AGRAFIRST"
+                      placeholder="Enter coupon code"
                       className="flex-1 bg-white border border-ivory-300 px-3 py-2 text-xs text-charcoal-900 uppercase placeholder:normal-case focus:outline-none focus:border-charcoal-800 rounded-xs"
                     />
                     <Button type="submit" variant="secondary" size="sm">
                       Apply
                     </Button>
                   </form>
+                )}
+                {couponCode && getCouponShortfall() > 0 && (
+                  <p className="text-[11px] text-amber-700 mt-1">
+                    Add {formatINR(getCouponShortfall())} more to unlock this coupon.
+                  </p>
                 )}
                 {couponFeedback && !couponCode && (
                   <p className="text-[11px] text-red-600 mt-1">{couponFeedback.text}</p>

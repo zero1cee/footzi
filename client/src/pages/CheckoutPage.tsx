@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Lock, CheckCircle2, ArrowRight, Truck, CreditCard, Sparkles, AlertCircle, ShieldCheck } from 'lucide-react';
 import { useCartStore } from '@/store/useCartStore';
 import { useAuthStore } from '@/store/useAuthStore';
+import { couponService } from '@/services/couponService';
 import { orderService } from '@/services/orderService';
 import { formatINR, isBackendUnreachable } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
@@ -26,7 +27,7 @@ const loadRazorpayScript = (): Promise<void> =>
   });
 
 export const CheckoutPage: React.FC = () => {
-  const { items, getSubtotal, getDiscountAmount, getShippingFee, getTotal, clearCart, couponCode } = useCartStore();
+  const { items, getSubtotal, getDiscountAmount, getShippingFee, getTotal, clearCart, couponCode, removeCoupon } = useCartStore();
   const { user, token, loginAsDemo } = useAuthStore();
 
   const [formData, setFormData] = useState({
@@ -119,6 +120,16 @@ export const CheckoutPage: React.FC = () => {
 
       let createdOrder: any = null;
       try {
+        // A coupon can stop applying between the bag and checkout (used up, expired, first-order only)
+        if (couponCode) {
+          try {
+            await couponService.validate(couponCode, getSubtotal(), activeToken);
+          } catch (couponErr: any) {
+            if (isBackendUnreachable(couponErr)) throw couponErr;
+            removeCoupon();
+            throw new Error(`${couponErr.message} The coupon was removed from your bag; review the total and place the order again.`);
+          }
+        }
         createdOrder = await orderService.createOrder(orderPayload, activeToken);
       } catch (err: any) {
         // A real rejection from the API (out of stock, validation, auth) must reach the patron

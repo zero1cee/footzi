@@ -20,6 +20,7 @@ export const CartDrawer: React.FC = () => {
     couponCode,
     applyCoupon,
     removeCoupon,
+    getCouponShortfall,
   } = useCartStore();
 
   const [inputCoupon, setInputCoupon] = useState('');
@@ -36,10 +37,10 @@ export const CartDrawer: React.FC = () => {
   const remainingForFreeShipping = Math.max(0, freeShippingThreshold - subtotal);
   const progressPercent = Math.min(100, Math.round((subtotal / freeShippingThreshold) * 100));
 
-  const handleApplyCoupon = (e: React.FormEvent) => {
+  const handleApplyCoupon = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputCoupon.trim()) return;
-    const res = applyCoupon(inputCoupon);
+    const res = await applyCoupon(inputCoupon);
     setCouponFeedback({ success: res.success, text: res.message });
     if (res.success) {
       setInputCoupon('');
@@ -224,13 +225,18 @@ export const CartDrawer: React.FC = () => {
                       type="text"
                       value={inputCoupon}
                       onChange={(e) => setInputCoupon(e.target.value)}
-                      placeholder="Coupon code (e.g. FOOTZI10)"
+                      placeholder="Coupon code"
                       className="flex-1 bg-white border border-ivory-300 px-3 py-1.5 text-xs text-charcoal-900 uppercase placeholder:normal-case focus:outline-none focus:border-charcoal-800 rounded-xs"
                     />
                     <Button type="submit" variant="secondary" size="sm">
                       Apply
                     </Button>
                   </form>
+                )}
+                {couponCode && getCouponShortfall() > 0 && (
+                  <p className="text-[11px] text-amber-700 mt-1">
+                    Add {formatINR(getCouponShortfall())} more to unlock this coupon.
+                  </p>
                 )}
                 {couponFeedback && !couponCode && (
                   <p className="text-[11px] text-red-600 mt-1">{couponFeedback.text}</p>

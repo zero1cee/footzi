@@ -6,6 +6,7 @@ import {
   fulfillSupplierOrder,
   getInventoryOverview,
   updateInventoryStockAdmin,
+  getProductsAdmin,
   createProductAdmin,
   updateProductAdmin,
   deleteProductAdmin,
@@ -17,6 +18,7 @@ import {
   getAllReturnsAdmin,
   updateReturnStatusAdmin,
 } from '../controllers/returnController.js';
+import { listCouponsAdmin, createCouponAdmin, updateCouponAdmin } from '../controllers/couponController.js';
 import { authenticate, requireAdmin } from '../middleware/auth.js';
 
 const router = Router();
@@ -38,11 +40,17 @@ router.get('/supplier-orders', getSupplierOrders);
 router.post('/supplier-orders/:id/fulfill', fulfillSupplierOrder);
 
 // Catalog & Product Operations
+router.get('/products', getProductsAdmin);
 router.post('/products', createProductAdmin);
 router.put('/products/:id', updateProductAdmin);
 router.delete('/products/:id', deleteProductAdmin);
 router.patch('/products/:id/toggle-active', toggleProductActiveAdmin);
 router.post('/products/upload-image', uploadProductImageAdmin);
+
+// Coupons
+router.get('/coupons', listCouponsAdmin);
+router.post('/coupons', createCouponAdmin);
+router.put('/coupons/:id', updateCouponAdmin);
 
 // Returns & Exchanges Management
 router.get('/returns', getAllReturnsAdmin);

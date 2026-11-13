@@ -103,4 +103,60 @@ export const adminService = {
     });
     return parseApiJson(res, 'Failed to upload product image to Cloudinary');
   },
+
+  async getOrders(params: { status?: string; search?: string; page?: number }, token: string) {
+    const q = new URLSearchParams();
+    if (params.status && params.status !== 'all') q.set('status', params.status);
+    if (params.search) q.set('search', params.search);
+    q.set('page', String(params.page ?? 1));
+    q.set('limit', '15');
+    const res = await fetch(`/api/admin/orders?${q.toString()}`, { headers: { Authorization: `Bearer ${token}` } });
+    return parseApiJson(res, 'Failed to retrieve orders');
+  },
+
+  async refundCancelledOrder(id: string, token: string) {
+    const res = await fetch(`/api/admin/orders/${id}/refund`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return parseApiJson(res, 'Failed to refund the order');
+  },
+
+  async getCoupons(token: string) {
+    const res = await fetch('/api/admin/coupons', { headers: { Authorization: `Bearer ${token}` } });
+    return parseApiJson(res, 'Failed to retrieve coupons');
+  },
+
+  async createCoupon(data: Record<string, unknown>, token: string) {
+    const res = await fetch('/api/admin/coupons', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(data),
+    });
+    return parseApiJson(res, 'Failed to create the coupon');
+  },
+
+  async updateCoupon(id: string, data: Record<string, unknown>, token: string) {
+    const res = await fetch(`/api/admin/coupons/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(data),
+    });
+    return parseApiJson(res, 'Failed to update the coupon');
+  },
+
+  /** Every product, including archived ones. */
+  async getAllProducts(token: string) {
+    const res = await fetch('/api/admin/products', { headers: { Authorization: `Bearer ${token}` } });
+    return parseApiJson(res, 'Failed to retrieve the catalog');
+  },
+
+  async updateProduct(id: string, data: Record<string, unknown>, token: string) {
+    const res = await fetch(`/api/admin/products/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(data),
+    });
+    return parseApiJson(res, 'Failed to update the product');
+  },
 };

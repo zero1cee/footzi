@@ -6,6 +6,7 @@ import { Cart } from '../models/Cart.js';
 import { SupplierOrder } from '../models/SupplierOrder.js';
 import { escapeRegex } from './productService.js';
 import { refundService } from './refundService.js';
+import { couponService } from './couponService.js';
 import { emailService } from './emailService.js';
 import { restock } from './returnService.js';
 
@@ -128,13 +129,14 @@ export class OrderService {
       });
     }
 
-    // 2. Validate Coupon & Discount
+    // 2. Validate Coupon & Discount (the server decides; an invalid code is an error, never a silent zero)
     let discount = 0;
-    const cleanCoupon = couponCode?.trim().toUpperCase();
-    if (cleanCoupon === 'FOOTZI10') {
-      discount = Math.round(subtotal * 0.1);
-    } else if (cleanCoupon === 'AGRAFIRST') {
-      discount = Math.round(subtotal * 0.15);
+    let cleanCoupon: string | undefined;
+    if (couponCode && couponCode.trim()) {
+      const check = await couponService.evaluate(couponCode, subtotal, userId);
+      if (!check.ok) throw new Error(check.reason);
+      discount = check.discount;
+      cleanCoupon = check.coupon.code;
     }
 
     // 3. Shipping Fee (Complimentary for >= ₹1,999)
@@ -225,7 +227,7 @@ export class OrderService {
 
     // Paid orders can be cancelled until they ship, with a full refund
     if (order.paymentStatus === 'paid') {
-      return this.cancelPaidOrder(order._id, userId, reason);
+      return this.cancelPaidOrder(order._id, { userId, reason });
     }
 
     const cancelled = await this.cancelUnpaidOrder(
@@ -246,10 +248,17 @@ export class OrderService {
    * If the gateway refuses the refund the order stays cancelled (the stock is already
    * back) and is flagged for an admin to retry, rather than leaving a half-done state.
    */
-  private async cancelPaidOrder(orderId: unknown, userId: string, reason?: string) {
-    const note = reason || 'Customer cancelled before dispatch.';
+  async cancelPaidOrder(orderId: unknown, opts: { userId?: string; reason?: string; byWorkshop?: boolean } = {}) {
+    const note = opts.reason || (opts.byWorkshop ? 'Cancelled by the workshop before dispatch.' : 'Customer cancelled before dispatch.');
+    const filter: Record<string, unknown> = {
+      _id: orderId,
+      paymentStatus: 'paid',
+      orderStatus: { $in: ['confirmed', 'processing'] },
+    };
+    if (opts.userId) filter.user = opts.userId;
+
     const order = await Order.findOneAndUpdate(
-      { _id: orderId, user: userId, paymentStatus: 'paid', orderStatus: { $in: ['confirmed', 'processing'] } },
+      filter,
       { $set: { orderStatus: 'cancelled' }, $push: { statusHistory: { status: 'cancelled', timestamp: new Date(), note } } },
       { new: true }
     );
@@ -267,7 +276,7 @@ export class OrderService {
       { customerOrder: order._id, status: { $nin: ['shipped', 'delivered', 'cancelled'] } },
       {
         $set: { status: 'cancelled' },
-        $push: { shipmentEvents: { timestamp: new Date(), status: 'CANCELLED', location: 'Footzi Central Atelier, Agra', note: 'Cancelled by the customer before dispatch.' } },
+        $push: { shipmentEvents: { timestamp: new Date(), status: 'CANCELLED', location: 'Footzi Central Atelier, Agra', note: opts.byWorkshop ? 'Cancelled by the workshop before dispatch.' : 'Cancelled by the customer before dispatch.' } },
       }
     );
 

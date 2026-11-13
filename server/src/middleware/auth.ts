@@ -64,6 +64,22 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
   }
 };
 
+/** Signs the user in when a valid token is sent, and carries on as a guest otherwise. */
+export const optionalAuthenticate = async (req: AuthRequest, _res: Response, next: NextFunction): Promise<void> => {
+  const header = req.headers.authorization;
+  if (header && header.startsWith('Bearer ')) {
+    try {
+      const decoded = jwt.verify(header.split(' ')[1], getJwtSecret()) as JwtPayload;
+      const user = await User.findById(decoded.id);
+      const stale = user?.passwordChangedAt && decoded.iat && decoded.iat < Math.floor(user.passwordChangedAt.getTime() / 1000);
+      if (user && !stale) req.user = user;
+    } catch {
+      // An unusable token just means the caller is treated as a guest
+    }
+  }
+  next();
+};
+
 /** True for accounts that may open the operations desk (full admin or the read-only demo admin). */
 export const isAdminRole = (role?: string): boolean => role === 'admin' || role === 'demo_admin';
 

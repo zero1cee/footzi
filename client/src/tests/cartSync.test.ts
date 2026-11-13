@@ -15,7 +15,7 @@ describe('bag follows the session', () => {
     vi.stubGlobal('fetch', fetchMock);
     fetchMock.mockReset();
     useAuthStore.setState(signedOut);
-    useCartStore.setState({ items: [], couponCode: null, discountRate: 0 });
+    useCartStore.setState({ items: [], couponCode: null, coupon: null });
   });
 
   afterEach(() => {
@@ -72,7 +72,7 @@ describe('bag follows the session', () => {
   it('clears the bag on sign-out so the next person does not inherit it', () => {
     useAuthStore.setState(signedIn);
     fetchMock.mockResolvedValue(serverCart([]));
-    useCartStore.setState({ items: [{ id: 'x' } as any], couponCode: 'FOOTZI10', discountRate: 0.1 });
+    useCartStore.setState({ items: [{ id: 'x' } as any], couponCode: 'FOOTZI10', coupon: { code: 'FOOTZI10', description: '', type: 'percent', value: 10, maxDiscount: null, minOrderValue: 0 } });
 
     useAuthStore.setState(signedOut);
 

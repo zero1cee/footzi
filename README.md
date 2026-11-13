@@ -10,7 +10,7 @@
 ![Express.js](https://img.shields.io/badge/Express.js-000000?style=for-the-badge&logo=express&logoColor=white)
 ![MongoDB](https://img.shields.io/badge/MongoDB-4EA94B?style=for-the-badge&logo=mongodb&logoColor=white)
 ![Razorpay](https://img.shields.io/badge/Razorpay_Sandbox-02042B?style=for-the-badge&logo=razorpay&logoColor=3395FF)
-![Vitest](https://img.shields.io/badge/Vitest-95_Tests_Passed-6E9F18?style=for-the-badge&logo=vitest&logoColor=white)
+![Vitest](https://img.shields.io/badge/Vitest-127_Tests_Passed-6E9F18?style=for-the-badge&logo=vitest&logoColor=white)
 
 <p align="center">
   <strong>Architectural footwear inspired by the generational leathercraft of Agra, engineered for modern Indian luxury.</strong>
@@ -42,7 +42,7 @@ Built as a portfolio demonstration for **Software Development Engineer (SDE)** i
 - **Dual-Mode Shopping Cart**:
   - Local client storage (Zustand) for instant guest browsing.
   - Automatic synchronization with MongoDB `/api/cart` upon customer login.
-- **Server-Authoritative Pricing**: Subtotals, coupon codes (`FOOTZI10`, `AGRAFIRST`), and free delivery thresholds ($\ge ₹1,999$) are strictly recalculated and verified on the backend.
+- **Server-Authoritative Pricing**: Subtotals, coupons and free delivery thresholds ($\ge ₹1,999$) are strictly recalculated and verified on the backend. Coupons live in the database and are managed from the admin panel: percent or flat, minimum order, maximum discount, first-order-only, total and per-customer limits, and an expiry date. A cancelled or expired order gives its coupon use back.
 - **Razorpay Payment Gateway Integration**:
   - Razorpay gateway order generation in paise.
   - Interactive Sandbox Checkout Sheet with HMAC-SHA256 signature verification.
@@ -192,7 +192,7 @@ sequenceDiagram
 
 ### Q3: How is payment tampering prevented?
 > **Answer**: The frontend is treated as completely untrusted:
-> - Prices and discounts submitted in client payloads are ignored; the server looks up the product, applies verified coupons (`FOOTZI10`), and calculates totals in INR.
+> - Prices and discounts submitted in client payloads are ignored; the server looks up the product, applies verified coupons, and calculates totals in INR.
 > - Razorpay orders are initialized in integer **paise** (`₹1,999` $\to$ `199900` paise).
 > - Upon payment completion, the backend cryptographically reconstructs the signature:
 >   $$\text{Signature} = \text{HMAC-SHA256}(\text{razorpay\_order\_id} \mathbin{\Vert} \text{razorpay\_payment\_id}, \text{secret})$$
@@ -246,6 +246,11 @@ For evaluation, three pre-configured accounts are seeded into MongoDB. The patro
 | `DELETE`| `/api/cart/items/:id`| Authenticated | Remove item from bag (`:id` is the line id or the variant SKU) |
 | `POST` | `/api/cart/merge` | Authenticated | Fold a guest bag into the saved bag; the larger quantity wins, so it is safe to repeat |
 
+### Coupons
+| Method | Endpoint | Access | Description |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/api/coupons/validate` | Public | Check a code against the bag. Guests get the general rules; signed-in customers also get their first-order and per-customer limits. Limited to 40 attempts per 15 minutes |
+
 ### Orders & Payments
 | Method | Endpoint | Access | Description |
 | :--- | :--- | :--- | :--- |
@@ -272,8 +277,13 @@ Requests move one step at a time (`requested → approved → pickup_scheduled �
 | `GET` | `/api/admin/inventory` | Admin Only | View size-level inventory across all variants |
 | `PATCH`| `/api/admin/inventory/:sku` | Admin Only | Update variant stock count directly |
 | `GET` | `/api/admin/supplier-orders`| Admin Only | View active dropshipping supplier orders |
-| `POST` | `/api/admin/supplier-orders/:id/fulfill` | Admin Only | Advance supplier fulfillment pipeline state |
-| `POST` | `/api/admin/products` | Admin Only | Handcraft and publish new footwear style |
+| `POST` | `/api/admin/supplier-orders/:id/fulfill` | Admin Only | Advance the workshop pipeline one step at a time (`accepted → processing → shipped → delivered`). `cancelled` is allowed until it ships and refunds the customer and returns the stock |
+| `GET` | `/api/admin/products` | Admin Only | Every product, including archived ones |
+| `POST` | `/api/admin/products` | Admin Only | Publish a new footwear style (validated; a SKU may belong to only one product) |
+| `PUT` | `/api/admin/products/:id` | Admin Only | Edit details, price, images and badge. Existing variants keep their stock (use the inventory endpoint); new SKUs can be added |
+| `GET` / `POST` | `/api/admin/coupons` | Admin Only | List coupons with their usage, or create one |
+| `PUT` | `/api/admin/coupons/:id` | Admin Only | Edit a coupon (the code itself never changes) or switch it off |
+| `POST` | `/api/admin/products/upload-image` | Admin Only | Store an image on Cloudinary, or reuse an https link. File uploads need the `CLOUDINARY_*` settings; without them the server says so instead of inventing a link |
 | `PATCH`| `/api/admin/products/:id/toggle-active` | Admin Only | Toggle product visibility in catalog |
 | `POST` | `/api/admin/orders/:id/refund` | Admin Only | Retry the refund of a cancelled paid order whose automatic refund failed (safe to repeat) |
 | `GET` | `/api/admin/returns` | Admin Only | View customer return/exchange requests |
@@ -319,15 +329,15 @@ Open **[http://localhost:5173](http://localhost:5173)** in your browser.
 
 ### 4. Running Automated Tests
 
-Footzi includes **95 automated unit and integration tests** ensuring test-driven reliability:
+Footzi includes **127 automated unit and integration tests** ensuring test-driven reliability:
 
 ```bash
-# Client Vitest Suite (24 tests: Cart calculations, coupon math, bag merge on sign-in, password reset and order pages, UI components, return service)
+# Client Vitest Suite (39 tests: Cart and server-checked coupons, bag merge on sign-in, password reset and order pages, admin panels, UI components, return service)
 cd client
 npm test
 
-# Server Integration Suite (71 tests: Auth, Cart, Orders, Razorpay HMAC and webhook, Dropship Pipeline,
-# Returns, Reviews, Order expiry, Demo admin, Password reset, Refunds, Email providers, Cloudinary, Inventory). Needs a seeded MongoDB; point
+# Server Integration Suite (88 tests: Auth, Cart, Orders, Razorpay HMAC and webhook, Dropship Pipeline,
+# Returns, Reviews, Order expiry, Demo admin, Password reset, Refunds, Email providers, Coupons, Product editing, Workshop pipeline, Cloudinary, Inventory). Needs a seeded MongoDB; point
 # MONGODB_URI at a scratch database, because the tests create and delete orders.
 cd server
 npx vitest run

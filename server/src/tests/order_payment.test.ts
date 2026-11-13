@@ -131,6 +131,20 @@ describe('Order Lifecycle & Payment Integration Suite', () => {
     const supplierOrder = await SupplierOrder.findOne({ customerOrder: createdOrderId });
     expect(supplierOrder).toBeDefined();
 
+    // The workshop pipeline cannot skip a step
+    const skipped = await request(app)
+      .post(`/api/admin/supplier-orders/${supplierOrder!._id}/fulfill`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ status: 'delivered' });
+    expect(skipped.status).toBe(400);
+    expect(skipped.body.error).toMatch(/can only move to: processing, cancelled/);
+
+    const processing = await request(app)
+      .post(`/api/admin/supplier-orders/${supplierOrder!._id}/fulfill`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ status: 'processing' });
+    expect(processing.status).toBe(200);
+
     // Transition to 'shipped'
     const res = await request(app)
       .post(`/api/admin/supplier-orders/${supplierOrder!._id}/fulfill`)

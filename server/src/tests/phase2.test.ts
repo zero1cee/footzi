@@ -100,7 +100,8 @@ describe('Phase 2 - accounts, refunds and email', () => {
     await SupplierOrder.deleteMany({ customerOrder: { $in: ids } });
     await Payment.deleteMany({ order: { $in: ids } });
     await Order.deleteMany({ _id: { $in: ids } });
-    await Cart.deleteMany({});
+    const mine = await User.find({ email: new RegExp(`^phase2-.*-${stamp}@example\\.com$`) }).select('_id');
+    await Cart.deleteMany({ user: { $in: mine.map((u) => u._id) } });
     await Inventory.deleteMany({ variantSku: skuA });
     await Product.deleteOne({ _id: product._id });
     await User.deleteMany({ email: new RegExp(`^phase2-.*-${stamp}@example\\.com$`) });
@@ -451,7 +452,7 @@ describe('Phase 2 - accounts, refunds and email', () => {
       const paid = await payOrder(user.token, order);
 
       const supplierId = paid.supplierOrder._id;
-      for (const status of ['shipped', 'delivered']) {
+      for (const status of ['processing', 'shipped', 'delivered']) {
         const res = await request(app).post(`/api/admin/supplier-orders/${supplierId}/fulfill`).set(auth(adminToken)).send({ status });
         expect(res.status).toBe(200);
       }

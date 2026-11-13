@@ -3,6 +3,7 @@ import { Product, IProduct } from '../models/Product.js';
 import { Order } from '../models/Order.js';
 import { IUser } from '../models/User.js';
 import { Inventory } from '../models/Inventory.js';
+import type { CreateProductInput, UpdateProductInput } from '../validators/productValidators.js';
 
 export interface ProductQueryFilters {
   category?: string;
@@ -154,88 +155,95 @@ export class ProductService {
     }
   }
 
-  async createProduct(data: any): Promise<IProduct> {
-    const slug =
-      data.slug ||
-      data.name
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/(^-|-$)+/g, '');
+  /** Every variant SKU is the key of an inventory record, so a SKU may belong to only one product. */
+  private async assertSkusFree(skus: string[], exceptProductId?: unknown): Promise<void> {
+    const unique = new Set(skus);
+    if (unique.size !== skus.length) throw new Error('Each variant needs its own SKU; one is repeated.');
+    const taken = await Product.findOne({
+      'variants.sku': { $in: skus },
+      ...(exceptProductId ? { _id: { $ne: exceptProductId } } : {}),
+    }).select('name variants.sku');
+    if (taken) {
+      const clash = taken.variants.find((v) => skus.includes(v.sku));
+      throw new Error(`SKU ${clash?.sku} is already used by "${taken.name}".`);
+    }
+  }
 
-    const originalPrice = Number(data.originalPrice || data.price);
-    const price = Number(data.price);
-    const discountPercent =
-      data.discountPercent !== undefined
-        ? Number(data.discountPercent)
-        : originalPrice > price
-        ? Math.round(((originalPrice - price) / originalPrice) * 100)
-        : 0;
+  private async createInventoryFor(product: IProduct, variants: IProduct['variants']): Promise<void> {
+    for (const variant of variants) {
+      await Inventory.updateOne(
+        { variantSku: variant.sku },
+        {
+          $set: { product: product._id, size: variant.size, color: variant.color, supplierRef: variant.supplierRef || 'SUP-AGR-01' },
+          $setOnInsert: { variantSku: variant.sku, availableStock: variant.stock || 0, reservedStock: 0, reorderThreshold: 5 },
+        },
+        { upsert: true }
+      );
+    }
+  }
 
-    const product = new Product({
-      ...data,
-      slug,
-      price,
-      originalPrice,
-      discountPercent,
-      isActive: data.isActive !== undefined ? data.isActive : true,
-    });
+  async createProduct(data: CreateProductInput): Promise<IProduct> {
+    const slug = data.name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)+/g, '');
 
-    await product.save();
+    const price = data.price!;
+    const originalPrice = data.originalPrice ?? price;
+    const discountPercent = originalPrice > price ? Math.round(((originalPrice - price) / originalPrice) * 100) : 0;
 
-    // Automatically initialize Inventory variant entries
-    if (product.variants && Array.isArray(product.variants)) {
-      for (const variant of product.variants) {
-        await Inventory.findOneAndUpdate(
-          { variantSku: variant.sku },
-          {
-            variantSku: variant.sku,
-            product: product._id,
-            size: variant.size,
-            color: variant.color,
-            availableStock: variant.stock || 0,
-            reservedStock: 0,
-            reorderThreshold: 5,
-            supplierRef: variant.supplierRef || 'SUP-AGR-01',
-          },
-          { upsert: true, new: true }
-        );
-      }
+    await this.assertSkusFree((data.variants ?? []).map((v) => v.sku));
+
+    const product = new Product({ ...data, slug, price, originalPrice, discountPercent, isActive: data.isActive ?? true });
+    try {
+      await product.save();
+    } catch (error: any) {
+      if (error.code === 11000) throw new Error(`A product called "${data.name}" already exists. Choose a different name.`);
+      throw error;
     }
 
+    await this.createInventoryFor(product, product.variants);
     return product;
   }
 
-  async updateProduct(id: string, data: any): Promise<IProduct | null> {
+  /**
+   * Edits a product's details. Only the validated fields are applied. Existing variants keep
+   * their size, colour and stock (stock is changed on the inventory screen, where reserved
+   * pairs are accounted for); variants with new SKUs are added with their opening stock.
+   */
+  async updateProduct(id: string, data: UpdateProductInput): Promise<IProduct | null> {
+    if (!mongoose.isValidObjectId(id)) return null;
     const product = await Product.findById(id);
     if (!product) return null;
 
-    if (data.price !== undefined && data.originalPrice !== undefined) {
-      data.discountPercent = Math.round(
-        ((data.originalPrice - data.price) / data.originalPrice) * 100
-      );
+    const { variants: incoming, ...fields } = data;
+    Object.assign(product, fields);
+
+    if (product.originalPrice < product.price) {
+      throw new Error('Original price cannot be lower than the selling price');
     }
+    product.discountPercent =
+      product.originalPrice > product.price ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100) : 0;
 
-    Object.assign(product, data);
-    await product.save();
-
-    // Sync inventory variant records
-    if (data.variants && Array.isArray(data.variants)) {
-      for (const variant of data.variants) {
-        if (variant.sku) {
-          await Inventory.findOneAndUpdate(
-            { variantSku: variant.sku },
-            {
-              product: product._id,
-              size: variant.size,
-              color: variant.color,
-              availableStock: variant.stock || 0,
-            },
-            { upsert: true }
-          );
+    const added: IProduct['variants'] = [];
+    if (incoming) {
+      const known = new Map(product.variants.map((v) => [v.sku, v]));
+      const fresh = incoming.filter((v) => !known.has(v.sku));
+      await this.assertSkusFree(fresh.map((v) => v.sku), product._id);
+      for (const v of incoming) {
+        const existing = known.get(v.sku);
+        if (existing) {
+          existing.priceOverride = v.priceOverride;
+          if (v.supplierRef) existing.supplierRef = v.supplierRef;
+        } else {
+          product.variants.push(v as any);
+          added.push(product.variants[product.variants.length - 1]);
         }
       }
     }
 
+    await product.save();
+    await this.createInventoryFor(product, added);
     return product;
   }
 
@@ -265,11 +273,11 @@ export class ProductService {
       { new: true }
     );
 
-    // Also sync back to Product variant document
+    // The catalog shows pairs on hand, which includes the ones held for unpaid orders
     if (inv) {
       await Product.updateOne(
         { _id: inv.product, 'variants.sku': sku },
-        { $set: { 'variants.$.stock': Math.max(0, newStock) } }
+        { $set: { 'variants.$.stock': inv.availableStock + inv.reservedStock } }
       );
     }
 
