@@ -15,6 +15,7 @@ export interface IProductVariant {
 
 export interface IProductReview {
   id: string;
+  user?: mongoose.Types.ObjectId;
   author: string;
   city: string;
   rating: number;
@@ -75,6 +76,7 @@ const VariantSchema = new Schema<IProductVariant>(
 
 const ReviewSchema = new Schema<IProductReview>(
   {
+    user: { type: Schema.Types.ObjectId, ref: 'User' },
     author: { type: String, required: true },
     city: { type: String, default: 'India' },
     rating: { type: Number, required: true, min: 1, max: 5 },

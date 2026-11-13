@@ -78,10 +78,10 @@ export const LoginPage: React.FC = () => {
               </button>
               <button
                 type="button"
-                onClick={() => handleInstantDemoLogin('admin@footzi.in')}
+                onClick={() => handleInstantDemoLogin('demo-admin@footzi.in')}
                 className="flex-1 py-1.5 px-2 bg-charcoal-900 hover:bg-charcoal-800 text-white text-[11px] font-medium rounded-xs transition-colors flex items-center justify-center gap-1"
               >
-                Admin Deck
+                Admin Demo (read-only)
               </button>
             </div>
           </div>

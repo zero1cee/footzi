@@ -734,6 +734,14 @@ const seed = async () => {
       ],
     },
     {
+      // Public, read-only account behind the "Admin Demo" button
+      name: 'Demo Admin',
+      email: 'demo-admin@footzi.in',
+      passwordHash,
+      role: 'demo_admin',
+      addresses: [],
+    },
+    {
       name: 'Devraj Chauhan',
       email: 'admin@footzi.in',
       passwordHash: adminPasswordHash,

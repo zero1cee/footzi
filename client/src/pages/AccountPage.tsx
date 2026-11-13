@@ -34,6 +34,21 @@ const resolveTabFromPath = (pathname: string): AccountTab => {
   return 'orders';
 };
 
+const RETURN_WINDOW_DAYS = 7;
+
+// Mirrors the server's rule: returns open once the order is delivered and close after 7 days
+const returnEligibility = (order: any): { eligible: boolean; note: string } => {
+  if (order.orderStatus !== 'delivered') {
+    return { eligible: false, note: 'Size exchange and returns open once your order is delivered.' };
+  }
+  const delivered = (order.statusHistory || []).filter((h: any) => h.status === 'delivered');
+  const at = new Date(delivered.length ? delivered[delivered.length - 1].timestamp : order.updatedAt || order.createdAt).getTime();
+  const daysLeft = Math.ceil((at + RETURN_WINDOW_DAYS * 86_400_000 - Date.now()) / 86_400_000);
+  return daysLeft > 0
+    ? { eligible: true, note: `${daysLeft} day${daysLeft === 1 ? '' : 's'} left to exchange or return` }
+    : { eligible: false, note: `The ${RETURN_WINDOW_DAYS}-day exchange and return window has closed.` };
+};
+
 export const AccountPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -82,6 +97,9 @@ export const AccountPage: React.FC = () => {
   const [exchangeReason, setExchangeReason] = useState<string>('Fit issue - too tight');
   const [comments, setComments] = useState('');
   const [isSubmittingReturn, setIsSubmittingReturn] = useState(false);
+  const [selectedItemIdx, setSelectedItemIdx] = useState(0);
+  const [returnQty, setReturnQty] = useState(1);
+  const [returnError, setReturnError] = useState<string | null>(null);
 
   // Fallback sample orders only when backend is offline
   const fallbackOrders = [
@@ -166,8 +184,13 @@ export const AccountPage: React.FC = () => {
     }
   };
 
+  const modalItem = selectedOrder?.items?.[selectedItemIdx] ?? selectedOrder?.items?.[0];
+
   const handleOpenExchangeModal = (order: any) => {
     setSelectedOrder(order);
+    setSelectedItemIdx(0);
+    setReturnQty(1);
+    setReturnError(null);
     setIsModalOpen(true);
   };
 
@@ -175,47 +198,31 @@ export const AccountPage: React.FC = () => {
     e.preventDefault();
     if (!selectedOrder || !selectedOrder.items || selectedOrder.items.length === 0) return;
 
-    const firstItem = selectedOrder.items[0];
+    if (!token || !modalItem) return;
+    setReturnError(null);
 
     try {
       setIsSubmittingReturn(true);
+      // Only the choices are sent; the server takes prices and item details from the order itself
       const payload = {
         orderId: selectedOrder._id,
         type: exchangeType,
         customerComments: comments,
         items: [
           {
-            sku: firstItem.sku,
-            productName: firstItem.name,
-            size: firstItem.size,
-            color: firstItem.color,
-            quantity: 1,
-            price: firstItem.unitPrice || firstItem.lineTotal,
+            sku: modalItem.sku,
+            quantity: returnQty,
             reason: exchangeReason,
             replacementSize: exchangeType === 'exchange' ? replacementSize : undefined,
-            replacementColor: firstItem.color,
           },
         ],
       };
 
-      if (token) {
-        await returnService.requestReturn(payload, token);
-      }
+      const { returnRequest } = await returnService.requestReturn(payload, token);
 
-      // Optimistic addition
       const newReturnEntry = {
-        _id: `ret_${Date.now()}`,
-        returnNumber: `RET-AGR-${Date.now().toString().slice(-6)}`,
-        type: exchangeType,
-        status: 'requested',
-        items: payload.items,
-        pickupTrackingNumber: `BD-REV-${Math.floor(10000000 + Math.random() * 90000000)}IN`,
-        carrier: 'BlueDart Reverse Logistics',
-        createdAt: new Date().toISOString(),
-        order: {
-          orderNumber: selectedOrder.orderNumber,
-          total: selectedOrder.total,
-        },
+        ...returnRequest,
+        order: { orderNumber: selectedOrder.orderNumber, total: selectedOrder.total },
       };
 
       setReturnsList((prev) => [newReturnEntry, ...prev]);
@@ -228,7 +235,7 @@ export const AccountPage: React.FC = () => {
       );
       setTimeout(() => setFeedback(null), 4500);
     } catch (err: any) {
-      alert(err.message || 'Failed to submit exchange request');
+      setReturnError(err.message || 'Failed to submit your request');
     } finally {
       setIsSubmittingReturn(false);
     }
@@ -250,7 +257,7 @@ export const AccountPage: React.FC = () => {
                   {user ? user.name : 'Footzi Patron'}
                 </h1>
                 <Badge variant="sand">
-                  {user?.role === 'admin' ? 'Administrator' : 'Footzi Privé Patron'}
+                  {user?.role === 'admin' ? 'Administrator' : user?.role === 'demo_admin' ? 'Demo Admin (read-only)' : 'Footzi Privé Patron'}
                 </Badge>
               </div>
               <p className="text-xs text-charcoal-500 mt-0.5">
@@ -260,7 +267,7 @@ export const AccountPage: React.FC = () => {
           </div>
 
           <div className="text-right flex items-center gap-3">
-            {user?.role === 'admin' && (
+            {(user?.role === 'admin' || user?.role === 'demo_admin') && (
               <Link
                 to="/admin"
                 className="px-3 py-1.5 bg-charcoal-900 text-white hover:bg-charcoal-800 text-xs font-semibold rounded-xs transition-colors flex items-center gap-1.5"
@@ -419,14 +426,21 @@ export const AccountPage: React.FC = () => {
                             </strong>{' '}
                             ({order.carrier || 'BlueDart Air Express'})
                           </p>
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => handleOpenExchangeModal(order)}
-                              className="px-3 py-1.5 bg-ivory-100 hover:bg-ivory-200 border border-ivory-300 text-charcoal-800 text-[11px] font-semibold rounded-xs flex items-center gap-1 transition-colors"
-                            >
-                              <RotateCcw className="w-3 h-3 text-sand-600" /> Request Size Exchange
-                            </button>
-                          </div>
+                          {returnEligibility(order).eligible ? (
+                            <div className="flex flex-col sm:items-end gap-1">
+                              <button
+                                onClick={() => handleOpenExchangeModal(order)}
+                                className="px-3 py-1.5 bg-ivory-100 hover:bg-ivory-200 border border-ivory-300 text-charcoal-800 text-[11px] font-semibold rounded-xs flex items-center gap-1 transition-colors"
+                              >
+                                <RotateCcw className="w-3 h-3 text-sand-600" /> Request Size Exchange
+                              </button>
+                              <span className="text-[10px] text-charcoal-500">{returnEligibility(order).note}</span>
+                            </div>
+                          ) : (
+                            <span className="text-[11px] text-charcoal-500 sm:text-right max-w-[16rem]">
+                              {returnEligibility(order).note}
+                            </span>
+                          )}
                         </div>
                       </div>
                     )}
@@ -749,11 +763,44 @@ export const AccountPage: React.FC = () => {
                 Size Exchange or Return
               </h3>
               <p className="text-xs text-charcoal-500 mt-1">
-                Order #{selectedOrder.orderNumber} • {selectedOrder.items[0]?.name}
+                Order #{selectedOrder.orderNumber} • {modalItem?.name}
               </p>
             </div>
 
             <form onSubmit={handleSubmitReturnOrExchange} className="space-y-4 text-xs">
+              {selectedOrder.items.length > 1 && (
+                <div>
+                  <label className="block font-semibold text-charcoal-800 mb-1.5">Which pair?</label>
+                  <select
+                    value={selectedItemIdx}
+                    onChange={(e) => {
+                      setSelectedItemIdx(Number(e.target.value));
+                      setReturnQty(1);
+                    }}
+                    className="w-full border border-ivory-300 rounded-xs px-3 py-2 bg-white text-charcoal-850 focus:outline-hidden focus:border-charcoal-900"
+                  >
+                    {selectedOrder.items.map((it: any, idx: number) => (
+                      <option key={it.sku} value={idx}>
+                        {it.name} • {it.size} • {it.color}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              {(modalItem?.quantity ?? 1) > 1 && (
+                <div>
+                  <label className="block font-semibold text-charcoal-800 mb-1.5">How many pairs?</label>
+                  <select
+                    value={returnQty}
+                    onChange={(e) => setReturnQty(Number(e.target.value))}
+                    className="w-full border border-ivory-300 rounded-xs px-3 py-2 bg-white text-charcoal-850 focus:outline-hidden focus:border-charcoal-900"
+                  >
+                    {Array.from({ length: modalItem.quantity }, (_, i) => i + 1).map((n) => (
+                      <option key={n} value={n}>{n}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div>
                 <label className="block font-semibold text-charcoal-800 mb-1.5">
                   Resolution Type
@@ -787,7 +834,7 @@ export const AccountPage: React.FC = () => {
               {exchangeType === 'exchange' && (
                 <div>
                   <label className="block font-semibold text-charcoal-800 mb-1.5">
-                    Select Replacement Shoe Size (Current: {selectedOrder.items[0]?.size})
+                    Select Replacement Shoe Size (Current: {modalItem?.size})
                   </label>
                   <div className="grid grid-cols-6 gap-2">
                     {(['UK 6', 'UK 7', 'UK 8', 'UK 9', 'UK 10', 'UK 11'] as ShoeSize[]).map((sz) => (
@@ -795,7 +842,8 @@ export const AccountPage: React.FC = () => {
                         key={sz}
                         type="button"
                         onClick={() => setReplacementSize(sz)}
-                        className={`py-2 border rounded-xs text-center font-semibold transition-all ${
+                        disabled={sz === modalItem?.size}
+                        className={`py-2 border rounded-xs text-center font-semibold transition-all disabled:opacity-30 disabled:cursor-not-allowed ${
                           replacementSize === sz
                             ? 'border-charcoal-900 bg-charcoal-900 text-white'
                             : 'border-ivory-300 text-charcoal-700 hover:border-ivory-400'
@@ -844,6 +892,10 @@ export const AccountPage: React.FC = () => {
                 </p>
                 A BlueDart courier agent will collect the boxed footwear with barcode label pre-printed.
               </div>
+
+              {returnError && (
+                <p className="text-[11px] text-red-700 bg-red-50 border border-red-200 rounded-xs p-2">{returnError}</p>
+              )}
 
               <div className="flex items-center justify-end gap-3 pt-3">
                 <Button

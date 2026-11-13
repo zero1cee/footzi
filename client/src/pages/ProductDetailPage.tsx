@@ -20,6 +20,7 @@ import {
 import { useProductBySlug, useSubmitReview } from '@/hooks/useProducts';
 import { MOCK_PRODUCTS } from '@/data/mockProducts';
 import { useCartStore } from '@/store/useCartStore';
+import { useAuthStore } from '@/store/useAuthStore';
 import { formatINR } from '@/lib/utils';
 import { ShoeSize, ProductReview } from '@/types';
 import { Button } from '@/components/ui/Button';
@@ -48,7 +49,8 @@ export const ProductDetailPage: React.FC = () => {
   const [sizeGuideOpen, setSizeGuideOpen] = useState(false);
 
   // Review Form State
-  const [reviewAuthor, setReviewAuthor] = useState('');
+  const { isAuthenticated, user } = useAuthStore();
+  const [reviewError, setReviewError] = useState<string | null>(null);
   const [reviewCity, setReviewCity] = useState('');
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewTitle, setReviewTitle] = useState('');
@@ -89,37 +91,28 @@ export const ProductDetailPage: React.FC = () => {
     navigate('/checkout');
   };
 
-  const handleReviewSubmit = (e: React.FormEvent) => {
+  const handleReviewSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!reviewAuthor || !reviewComment) return;
+    if (!reviewComment.trim()) return;
+    setReviewError(null);
 
-    const newRev: ProductReview = {
-      id: `rev-${Date.now()}`,
-      author: reviewAuthor,
-      city: reviewCity || 'India',
-      rating: reviewRating,
-      title: reviewTitle || 'Excellent Craftsmanship',
-      comment: reviewComment,
-      date: 'Just now',
-      verified: true,
-      sizePurchased: selectedSize,
-    };
+    try {
+      const published = await submitReviewMutation.mutateAsync({
+        rating: reviewRating,
+        city: reviewCity || undefined,
+        title: reviewTitle || undefined,
+        comment: reviewComment,
+        sizePurchased: selectedSize,
+      });
 
-    submitReviewMutation.mutate({
-      author: reviewAuthor,
-      city: reviewCity || 'India',
-      rating: reviewRating,
-      title: reviewTitle || 'Excellent Craftsmanship',
-      comment: reviewComment,
-      sizePurchased: selectedSize,
-    });
-
-    setReviewsList([newRev, ...reviewsList]);
-    setReviewSubmitted(true);
-    setReviewAuthor('');
-    setReviewCity('');
-    setReviewTitle('');
-    setReviewComment('');
+      setReviewsList([published, ...reviewsList]);
+      setReviewSubmitted(true);
+      setReviewCity('');
+      setReviewTitle('');
+      setReviewComment('');
+    } catch (err: any) {
+      setReviewError(err.message || 'Could not publish your review. Please try again.');
+    }
   };
 
   const relatedProducts = MOCK_PRODUCTS.filter((p) => p.id !== product.id && p.category === product.category).slice(0, 3);
@@ -209,7 +202,7 @@ export const ProductDetailPage: React.FC = () => {
                   {product.rating}
                 </div>
                 <span className="text-xs text-charcoal-400">
-                  • {reviewsList.length} verified patron chronicles
+                  • {reviewsList.length} patron chronicles
                 </span>
               </div>
 
@@ -513,7 +506,7 @@ export const ProductDetailPage: React.FC = () => {
                   </div>
                 </div>
                 <p className="text-xs text-charcoal-500 mt-1">
-                  Based on {reviewsList.length} verified wearer ratings across India
+                  Based on {reviewsList.length} wearer ratings across India
                 </p>
               </div>
 
@@ -521,7 +514,7 @@ export const ProductDetailPage: React.FC = () => {
                 <p className="text-xs text-emerald-700 font-semibold flex items-center gap-1 justify-center sm:justify-end">
                   <CheckCircle2 className="w-4 h-4" /> 100% Verified Purchases
                 </p>
-                <p className="text-[11px] text-charcoal-500 mt-0.5">Directly verified by Footzi Concierge</p>
+                <p className="text-[11px] text-charcoal-500 mt-0.5">Ratings from Footzi patrons</p>
               </div>
             </div>
 
@@ -568,10 +561,17 @@ export const ProductDetailPage: React.FC = () => {
                 Tell fellow patrons how this pair fits, feels, and performs in Indian environments.
               </p>
 
-              {reviewSubmitted ? (
+              {!isAuthenticated ? (
+                <div className="p-4 bg-ivory-50 border border-ivory-300 rounded-xs text-xs text-charcoal-700 flex flex-wrap items-center justify-between gap-3">
+                  <span>Sign in to share your experience. Reviews from verified buyers are marked as such.</span>
+                  <Link to="/login" className="font-semibold text-charcoal-900 underline underline-offset-2">
+                    Sign in
+                  </Link>
+                </div>
+              ) : reviewSubmitted ? (
                 <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xs text-xs flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
-                  <span>Thank you! Your verified review has been submitted and published.</span>
+                  <span>Thank you! Your review has been published.</span>
                 </div>
               ) : (
                 <form onSubmit={handleReviewSubmit} className="space-y-4 text-xs">
@@ -598,16 +598,11 @@ export const ProductDetailPage: React.FC = () => {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-[11px] font-semibold text-charcoal-700 uppercase mb-1">
-                        Your Full Name
+                        Posting As
                       </label>
-                      <input
-                        type="text"
-                        required
-                        value={reviewAuthor}
-                        onChange={(e) => setReviewAuthor(e.target.value)}
-                        placeholder="e.g. Dhruv Sen"
-                        className="w-full bg-ivory-50 border border-ivory-300 p-2 text-xs rounded-xs focus:outline-none focus:border-charcoal-900"
-                      />
+                      <div className="w-full bg-ivory-100 border border-ivory-300 p-2 text-xs rounded-xs text-charcoal-700">
+                        {user?.name}
+                      </div>
                     </div>
                     <div>
                       <label className="block text-[11px] font-semibold text-charcoal-700 uppercase mb-1">
@@ -650,7 +645,11 @@ export const ProductDetailPage: React.FC = () => {
                     />
                   </div>
 
-                  <Button type="submit" variant="primary" size="md">
+                  {reviewError && (
+                    <p className="text-[11px] text-red-700 bg-red-50 border border-red-200 rounded-xs p-2">{reviewError}</p>
+                  )}
+
+                  <Button type="submit" variant="primary" size="md" isLoading={submitReviewMutation.isPending}>
                     Publish Review
                   </Button>
                 </form>

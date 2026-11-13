@@ -1,5 +1,6 @@
 import { Product, ProductReview, ShoeSize } from '@/types';
 import { MOCK_PRODUCTS } from '@/data/mockProducts';
+import { parseApiJson } from '@/lib/utils';
 
 export interface ProductQueryParams {
   category?: string;
@@ -171,28 +172,21 @@ export const productService = {
     return mock ? normalizeProduct(mock) : null;
   },
 
-  // Submit customer review
-  async submitReview(productId: string, review: Omit<ProductReview, 'id' | 'date' | 'verified'>): Promise<ProductReview> {
-    const newReview: ProductReview = {
-      ...review,
-      id: `rev-${Date.now()}`,
-      date: 'Just now',
-      verified: true,
-    };
-
-    try {
-      const res = await fetch(`/api/products/${productId}/reviews`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newReview),
-      });
-      if (res.ok) {
-        return await res.json();
-      }
-    } catch {
-      // Fallback
-    }
-
-    return newReview;
+  // Submit a customer review. The server decides the author and whether it is a verified purchase.
+  async submitReview(
+    productId: string,
+    review: { rating: number; title?: string; comment: string; city?: string; sizePurchased?: ShoeSize },
+    token: string
+  ): Promise<ProductReview> {
+    const res = await fetch(`/api/products/${productId}/reviews`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(review),
+    });
+    const body = await parseApiJson<{ review: any }>(res, 'Could not publish your review');
+    return { ...body.review, id: body.review.id || body.review._id };
   },
 };

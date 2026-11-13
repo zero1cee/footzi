@@ -15,7 +15,7 @@ export interface AuthUser {
   _id: string;
   name: string;
   email: string;
-  role: 'customer' | 'admin';
+  role: 'customer' | 'admin' | 'demo_admin';
   phone?: string;
   addresses?: SavedAddress[];
 }

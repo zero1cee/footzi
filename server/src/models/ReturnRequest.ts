@@ -27,6 +27,7 @@ export interface IReturnItem {
     | 'Changed mind';
   replacementSize?: ShoeSize;
   replacementColor?: string;
+  replacementSku?: string;
 }
 
 export interface IReturnRequest extends Document {
@@ -74,6 +75,7 @@ const ReturnItemSchema = new Schema<IReturnItem>(
       enum: ['UK 6', 'UK 7', 'UK 8', 'UK 9', 'UK 10', 'UK 11'],
     },
     replacementColor: { type: String },
+    replacementSku: { type: String },
   },
   { _id: false }
 );

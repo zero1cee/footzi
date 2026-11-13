@@ -164,41 +164,81 @@ export class PaymentService {
       };
     }
 
-    // Atomically claim the order: of several concurrent verifications only one proceeds
+    const outcome = await this.fulfillPaidOrder(order, payment, razorpayOrderId, razorpayPaymentId, razorpaySignature);
+    if (outcome.status === 'already_paid') {
+      return this.alreadyPaidResult(order);
+    }
+    if (outcome.status === 'not_payable') {
+      // The order expired or was cancelled while the customer was paying
+      payment.status = 'captured';
+      payment.gatewayPaymentId = razorpayPaymentId;
+      payment.failureReason = 'Payment received after the order was cancelled; refund required';
+      await payment.save();
+      throw new Error(
+        'This order expired before the payment completed. If you were charged, the amount will be refunded.'
+      );
+    }
+
+    return {
+      verified: true,
+      message: 'Payment successfully verified. Order confirmed and supplier queued in Agra.',
+      order: outcome.order,
+      supplierOrder: outcome.supplierOrder,
+    };
+  }
+
+  /**
+   * Moves an unpaid order to paid and starts fulfilment. Used by both the client's
+   * verify call and the Razorpay webhook. The first step is a single conditional
+   * update, so however many verifications and webhooks arrive for one payment,
+   * only one of them confirms the order, deducts stock and creates the supplier order.
+   */
+  private async fulfillPaidOrder(
+    order: any,
+    payment: any,
+    gatewayOrderId: string,
+    gatewayPaymentId: string,
+    gatewaySignature: string
+  ): Promise<
+    | { status: 'fulfilled'; order: any; supplierOrder: any }
+    | { status: 'already_paid' }
+    | { status: 'not_payable' }
+  > {
     const claim = await Order.updateOne(
-      { _id: order._id, paymentStatus: { $ne: 'paid' } },
+      { _id: order._id, orderStatus: 'pending_payment', paymentStatus: { $ne: 'paid' } },
       { $set: { paymentStatus: 'paid' } }
     );
     if (claim.modifiedCount === 0) {
-      return this.alreadyPaidResult(order);
+      const current = await Order.findById(order._id).select('paymentStatus');
+      return { status: current?.paymentStatus === 'paid' ? 'already_paid' : 'not_payable' };
     }
 
-    // Mark payment as captured & verified
     payment.status = 'captured';
     payment.signatureVerified = true;
-    payment.gatewayPaymentId = razorpayPaymentId;
-    payment.gatewaySignature = razorpaySignature;
+    payment.gatewayPaymentId = gatewayPaymentId;
+    payment.gatewaySignature = gatewaySignature;
     await payment.save();
 
-    // Update order status
-    order.paymentStatus = 'paid';
-    order.orderStatus = 'confirmed';
-    order.paymentDetails = {
-      gatewayOrderId: razorpayOrderId,
-      gatewayPaymentId: razorpayPaymentId,
-      gatewaySignature: razorpaySignature,
+    // Reload so the update below does not overwrite the claim made above
+    const fresh = await Order.findById(order._id);
+    if (!fresh) return { status: 'not_payable' };
+
+    fresh.orderStatus = 'confirmed';
+    fresh.paymentDetails = {
+      gatewayOrderId,
+      gatewayPaymentId,
+      gatewaySignature,
       method: 'razorpay',
       paidAt: new Date(),
     };
-    order.statusHistory.push({
+    fresh.statusHistory.push({
       status: 'confirmed',
       timestamp: new Date(),
       note: 'Payment verified and captured via Razorpay. Order confirmed.',
     });
-    await order.save();
+    await fresh.save();
 
-    // Confirm inventory fulfillment deduction
-    for (const item of order.items) {
+    for (const item of fresh.items) {
       const inv = await Inventory.findOne({ variantSku: item.sku });
       if (inv) {
         await inv.confirmFulfillment(item.quantity);
@@ -210,27 +250,21 @@ export class PaymentService {
       );
     }
 
-    // Trigger dropshipping supplier fulfillment order in Agra
-    const supplierOrder = await supplierFulfillmentService.createSupplierOrder(order);
+    const supplierOrder = await supplierFulfillmentService.createSupplierOrder(fresh);
     if (supplierOrder) {
-      order.supplierOrderId = supplierOrder._id as any;
-      order.trackingNumber = supplierOrder.trackingNumber;
-      order.carrier = supplierOrder.carrier;
-      order.orderStatus = 'processing';
-      order.statusHistory.push({
+      fresh.supplierOrderId = supplierOrder._id as any;
+      fresh.trackingNumber = supplierOrder.trackingNumber;
+      fresh.carrier = supplierOrder.carrier;
+      fresh.orderStatus = 'processing';
+      fresh.statusHistory.push({
         status: 'processing',
         timestamp: new Date(),
         note: `Supplier fulfillment order queued in Agra workshop. Tracking: ${supplierOrder.trackingNumber}`,
       });
-      await order.save();
+      await fresh.save();
     }
 
-    return {
-      verified: true,
-      message: 'Payment successfully verified. Order confirmed and supplier queued in Agra.',
-      order,
-      supplierOrder,
-    };
+    return { status: 'fulfilled', order: fresh, supplierOrder };
   }
 
   private async alreadyPaidResult(order: any) {
@@ -267,28 +301,49 @@ export class PaymentService {
     const event = body.event;
     console.log(`[Razorpay Webhook] Received event: ${event}`);
 
-    if (event === 'payment.captured') {
-      const paymentEntity = body.payload?.payment?.entity;
-      if (paymentEntity?.order_id) {
-        const payment = await Payment.findOne({ gatewayOrderId: paymentEntity.order_id });
-        if (payment) {
-          payment.status = 'captured';
-          payment.webhookEvents.push(body);
-          await payment.save();
-        }
-      }
-    } else if (event === 'payment.failed') {
-      const paymentEntity = body.payload?.payment?.entity;
-      if (paymentEntity?.order_id) {
-        const payment = await Payment.findOne({ gatewayOrderId: paymentEntity.order_id });
-        if (payment) {
-          payment.status = 'failed';
-          payment.failureReason = paymentEntity.error_description || 'Gateway failed';
-          payment.webhookEvents.push(body);
-          await payment.save();
-        }
-      }
+    const paymentEntity = body.payload?.payment?.entity;
+    if (!paymentEntity?.order_id) {
+      return { status: 'processed', event };
     }
+
+    const payment = await Payment.findOne({ gatewayOrderId: paymentEntity.order_id });
+    if (!payment) {
+      return { status: 'processed', event };
+    }
+    payment.webhookEvents.push(body);
+
+    if (event === 'payment.captured') {
+      const order = await Order.findById(payment.order);
+
+      // Only an authenticated webhook may confirm an order. In demo mode the
+      // webhook is unauthenticated, so it is recorded but never trusted to pay.
+      if (hasRealSecret && order) {
+        if (paymentEntity.amount !== Math.round(order.total * 100)) {
+          payment.failureReason = 'Captured amount does not match the order total';
+          console.error(`[Razorpay Webhook] Amount mismatch on order ${order.orderNumber}`);
+        } else if (order.paymentStatus !== 'paid') {
+          const outcome = await this.fulfillPaidOrder(
+            order,
+            payment,
+            paymentEntity.order_id,
+            paymentEntity.id,
+            'confirmed-by-webhook'
+          );
+          if (outcome.status === 'not_payable') {
+            payment.status = 'captured';
+            payment.failureReason = 'Payment received after the order was cancelled; refund required';
+            console.error(`[Razorpay Webhook] Payment for cancelled order ${order.orderNumber} needs a refund`);
+          }
+        }
+      } else {
+        payment.status = 'captured';
+      }
+    } else if (event === 'payment.failed' && payment.status !== 'captured') {
+      payment.status = 'failed';
+      payment.failureReason = paymentEntity.error_description || 'Gateway failed';
+    }
+
+    await payment.save();
 
     return { status: 'processed', event };
   }

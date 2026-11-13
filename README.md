@@ -10,7 +10,7 @@
 ![Express.js](https://img.shields.io/badge/Express.js-000000?style=for-the-badge&logo=express&logoColor=white)
 ![MongoDB](https://img.shields.io/badge/MongoDB-4EA94B?style=for-the-badge&logo=mongodb&logoColor=white)
 ![Razorpay](https://img.shields.io/badge/Razorpay_Sandbox-02042B?style=for-the-badge&logo=razorpay&logoColor=3395FF)
-![Vitest](https://img.shields.io/badge/Vitest-33_Tests_Passed-6E9F18?style=for-the-badge&logo=vitest&logoColor=white)
+![Vitest](https://img.shields.io/badge/Vitest-62_Tests_Passed-6E9F18?style=for-the-badge&logo=vitest&logoColor=white)
 
 <p align="center">
   <strong>Architectural footwear inspired by the generational leathercraft of Agra, engineered for modern Indian luxury.</strong>
@@ -188,7 +188,7 @@ sequenceDiagram
 > **Answer**: Footzi utilizes stateless **JSON Web Tokens (JWT)** for multiple reasons:
 > 1. **Horizontal Scalability**: Stateless verification removes the requirement for a shared Redis session store, allowing multi-instance cloud deployments (e.g., Render, Railway, Kubernetes) with zero sticky-session overhead.
 > 2. **Cross-Origin Client Decoupling**: Vite frontend and Express backend can run on independent domains without encountering Third-Party Cookie blocking (Safari ITP / Chrome Privacy Sandbox).
-> 3. **Mitigating Revocation Tradeoffs**: While JWTs are stateless, Footzi's `authenticate` middleware looks up the user's `isActive` status in MongoDB, ensuring that deleted or suspended accounts lose access immediately.
+> 3. **Mitigating Revocation Tradeoffs**: While JWTs are stateless, Footzi's `authenticate` middleware loads the user from MongoDB on every request, so a deleted account loses access immediately instead of when its token expires.
 
 ### Q3: How is payment tampering prevented?
 > **Answer**: The frontend is treated as completely untrusted:
@@ -209,12 +209,13 @@ sequenceDiagram
 
 ## 4. Demo Credentials & 1-Click Access
 
-For evaluation, two pre-configured accounts are seeded into MongoDB. Both accounts can be accessed using the **1-Click Demo Login** buttons on `/login` or `/checkout`:
+For evaluation, three pre-configured accounts are seeded into MongoDB. The patron and the read-only demo admin can be accessed using the **1-Click Demo Login** buttons on `/login` or `/checkout`:
 
 | Role | Account Email | Password | Access Capabilities |
 | :--- | :--- | :--- | :--- |
 | **Patron (Customer)** | `patron@footzi.in` | `Footzi@2026` | Full customer shopping, cart sync, Razorpay test checkout, order tracking, 7-day size exchange portal |
-| **Admin (Operations)** | `admin@footzi.in` | `Footzi@2026` | Operations deck, verified revenue analytics, dropship fulfillment pipeline, catalog creator, inventory adjustment |
+| **Demo Admin (read-only)** | `demo-admin@footzi.in` | `Footzi@2026` | Browse the whole operations deck. Every change is refused and customer contact details are masked |
+| **Admin (Operations)** | `admin@footzi.in` | `Footzi@2026` locally; the `SEED_ADMIN_PASSWORD` you set on a deployment | Full control: fulfillment pipeline, returns, catalog creator, inventory adjustment |
 
 ---
 
@@ -225,7 +226,7 @@ For evaluation, two pre-configured accounts are seeded into MongoDB. Both accoun
 | :--- | :--- | :--- | :--- |
 | `GET` | `/api/products` | Public | Paginated footwear list with filters (category, size, color, price) |
 | `GET` | `/api/products/:slug` | Public | Retrieve single silhouette by slug with size variants |
-| `POST` | `/api/products/:id/reviews` | Public | Submit verified customer review and recalculate rating |
+| `POST` | `/api/products/:id/reviews` | Authenticated | One review per customer; marked verified only if the customer has a paid order for the shoe |
 
 ### Authentication & Cart
 | Method | Endpoint | Access | Description |
@@ -236,7 +237,8 @@ For evaluation, two pre-configured accounts are seeded into MongoDB. Both accoun
 | `GET` | `/api/cart` | Authenticated | Fetch server-persisted shopping bag |
 | `POST` | `/api/cart/items` | Authenticated | Add variant to bag with stock check |
 | `PATCH` | `/api/cart/items/:id`| Authenticated | Update item quantity in bag |
-| `DELETE`| `/api/cart/items/:id`| Authenticated | Remove item from bag |
+| `DELETE`| `/api/cart/items/:id`| Authenticated | Remove item from bag (`:id` is the line id or the variant SKU) |
+| `POST` | `/api/cart/merge` | Authenticated | Fold a guest bag into the saved bag; the larger quantity wins, so it is safe to repeat |
 
 ### Orders & Payments
 | Method | Endpoint | Access | Description |
@@ -246,6 +248,15 @@ For evaluation, two pre-configured accounts are seeded into MongoDB. Both accoun
 | `POST` | `/api/orders/:id/cancel`| Authenticated | Cancel order and release reserved inventory |
 | `POST` | `/api/payments/create-order`| Authenticated | Generate Razorpay gateway order in paise |
 | `POST` | `/api/payments/verify` | Authenticated | Verify HMAC-SHA256 signature and trigger dropship pipeline |
+
+### Returns & Exchanges
+| Method | Endpoint | Access | Description |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/api/returns` | Authenticated | Open a return or size exchange on a **delivered** order within 7 days; prices and item details come from the order, and an exchange holds the replacement pair |
+| `GET` | `/api/returns/my-returns` | Authenticated | The patron's own requests |
+| `GET` | `/api/returns/:id` | Owner / Admin | One request |
+
+Requests move one step at a time (`requested → approved → pickup_scheduled → inspected → replacement_dispatched` or `refund_processed`, or `rejected` along the way). Finished pairs are restocked and held replacements are released on rejection. Recording a refund does not move money; that still needs Razorpay's refund API.
 
 ### Admin Operations
 | Method | Endpoint | Access | Description |
@@ -282,7 +293,7 @@ cd ../server && npm install
 cd server
 npm run seed
 ```
-*Seeds 16 handcrafted footwear styles, 76 size-variant inventory records, and demo patron/admin accounts.*
+*Seeds 16 handcrafted footwear styles, 76 size-variant inventory records, and the demo patron, demo admin and admin accounts.*
 
 ### 3. Launch Development Servers
 ```bash
@@ -300,14 +311,16 @@ Open **[http://localhost:5173](http://localhost:5173)** in your browser.
 
 ### 4. Running Automated Tests
 
-Footzi includes **33 automated unit and integration tests** ensuring test-driven reliability:
+Footzi includes **62 automated unit and integration tests** ensuring test-driven reliability:
 
 ```bash
-# Client Vitest Suite (11 tests: Cart calculations, coupon math, UI components, return service)
+# Client Vitest Suite (14 tests: Cart calculations, coupon math, bag merge on sign-in, UI components, return service)
 cd client
 npm test
 
-# Server Integration Suite (22 tests: Auth, Cart, Orders, Razorpay HMAC, Dropship Pipeline, Returns, Cloudinary, Inventory)
+# Server Integration Suite (48 tests: Auth, Cart, Orders, Razorpay HMAC and webhook, Dropship Pipeline,
+# Returns, Reviews, Order expiry, Demo admin, Cloudinary, Inventory). Needs a seeded MongoDB; point
+# MONGODB_URI at a scratch database, because the tests create and delete orders.
 cd server
 npx vitest run
 ```
@@ -346,6 +359,11 @@ MONGODB_URI="<atlas connection string>" SEED_ADMIN_PASSWORD="<private admin pass
 ```
 The seed **deletes all products, inventory and users** before inserting, so run it only on a fresh database. Without `SEED_ADMIN_PASSWORD`, `admin@footzi.in` gets the public demo password.
 
+To add the read-only demo admin to a database that already has data, without wiping anything:
+```bash
+MONGODB_URI="<atlas connection string>" npm run seed:demo-admin
+```
+
 ### 3. Deploy on Render
 1. Push the repository to GitHub.
 2. In Render: **New → Blueprint**, pick the repository; Render reads `render.yaml`.
@@ -361,6 +379,7 @@ The seed **deletes all products, inventory and users** before inserting, so run 
 | `RAZORPAY_WEBHOOK_SECRET` | with real keys | Webhook URL: `https://<service>.onrender.com/api/payments/webhook` |
 | `CLOUDINARY_*` | no | Real image uploads; unset = uploads are simulated |
 | `CORS_ORIGIN` | no | Only if a separately hosted frontend calls this API |
+| `ORDER_EXPIRY_MINUTES` | no | Unpaid orders are cancelled and their stock released after this long (default 30) |
 
 ### Production behaviour
 - The server exits at startup if `MONGODB_URI` is missing, `JWT_SECRET` is weak, or the database is unreachable.

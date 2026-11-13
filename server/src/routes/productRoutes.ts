@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { getProducts, getProductBySlug, addProductReview } from '../controllers/productController.js';
+import { authenticate } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -10,6 +11,6 @@ router.get('/', getProducts);
 router.get('/:slug', getProductBySlug);
 
 // POST /api/products/:id/reviews - Submit customer review
-router.post('/:id/reviews', addProductReview);
+router.post('/:id/reviews', authenticate, addProductReview);
 
 export default router;

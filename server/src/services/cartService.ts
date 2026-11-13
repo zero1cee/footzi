@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import { Cart, ICart } from '../models/Cart.js';
 import { Product } from '../models/Product.js';
 
@@ -76,6 +77,57 @@ export class CartService {
         unitPrice: price,
         lineTotal: data.quantity * price,
       });
+    }
+
+    cart.calculateSubtotal();
+    await cart.save();
+    return cart;
+  }
+
+  /**
+   * Folds a guest's bag into the account's saved bag after sign-in. For a pair that
+   * is in both, the larger quantity wins instead of the two adding up, so running
+   * this repeatedly (every page load, every login) never inflates the bag. Prices
+   * are refreshed from the catalog, and anything unavailable is skipped.
+   */
+  async mergeItems(userId: string, items: AddItemDTO[]): Promise<ICart> {
+    const ids = [...new Set(items.map((i) => i.productId))].filter((id) => mongoose.isValidObjectId(id));
+    const products = await Product.find({ _id: { $in: ids }, isActive: true });
+    const byId = new Map(products.map((p) => [String(p._id), p]));
+
+    let cart = await Cart.findOne({ user: userId });
+    if (!cart) {
+      cart = new Cart({ user: userId, items: [] });
+    }
+
+    for (const wanted of items) {
+      const product = byId.get(wanted.productId);
+      const variant = product?.variants.find((v) => v.sku === wanted.variantSku);
+      if (!product || !variant || variant.stock <= 0) continue;
+
+      const price = variant.priceOverride ?? product.price;
+      const existing = cart.items.find((item) => item.variantSku === variant.sku);
+      const quantity = Math.min(Math.max(existing?.quantity ?? 0, wanted.quantity), variant.stock, 10);
+
+      if (existing) {
+        existing.quantity = quantity;
+        existing.unitPrice = price;
+        existing.lineTotal = quantity * price;
+      } else {
+        cart.items.push({
+          product: product._id as any,
+          productName: product.name,
+          productSlug: product.slug,
+          image: product.images[0],
+          variantSku: variant.sku,
+          size: variant.size,
+          color: variant.color,
+          colorHex: variant.colorHex,
+          quantity,
+          unitPrice: price,
+          lineTotal: quantity * price,
+        });
+      }
     }
 
     cart.calculateSubtotal();

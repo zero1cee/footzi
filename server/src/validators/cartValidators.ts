@@ -15,6 +15,19 @@ export const addToCartSchema = z.object({
     .default(1),
 });
 
+// A guest's bag may hold more than the per-variant limit; clamp it rather than reject the whole bag
+const mergeItemSchema = addToCartSchema.extend({
+  quantity: z
+    .number()
+    .int('Quantity must be an integer')
+    .min(1, 'Quantity must be at least 1')
+    .transform((q) => Math.min(q, 10)),
+});
+
+export const mergeCartSchema = z.object({
+  items: z.array(mergeItemSchema).max(50, 'Too many items to merge'),
+});
+
 export const updateCartItemSchema = z.object({
   quantity: z
     .number()

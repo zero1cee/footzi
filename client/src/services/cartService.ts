@@ -53,6 +53,22 @@ export const cartService = {
     return parseApiJson(res, 'Failed to add item to bag');
   },
 
+  // Folds a guest's bag into the saved bag; safe to repeat because the larger quantity wins
+  async mergeItems(
+    items: { productId: string; variantSku: string; size: string; color: string; quantity: number }[],
+    token: string
+  ): Promise<{ message: string; cart: ServerCart }> {
+    const res = await fetch('/api/cart/merge', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ items }),
+    });
+    return parseApiJson(res, 'Failed to merge your bag');
+  },
+
   // Cart lines are addressed by variant SKU, which both client and server know
   async updateQuantity(sku: string, quantity: number, token: string): Promise<{ message: string; cart: ServerCart }> {
     const res = await fetch(`/api/cart/items/${encodeURIComponent(sku)}`, {

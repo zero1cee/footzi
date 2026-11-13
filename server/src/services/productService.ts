@@ -1,4 +1,7 @@
+import mongoose from 'mongoose';
 import { Product, IProduct } from '../models/Product.js';
+import { Order } from '../models/Order.js';
+import { IUser } from '../models/User.js';
 import { Inventory } from '../models/Inventory.js';
 
 export interface ProductQueryFilters {
@@ -273,23 +276,55 @@ export class ProductService {
     return inv;
   }
 
-  async addReview(productId: string, reviewData: any) {
-    try {
-      const product = await Product.findById(productId);
-      if (!product) return null;
+  /**
+   * Records a review written by a signed-in customer. The author name comes from
+   * the account (never from the request), each customer can review a product once,
+   * and a review is marked verified only when the customer has a paid order for it.
+   */
+  async addReview(
+    productId: string,
+    user: IUser,
+    data: { rating: number; title?: string; comment: string; city?: string; sizePurchased?: string }
+  ): Promise<{ review: any; product: IProduct } | 'not_found' | 'duplicate'> {
+    if (!mongoose.isValidObjectId(productId)) return 'not_found';
 
-      product.reviews.unshift(reviewData);
-      product.reviewCount = product.reviews.length;
+    const purchase = await Order.findOne({
+      user: user._id,
+      paymentStatus: 'paid',
+      'items.product': productId,
+    })
+      .select('items')
+      .lean();
+    const purchasedItem = purchase?.items.find((i) => String(i.product) === productId);
 
-      // Recalculate average rating
-      const totalStars = product.reviews.reduce((acc, r) => acc + r.rating, 0);
-      product.rating = Number((totalStars / product.reviews.length).toFixed(1));
+    const review = {
+      user: user._id,
+      author: user.name,
+      city: data.city || 'India',
+      rating: data.rating,
+      title: data.title || 'Patron Review',
+      comment: data.comment,
+      sizePurchased: (data.sizePurchased || purchasedItem?.size || 'UK 8') as any,
+      date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+      verified: Boolean(purchase),
+    };
 
-      await product.save();
-      return product;
-    } catch {
-      return null;
+    // One review per customer, enforced by the update itself so a double submit cannot slip through
+    const product = await Product.findOneAndUpdate(
+      { _id: productId, 'reviews.user': { $ne: user._id } },
+      { $push: { reviews: { $each: [review], $position: 0 } } },
+      { new: true }
+    );
+    if (!product) {
+      return (await Product.exists({ _id: productId })) ? 'duplicate' : 'not_found';
     }
+
+    const total = product.reviews.reduce((sum, r) => sum + r.rating, 0);
+    product.reviewCount = product.reviews.length;
+    product.rating = Number((total / product.reviews.length).toFixed(1));
+    await product.save();
+
+    return { review: product.reviews[0], product };
   }
 }
 

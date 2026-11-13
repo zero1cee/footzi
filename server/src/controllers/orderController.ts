@@ -1,6 +1,6 @@
 import { Response } from 'express';
 import { orderService } from '../services/orderService.js';
-import { AuthRequest } from '../middleware/auth.js';
+import { AuthRequest, isAdminRole } from '../middleware/auth.js';
 import { z } from 'zod';
 
 const createOrderSchema = z.object({
@@ -70,7 +70,7 @@ export const getMyOrders = async (req: AuthRequest, res: Response): Promise<void
 export const getOrderById = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const id = req.params.id as string;
-    const order = await orderService.getOrderById(id, req.user?.role === 'admin' ? undefined : req.user?.id);
+    const order = await orderService.getOrderById(id, isAdminRole(req.user?.role) ? undefined : req.user?.id);
 
     if (!order) {
       res.status(404).json({ error: 'Order not found' });

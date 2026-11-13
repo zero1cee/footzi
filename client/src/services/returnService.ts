@@ -5,13 +5,14 @@ export interface RequestReturnPayload {
   type: 'return' | 'exchange';
   items: {
     sku: string;
-    productName: string;
-    size: string;
-    color: string;
     quantity: number;
-    price: number;
     reason: string;
     replacementSize?: string;
+    // Accepted for compatibility but ignored: the server reads these from the order
+    productName?: string;
+    size?: string;
+    color?: string;
+    price?: number;
     replacementColor?: string;
   }[];
   customerComments?: string;

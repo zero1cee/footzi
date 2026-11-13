@@ -174,6 +174,36 @@ export class OrderService {
     return Order.findOne(query).populate('supplierOrderId').lean();
   }
 
+  /**
+   * Cancels an order that has not been paid and releases its reserved stock.
+   * The status change is a single conditional update, so when a patron cancel,
+   * the expiry job and a payment verification race, exactly one of them wins and
+   * the stock is released exactly once.
+   */
+  async cancelUnpaidOrder(
+    orderId: unknown,
+    note: string,
+    extraFilter: Record<string, unknown> = {}
+  ): Promise<IOrder | null> {
+    const order = await Order.findOneAndUpdate(
+      { _id: orderId, orderStatus: 'pending_payment', paymentStatus: { $ne: 'paid' }, ...extraFilter },
+      {
+        $set: { orderStatus: 'cancelled' },
+        $push: { statusHistory: { status: 'cancelled', timestamp: new Date(), note } },
+      },
+      { new: true }
+    );
+    if (!order) return null;
+
+    for (const item of order.items) {
+      const inv = await Inventory.findOne({ variantSku: item.sku });
+      if (inv) {
+        await inv.releaseStock(item.quantity);
+      }
+    }
+    return order;
+  }
+
   async cancelOrder(orderId: string, userId: string, reason?: string): Promise<IOrder> {
     const order = await Order.findOne({ _id: orderId, user: userId });
     if (!order) {
@@ -186,27 +216,43 @@ export class OrderService {
       throw new Error('A paid order cannot be cancelled here. Please request a return instead.');
     }
 
-    if (!order.canTransitionTo('cancelled')) {
-      throw new Error(`Order in '${order.orderStatus}' state cannot be cancelled.`);
+    const cancelled = await this.cancelUnpaidOrder(
+      order._id,
+      reason || 'Customer requested order cancellation.',
+      { user: userId }
+    );
+    if (!cancelled) {
+      const current = await Order.findById(order._id);
+      throw new Error(`Order in '${current?.orderStatus ?? order.orderStatus}' state cannot be cancelled.`);
     }
+    return cancelled;
+  }
 
-    order.orderStatus = 'cancelled';
-    order.statusHistory.push({
-      status: 'cancelled',
-      timestamp: new Date(),
-      note: reason || 'Customer requested order cancellation.',
-    });
+  /**
+   * Cancels orders that were created but never paid within the window, so an
+   * abandoned checkout cannot hold stock forever. Safe to run from several
+   * instances at once.
+   */
+  async expireStaleOrders(maxAgeMinutes = Number(process.env.ORDER_EXPIRY_MINUTES) || 30): Promise<number> {
+    const cutoff = new Date(Date.now() - maxAgeMinutes * 60 * 1000);
+    const stale = await Order.find({
+      orderStatus: 'pending_payment',
+      paymentStatus: { $ne: 'paid' },
+      createdAt: { $lt: cutoff },
+    })
+      .select('_id')
+      .limit(200)
+      .lean();
 
-    // Release reserved inventory
-    for (const item of order.items) {
-      const inv = await Inventory.findOne({ variantSku: item.sku });
-      if (inv) {
-        await inv.releaseStock(item.quantity);
-      }
+    let expired = 0;
+    for (const { _id } of stale) {
+      const cancelled = await this.cancelUnpaidOrder(
+        _id,
+        `Payment was not completed within ${maxAgeMinutes} minutes. Order expired and stock released.`
+      );
+      if (cancelled) expired += 1;
     }
-
-    await order.save();
-    return order;
+    return expired;
   }
 
   async getAllOrders(query: any = {}) {

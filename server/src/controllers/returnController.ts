@@ -1,29 +1,58 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth.js';
-import { returnService } from '../services/returnService.js';
+import { z } from 'zod';
+import { returnService, RETURN_REASONS } from '../services/returnService.js';
+import { isAdminRole } from '../middleware/auth.js';
+
+const SHOE_SIZES = ['UK 6', 'UK 7', 'UK 8', 'UK 9', 'UK 10', 'UK 11'] as const;
+
+const createReturnSchema = z.object({
+  orderId: z.string().min(1, 'Order ID is required'),
+  type: z.enum(['return', 'exchange']).default('exchange'),
+  customerComments: z.string().max(500).optional(),
+  items: z
+    .array(
+      z.object({
+        sku: z.string().min(1),
+        quantity: z.number().int().min(1).max(10).default(1),
+        reason: z.enum(RETURN_REASONS),
+        replacementSize: z.enum(SHOE_SIZES).optional(),
+      })
+    )
+    .min(1, 'Select at least one item')
+    .max(10),
+});
+
+const updateReturnSchema = z.object({
+  status: z.enum([
+    'requested',
+    'approved',
+    'pickup_scheduled',
+    'inspected',
+    'replacement_dispatched',
+    'refund_processed',
+    'rejected',
+  ]),
+  adminNotes: z.string().max(500).optional(),
+  replacementTrackingNumber: z.string().max(40).optional(),
+});
 
 export const createReturn = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.user!._id.toString();
-    const { orderId, type, items, customerComments } = req.body;
+    const data = createReturnSchema.parse(req.body);
 
-    if (!orderId || !items) {
-      res.status(400).json({ error: 'Order ID and items are required' });
-      return;
-    }
-
-    const returnReq = await returnService.createReturnRequest(userId, {
-      orderId,
-      type: type || 'exchange',
-      items,
-      customerComments,
-    });
+    const returnReq = await returnService.createReturnRequest(userId, data);
 
     res.status(201).json({
-      message: `${type === 'exchange' ? 'Size exchange' : 'Return'} request registered successfully`,
+      message: `${data.type === 'exchange' ? 'Size exchange' : 'Return'} request registered successfully`,
       returnRequest: returnReq,
     });
   } catch (error: any) {
+    if (error.name === 'ZodError') {
+      res.status(400).json({ error: error.errors[0]?.message || 'Invalid request', details: error.errors });
+      return;
+    }
     res.status(400).json({ error: error.message });
   }
 };
@@ -50,7 +79,7 @@ export const getReturnById = async (req: AuthRequest, res: Response): Promise<vo
 
     // Must be owner or admin
     if (
-      req.user!.role !== 'admin' &&
+      !isAdminRole(req.user!.role) &&
       request.user._id.toString() !== req.user!._id.toString()
     ) {
       res.status(403).json({ error: 'Access denied to this return record' });
@@ -75,25 +104,19 @@ export const getAllReturnsAdmin = async (req: AuthRequest, res: Response): Promi
 export const updateReturnStatusAdmin = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const id = req.params.id as string;
-    const { status, adminNotes, replacementTrackingNumber } = req.body;
+    const { status, adminNotes, replacementTrackingNumber } = updateReturnSchema.parse(req.body);
 
-    if (!status) {
-      res.status(400).json({ error: 'Target status is required' });
-      return;
-    }
-
-    const updated = await returnService.updateReturnStatus(
-      id,
-      status,
-      adminNotes,
-      replacementTrackingNumber
-    );
+    const updated = await returnService.updateReturnStatus(id, status, adminNotes, replacementTrackingNumber);
 
     res.status(200).json({
       message: `Return request transitioned to ${status}`,
       returnRequest: updated,
     });
   } catch (error: any) {
+    if (error.name === 'ZodError') {
+      res.status(400).json({ error: error.errors[0]?.message || 'Invalid status', details: error.errors });
+      return;
+    }
     res.status(400).json({ error: error.message });
   }
 };

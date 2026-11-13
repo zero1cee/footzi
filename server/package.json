@@ -9,7 +9,8 @@
     "start": "node dist/server.js",
     "dev": "tsx watch src/server.ts",
     "seed": "tsx src/scripts/seed.ts",
-    "test": "vitest"
+    "test": "vitest",
+    "seed:demo-admin": "tsx src/scripts/ensureDemoAdmin.ts"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

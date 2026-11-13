@@ -1,6 +1,6 @@
 import { Response } from 'express';
 import { cartService } from '../services/cartService.js';
-import { addToCartSchema, updateCartItemSchema } from '../validators/cartValidators.js';
+import { addToCartSchema, updateCartItemSchema, mergeCartSchema } from '../validators/cartValidators.js';
 import { AuthRequest } from '../middleware/auth.js';
 
 export const getCart = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -25,6 +25,24 @@ export const addItem = async (req: AuthRequest, res: Response): Promise<void> =>
     const validatedData = addToCartSchema.parse(req.body);
     const cart = await cartService.addItem(req.user.id, validatedData);
     res.status(200).json({ message: 'Item added to bag', cart });
+  } catch (error: any) {
+    if (error.name === 'ZodError') {
+      res.status(400).json({ error: 'Validation failed', details: error.errors });
+      return;
+    }
+    res.status(400).json({ error: error.message });
+  }
+};
+
+export const mergeCart = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({ error: 'Not authenticated' });
+      return;
+    }
+    const { items } = mergeCartSchema.parse(req.body);
+    const cart = await cartService.mergeItems(req.user.id, items);
+    res.status(200).json({ message: 'Bag merged', cart });
   } catch (error: any) {
     if (error.name === 'ZodError') {
       res.status(400).json({ error: 'Validation failed', details: error.errors });

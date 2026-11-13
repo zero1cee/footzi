@@ -16,7 +16,7 @@ export const AdminRoute: React.FC<AdminRouteProps> = ({ children }) => {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  if (user?.role !== 'admin') {
+  if (user?.role !== 'admin' && user?.role !== 'demo_admin') {
     return (
       <div className="py-20 md:py-32 bg-ivory-100 min-h-[80vh] flex items-center justify-center px-4">
         <div className="max-w-md w-full bg-white p-8 rounded-xs border border-ivory-300 shadow-elevated text-center space-y-5">

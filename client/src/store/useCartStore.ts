@@ -149,8 +149,21 @@ export const useCartStore = create<CartState>()(
         if (!token || token.startsWith('demo-jwt-token')) return;
 
         try {
-          const serverCart = await cartService.getCart(token);
-          if (serverCart && Array.isArray(serverCart.items) && serverCart.items.length > 0) {
+          // Anything added as a guest (or on another device's stale copy) is merged into
+          // the saved bag first, then the saved bag becomes the source of truth.
+          const local = get().items.map((i) => ({
+            productId: i.productId,
+            variantSku: i.sku,
+            size: i.size,
+            color: i.color,
+            quantity: i.quantity,
+          }));
+          const serverCart =
+            local.length > 0
+              ? (await cartService.mergeItems(local, token)).cart
+              : await cartService.getCart(token);
+
+          if (serverCart && Array.isArray(serverCart.items)) {
             const mappedItems: CartItem[] = serverCart.items.map((si) => ({
               id: `${si.product}-${si.variantSku}`,
               productId: si.product,
@@ -242,3 +255,17 @@ export const useCartStore = create<CartState>()(
     }
   )
 );
+
+// Keep the bag in step with the session: signing in merges the guest bag into the
+// saved one, and signing out (or switching accounts) clears it so one patron's bag
+// never shows up for the next person on a shared device.
+useAuthStore.subscribe((state, previous) => {
+  if (state.token === previous.token) return;
+
+  if (previous.token) {
+    useCartStore.setState({ items: [], couponCode: null, discountRate: 0 });
+  }
+  if (state.token) {
+    void useCartStore.getState().syncWithBackend();
+  }
+});

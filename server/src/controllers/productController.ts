@@ -1,5 +1,7 @@
 import { Request, Response } from 'express';
+import { z } from 'zod';
 import { productService } from '../services/productService.js';
+import { AuthRequest } from '../middleware/auth.js';
 
 // Query params can arrive as arrays or objects (?category[$ne]=x). Only plain
 // strings are passed on, so operators can never be smuggled into a Mongo query.
@@ -65,34 +67,39 @@ export const getProductBySlug = async (req: Request, res: Response): Promise<voi
   }
 };
 
-export const addProductReview = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const id = req.params.id as string;
-    const { author, city, rating, title, comment, sizePurchased } = req.body;
+const reviewSchema = z.object({
+  rating: z.number().int().min(1, 'Rating must be between 1 and 5').max(5, 'Rating must be between 1 and 5'),
+  title: z.string().trim().max(100).optional(),
+  comment: z.string().trim().min(3, 'Please write a few words about the pair').max(1000),
+  city: z.string().trim().max(60).optional(),
+  sizePurchased: z.enum(['UK 6', 'UK 7', 'UK 8', 'UK 9', 'UK 10', 'UK 11']).optional(),
+});
 
-    if (!author || !rating || !comment) {
-      res.status(400).json({ error: 'Author, rating and comment are required' });
+export const addProductReview = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({ error: 'Please sign in to write a review' });
       return;
     }
 
-    const updated = await productService.addReview(id, {
-      author,
-      city: city || 'India',
-      rating: Number(rating),
-      title: title || 'Patron Review',
-      comment,
-      sizePurchased: sizePurchased || 'UK 8',
-      date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
-      verified: true,
-    });
+    const data = reviewSchema.parse(req.body);
+    const result = await productService.addReview(req.params.id as string, req.user, data);
 
-    if (!updated) {
+    if (result === 'not_found') {
       res.status(404).json({ error: 'Product not found' });
       return;
     }
+    if (result === 'duplicate') {
+      res.status(409).json({ error: 'You have already reviewed this product' });
+      return;
+    }
 
-    res.status(201).json({ message: 'Review successfully recorded', product: updated });
+    res.status(201).json({ message: 'Review successfully recorded', review: result.review, product: result.product });
   } catch (error: any) {
+    if (error.name === 'ZodError') {
+      res.status(400).json({ error: error.errors[0]?.message || 'Invalid review', details: error.errors });
+      return;
+    }
     res.status(500).json({ error: 'Failed to record review', message: error.message });
   }
 };

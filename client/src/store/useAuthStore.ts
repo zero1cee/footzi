@@ -59,15 +59,14 @@ export const useAuthStore = create<AuthState>()(
             });
             return true;
           }
-          if (offline && email === 'admin@footzi.in' && password === 'Footzi@2026') {
+          if (offline && email === 'demo-admin@footzi.in' && password === 'Footzi@2026') {
             console.warn('[Footzi Auth] Live login unavailable, falling back to simulated admin session.');
             set({
               user: {
                 _id: 'demo-admin-1',
-                name: 'Devraj Chauhan',
-                email: 'admin@footzi.in',
-                role: 'admin',
-                phone: '+91 98111 22334',
+                name: 'Demo Admin',
+                email: 'demo-admin@footzi.in',
+                role: 'demo_admin',
               },
               token: 'demo-jwt-token-admin',
               isAuthenticated: true,
@@ -82,7 +81,8 @@ export const useAuthStore = create<AuthState>()(
       },
 
       loginAsDemo: async (role = 'patron') => {
-        const email = role === 'admin' ? 'admin@footzi.in' : 'patron@footzi.in';
+        // The public Admin Demo is a read-only account; the full admin account keeps a private password
+        const email = role === 'admin' ? 'demo-admin@footzi.in' : 'patron@footzi.in';
         return get().login(email, 'Footzi@2026');
       },
 

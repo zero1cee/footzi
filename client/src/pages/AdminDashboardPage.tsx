@@ -13,17 +13,38 @@ import {
   RefreshCw,
   Eye,
   EyeOff,
+  ShieldAlert,
 } from 'lucide-react';
 import { formatINR } from '@/lib/utils';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { adminService } from '@/services/adminService';
-import { productService } from '@/services/productService';
+import { productService, normalizeProduct } from '@/services/productService';
 import { useAuthStore } from '@/store/useAuthStore';
 import { MOCK_PRODUCTS } from '@/data/mockProducts';
 
+// The next admin actions for a return, following the order the server enforces
+const returnActions = (ret: any) => {
+  const actions: { status: string; label: string; variant: 'primary' | 'secondary' | 'outline' }[] = [];
+  if (ret.status === 'requested') actions.push({ status: 'approved', label: 'Approve', variant: 'secondary' });
+  if (ret.status === 'approved') actions.push({ status: 'pickup_scheduled', label: 'Schedule Pickup', variant: 'secondary' });
+  if (ret.status === 'pickup_scheduled') actions.push({ status: 'inspected', label: 'Mark Inspected', variant: 'secondary' });
+  if (ret.status === 'inspected') {
+    actions.push(
+      ret.type === 'exchange'
+        ? { status: 'replacement_dispatched', label: 'Dispatch Replacement', variant: 'primary' }
+        : { status: 'refund_processed', label: 'Process Refund', variant: 'primary' }
+    );
+  }
+  if (['requested', 'approved', 'pickup_scheduled', 'inspected'].includes(ret.status)) {
+    actions.push({ status: 'rejected', label: 'Reject', variant: 'outline' });
+  }
+  return actions;
+};
+
 export const AdminDashboardPage: React.FC = () => {
-  const { token } = useAuthStore();
+  const { token, user } = useAuthStore();
+  const isReadOnly = user?.role === 'demo_admin';
   const activeToken = token || '';
 
   const [activeTab, setActiveTab] = useState<
@@ -111,45 +132,39 @@ export const AdminDashboardPage: React.FC = () => {
     fetchAdminData();
   }, [activeToken]);
 
+  // Report the server's answer as it is: an action that was refused must not look like it worked
+  const flash = (message: string, ms = 3500) => {
+    setActionFeedback(message);
+    setTimeout(() => setActionFeedback(null), ms);
+  };
+
   const handleSupplierTransition = async (orderId: string, nextStatus: string) => {
     try {
       await adminService.fulfillSupplierOrder(orderId, nextStatus, undefined, activeToken);
-      setActionFeedback(`Supplier Order transitioned to ${nextStatus.toUpperCase()}`);
-      setTimeout(() => setActionFeedback(null), 3500);
-
       setSupplierOrders((prev) =>
         prev.map((o) => (o._id === orderId ? { ...o, status: nextStatus } : o))
       );
-    } catch {
-      setSupplierOrders((prev) =>
-        prev.map((o) => (o._id === orderId ? { ...o, status: nextStatus } : o))
-      );
-      setActionFeedback(`Transitioned to ${nextStatus.toUpperCase()}`);
-      setTimeout(() => setActionFeedback(null), 3500);
+      flash(`Supplier Order transitioned to ${nextStatus.toUpperCase()}`);
+    } catch (err: any) {
+      flash(err.message || 'Could not update the supplier order');
     }
   };
 
   const handleReturnTransition = async (returnId: string, nextStatus: string) => {
     try {
-      await adminService.updateReturnStatus(
+      const res = await adminService.updateReturnStatus(
         returnId,
         nextStatus,
         'Processed by Footzi Fulfillment Operations',
         undefined,
         activeToken
       );
-      setActionFeedback(`Return Request #${returnId.slice(-6)} updated to ${nextStatus.toUpperCase()}`);
-      setTimeout(() => setActionFeedback(null), 3500);
-
       setReturnsList((prev) =>
-        prev.map((r) => (r._id === returnId ? { ...r, status: nextStatus } : r))
+        prev.map((r) => (r._id === returnId ? { ...r, ...res.returnRequest, user: r.user, order: r.order } : r))
       );
-    } catch {
-      setReturnsList((prev) =>
-        prev.map((r) => (r._id === returnId ? { ...r, status: nextStatus } : r))
-      );
-      setActionFeedback(`Return updated to ${nextStatus.toUpperCase()}`);
-      setTimeout(() => setActionFeedback(null), 3500);
+      flash(`Return Request #${returnId.slice(-6)} updated to ${nextStatus.toUpperCase()}`);
+    } catch (err: any) {
+      flash(err.message || 'Could not update the return request');
     }
   };
 
@@ -162,31 +177,23 @@ export const AdminDashboardPage: React.FC = () => {
         )
       );
       setEditingSku(null);
-      setActionFeedback(`Variant ${sku} stock updated to ${editingStockVal}`);
-      setTimeout(() => setActionFeedback(null), 3000);
-    } catch {
-      setInventoryList((prev) =>
-        prev.map((item) =>
-          item.variantSku === sku ? { ...item, availableStock: editingStockVal } : item
-        )
-      );
+      flash(`Variant ${sku} stock updated to ${editingStockVal}`, 3000);
+    } catch (err: any) {
       setEditingSku(null);
-      setActionFeedback(`Stock updated to ${editingStockVal}`);
-      setTimeout(() => setActionFeedback(null), 3000);
+      flash(err.message || 'Could not update stock', 3000);
     }
   };
 
   const handleToggleProductActive = async (productId: string) => {
     try {
       await adminService.toggleProductActive(productId, activeToken);
-    } catch {
-      // Ignored
+      setProductsList((prev) =>
+        prev.map((p) => (p.id === productId ? { ...p, isActive: !p.isActive } : p))
+      );
+      flash('Product visibility toggled', 3000);
+    } catch (err: any) {
+      flash(err.message || 'Could not change product visibility', 3000);
     }
-    setProductsList((prev) =>
-      prev.map((p) => (p.id === productId ? { ...p, isActive: !p.isActive } : p))
-    );
-    setActionFeedback(`Product visibility toggled`);
-    setTimeout(() => setActionFeedback(null), 3000);
   };
 
   const handleAddNewProduct = async (e: React.FormEvent) => {
@@ -226,27 +233,14 @@ export const AdminDashboardPage: React.FC = () => {
     };
 
     try {
-      await adminService.createProduct(productPayload, activeToken);
-    } catch {
-      // Fallback
+      const res = await adminService.createProduct(productPayload, activeToken);
+      setProductsList((prev) => [normalizeProduct(res.product), ...prev]);
+      setIsAddProductOpen(false);
+      flash(`Product "${newProductName}" handcrafted & added to catalog!`, 4000);
+      setNewProductName('');
+    } catch (err: any) {
+      flash(err.message || 'Could not create the product', 4000);
     }
-
-    const createdMockProduct = {
-      id: `prod_${Date.now()}`,
-      slug: newProductName.toLowerCase().replace(/\s+/g, '-'),
-      badge: 'New Arrival',
-      rating: 5.0,
-      reviewCount: 1,
-      ...productPayload,
-    };
-
-    setProductsList((prev) => [createdMockProduct as any, ...prev]);
-    setIsAddProductOpen(false);
-    setActionFeedback(`Product "${newProductName}" handcrafted & added to catalog!`);
-    setTimeout(() => setActionFeedback(null), 4000);
-
-    // Reset form
-    setNewProductName('');
   };
 
   return (
@@ -284,6 +278,16 @@ export const AdminDashboardPage: React.FC = () => {
         </div>
 
         {/* Action feedback alert */}
+        {isReadOnly && (
+          <div className="mb-6 p-3 bg-sand-100 border border-sand-300 text-xs text-charcoal-800 rounded-xs flex items-start gap-2">
+            <ShieldAlert className="w-4 h-4 shrink-0 text-sand-700 mt-0.5" />
+            <span>
+              <strong>Read-only demo.</strong> You can browse every screen, but changes are disabled and customer
+              contact details are masked.
+            </span>
+          </div>
+        )}
+
         {actionFeedback && (
           <div className="mb-6 p-3 bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs rounded-xs flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-emerald-600" />
@@ -914,23 +918,23 @@ export const AdminDashboardPage: React.FC = () => {
                           {ret.pickupTrackingNumber || 'Pending'}
                         </td>
                         <td className="p-3 text-right space-x-1.5 whitespace-nowrap">
-                          {ret.status === 'requested' && (
+                          {returnActions(ret).map((action) => (
                             <Button
-                              variant="secondary"
+                              key={action.status}
+                              variant={action.variant}
                               size="sm"
-                              onClick={() => handleReturnTransition(ret._id, 'approved')}
+                              onClick={() => handleReturnTransition(ret._id, action.status)}
                             >
-                              Approve Pickup
+                              {action.label}
                             </Button>
+                          ))}
+                          {ret.status === 'refund_processed' && (
+                            <span className="text-[11px] text-emerald-700 font-semibold flex items-center justify-end gap-1">
+                              <CheckCircle2 className="w-3.5 h-3.5" /> Refund processed
+                            </span>
                           )}
-                          {ret.status === 'approved' && (
-                            <Button
-                              variant="primary"
-                              size="sm"
-                              onClick={() => handleReturnTransition(ret._id, 'replacement_dispatched')}
-                            >
-                              Dispatch Replacement
-                            </Button>
+                          {ret.status === 'rejected' && (
+                            <span className="text-[11px] text-charcoal-500 font-semibold">Rejected</span>
                           )}
                           {ret.status === 'replacement_dispatched' && (
                             <span className="text-[11px] text-emerald-700 font-semibold flex items-center justify-end gap-1">

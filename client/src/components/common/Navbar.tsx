@@ -165,7 +165,7 @@ export const Navbar: React.FC = () => {
                       Account & Orders
                     </Link>
 
-                    {user.role === 'admin' && (
+                    {(user.role === 'admin' || user.role === 'demo_admin') && (
                       <Link
                         to="/admin"
                         onClick={() => setUserMenuOpen(false)}

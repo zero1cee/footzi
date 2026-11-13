@@ -149,31 +149,29 @@ describe('Returns, Exchanges & Admin Operations Suite', () => {
     expect(found.user.email).toBe('patron@footzi.in');
   });
 
-  it('PATCH /api/admin/returns/:id - admin should approve and dispatch replacement', async () => {
-    // 1. Approve return
-    const approveRes = await request(app)
-      .patch(`/api/admin/returns/${testReturnId}`)
-      .set('Authorization', `Bearer ${adminToken}`)
-      .send({
-        status: 'approved',
-        adminNotes: 'Size exchange approved. Scheduled reverse pickup at customer residence.',
-      });
+  it('PATCH /api/admin/returns/:id - admin should walk an exchange through to dispatch, one valid step at a time', async () => {
+    const patch = (status: string, adminNotes?: string) =>
+      request(app)
+        .patch(`/api/admin/returns/${testReturnId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ status, adminNotes });
 
-    expect(approveRes.status).toBe(200);
-    expect(approveRes.body.returnRequest.status).toBe('approved');
+    // A step cannot be skipped
+    const skipped = await patch('replacement_dispatched');
+    expect(skipped.status).toBe(400);
+    expect(skipped.body.error).toMatch(/can only move to/);
 
-    // 2. Dispatch replacement footwear
-    const dispatchRes = await request(app)
-      .patch(`/api/admin/returns/${testReturnId}`)
-      .set('Authorization', `Bearer ${adminToken}`)
-      .send({
-        status: 'replacement_dispatched',
-        adminNotes: 'Agra artisan workshop prepared UK 9 replacement pair and dispatched.',
-      });
+    expect((await patch('approved', 'Size exchange approved. Reverse pickup scheduled.')).status).toBe(200);
+    expect((await patch('pickup_scheduled')).status).toBe(200);
+    expect((await patch('inspected')).status).toBe(200);
 
+    const dispatchRes = await patch('replacement_dispatched', 'UK 9 replacement pair dispatched.');
     expect(dispatchRes.status).toBe(200);
     expect(dispatchRes.body.returnRequest.status).toBe('replacement_dispatched');
     expect(dispatchRes.body.returnRequest.replacementTrackingNumber).toMatch(/^BD-EXC-/);
+
+    // A finished request is final
+    expect((await patch('rejected')).status).toBe(400);
   });
 
   it('POST /api/admin/products/upload-image - should upload or optimize product image via Cloudinary service', async () => {
