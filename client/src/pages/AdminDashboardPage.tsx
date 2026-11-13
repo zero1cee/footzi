@@ -17,6 +17,8 @@ import {
   Tag,
   Pencil,
   Receipt,
+  BarChart3,
+  Users,
 } from 'lucide-react';
 import { formatINR } from '@/lib/utils';
 import { Badge } from '@/components/ui/Badge';
@@ -27,6 +29,8 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { MOCK_PRODUCTS } from '@/data/mockProducts';
 import { OrdersPanel } from '@/components/admin/OrdersPanel';
 import { CouponsPanel } from '@/components/admin/CouponsPanel';
+import { SalesPanel } from '@/components/admin/SalesPanel';
+import { CustomersPanel } from '@/components/admin/CustomersPanel';
 import { ProductEditor } from '@/components/admin/ProductEditor';
 import { useDocumentMeta } from '@/hooks/useDocumentMeta';
 
@@ -56,7 +60,7 @@ export const AdminDashboardPage: React.FC = () => {
   const activeToken = token || '';
 
   const [activeTab, setActiveTab] = useState<
-    'overview' | 'orders' | 'suppliers' | 'products' | 'coupons' | 'returns' | 'inventory'
+    'overview' | 'sales' | 'orders' | 'customers' | 'suppliers' | 'products' | 'coupons' | 'returns' | 'inventory'
   >('overview');
   const [editingProduct, setEditingProduct] = useState<any | null>(null);
   const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null);
@@ -337,6 +341,17 @@ export const AdminDashboardPage: React.FC = () => {
           </button>
 
           <button
+            onClick={() => setActiveTab('sales')}
+            className={`pb-3 px-4 text-xs uppercase tracking-wider font-semibold transition-all border-b-2 flex items-center gap-2 whitespace-nowrap ${
+              activeTab === 'sales'
+                ? 'border-charcoal-900 text-charcoal-950'
+                : 'border-transparent text-charcoal-500 hover:text-charcoal-800'
+            }`}
+          >
+            <BarChart3 className="w-4 h-4" /> Sales
+          </button>
+
+          <button
             onClick={() => setActiveTab('orders')}
             className={`pb-3 px-4 text-xs uppercase tracking-wider font-semibold transition-all border-b-2 flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'orders'
@@ -345,6 +360,17 @@ export const AdminDashboardPage: React.FC = () => {
             }`}
           >
             <Receipt className="w-4 h-4" /> Orders
+          </button>
+
+          <button
+            onClick={() => setActiveTab('customers')}
+            className={`pb-3 px-4 text-xs uppercase tracking-wider font-semibold transition-all border-b-2 flex items-center gap-2 whitespace-nowrap ${
+              activeTab === 'customers'
+                ? 'border-charcoal-900 text-charcoal-950'
+                : 'border-transparent text-charcoal-500 hover:text-charcoal-800'
+            }`}
+          >
+            <Users className="w-4 h-4" /> Customers
           </button>
 
           <button
@@ -691,6 +717,8 @@ export const AdminDashboardPage: React.FC = () => {
           </div>
         )}
 
+        {activeTab === 'sales' && <SalesPanel token={activeToken} />}
+        {activeTab === 'customers' && <CustomersPanel token={activeToken} isReadOnly={isReadOnly} onMessage={flash} />}
         {activeTab === 'orders' && <OrdersPanel token={activeToken} isReadOnly={isReadOnly} onMessage={flash} />}
         {activeTab === 'coupons' && <CouponsPanel token={activeToken} isReadOnly={isReadOnly} onMessage={flash} />}
 

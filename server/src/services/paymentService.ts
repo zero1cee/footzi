@@ -8,6 +8,7 @@ import { SupplierOrder } from '../models/SupplierOrder.js';
 import { supplierFulfillmentService } from './supplierFulfillmentService.js';
 import { refundService } from './refundService.js';
 import { emailService } from './emailService.js';
+import { OrderActor, orderFilterFor } from './orderAccess.js';
 
 // Demo mode = the server is running on the placeholder Razorpay credentials.
 const isDemoMode = (): boolean =>
@@ -21,8 +22,9 @@ const safeEqual = (a: string, b: string): boolean => {
 
 export class PaymentService {
   // Create Razorpay Gateway Order
-  async createGatewayOrder(orderId: string, userId: string) {
-    const order = await Order.findOne({ _id: orderId, user: userId });
+  async createGatewayOrder(orderId: string, actor: OrderActor) {
+    const filter = orderFilterFor(orderId, actor);
+    const order = filter ? await Order.findOne(filter) : null;
     if (!order) {
       throw new Error('Order not found.');
     }
@@ -97,15 +99,16 @@ export class PaymentService {
   // Cryptographically verify Razorpay signature
   async verifyPaymentSignature(params: {
     orderId: string;
-    userId: string;
+    actor: OrderActor;
     razorpayOrderId: string;
     razorpayPaymentId: string;
     razorpaySignature: string;
   }) {
-    const { orderId, userId, razorpayOrderId, razorpayPaymentId, razorpaySignature } = params;
+    const { orderId, actor, razorpayOrderId, razorpayPaymentId, razorpaySignature } = params;
 
-    // Only the patron who placed the order may verify its payment
-    const order = await Order.findOne({ _id: orderId, user: userId });
+    // Only the customer who placed the order (or the guest holding its link) may verify its payment
+    const filter = orderFilterFor(orderId, actor);
+    const order = filter ? await Order.findOne(filter) : null;
     if (!order) {
       throw new Error('Order not found.');
     }

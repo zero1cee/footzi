@@ -12,6 +12,8 @@ import { SizeGuidePage } from '../pages/SizeGuidePage';
 import { LeatherCarePage } from '../pages/LeatherCarePage';
 import { WishlistPage } from '../pages/WishlistPage';
 import { ForgotPasswordPage } from '../pages/ForgotPasswordPage';
+import { TrackOrderPage } from '../pages/TrackOrderPage';
+import { CheckoutPage } from '../pages/CheckoutPage';
 import { useCartStore } from '../store/useCartStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { MOCK_PRODUCTS } from '../data/mockProducts';
@@ -52,10 +54,17 @@ describe('accessibility', () => {
     ['leather care', <LeatherCarePage />],
     ['wishlist', <WishlistPage />],
     ['forgot password', <ForgotPasswordPage />],
+    ['find an order', <TrackOrderPage />],
   ];
 
   it.each(pages)('%s has no detectable violations', async (_name, element) => {
     const { container } = inLayout(element);
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it('the guest checkout form has no detectable violations', async () => {
+    useCartStore.getState().addItem(MOCK_PRODUCTS[0], 'UK 8', 'Vintage Tan', '#8C4E28', 1);
+    const { container } = inLayout(<CheckoutPage />, '/checkout');
     expect(await axe(container)).toHaveNoViolations();
   });
 

@@ -131,6 +131,11 @@ export const Footer: React.FC = () => {
                 </Link>
               </li>
               <li>
+                <Link to="/track-order" className="hover:text-ivory-100 transition-colors">
+                  Find an Order (no account)
+                </Link>
+              </li>
+              <li>
                 <Link to="/account/returns" className="hover:text-ivory-100 transition-colors">
                   Size Exchange & Returns
                 </Link>

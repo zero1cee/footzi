@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, Printer } from 'lucide-react';
-import { useAuthStore } from '@/store/useAuthStore';
+import { useOrderAccess } from '@/hooks/useOrderAccess';
 import { orderService } from '@/services/orderService';
 import { formatINR } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
@@ -10,32 +10,37 @@ import { useDocumentMeta } from '@/hooks/useDocumentMeta';
 const formatDate = (value: string) => new Date(value).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
 
 /** A clean, printable record of a paid order. Print it, or choose "Save as PDF" in the print window. */
-export const OrderReceiptPage: React.FC = () => {
+export const OrderReceiptPage: React.FC<{ mode?: 'account' | 'guest' }> = ({ mode = 'account' }) => {
   useDocumentMeta({ title: 'Order receipt — Footzi', noindex: true });
   const { id } = useParams<{ id: string }>();
-  const token = useAuthStore((s) => s.token);
+  const { auth, bearer, orderToken } = useOrderAccess(id, mode);
+  const base = mode === 'guest' ? '/order' : '/account/orders';
   const [order, setOrder] = useState<any | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!id || !token) return;
+    if (!id) return;
+    if (!auth) {
+      setError('This order link is incomplete. Use the link from your order email.');
+      return;
+    }
     let active = true;
     orderService
-      .getOrderById(id, token)
+      .getOrderById(id, auth)
       .then((data) => active && setOrder(data))
       .catch((err) => active && setError(err.message || 'Order not found'));
     return () => {
       active = false;
     };
-  }, [id, token]);
+  }, [id, bearer, orderToken]);
 
   if (error) {
     return (
       <div className="py-24 text-center">
         <h1 className="font-serif text-2xl text-charcoal-900">We couldn't find that order</h1>
         <p className="text-xs text-charcoal-500 mt-2">{error}</p>
-        <Link to="/account/orders" className="mt-4 inline-block text-xs uppercase tracking-widest font-semibold text-sand-600 underline">
-          Back to my orders
+        <Link to={mode === 'guest' ? '/track-order' : '/account/orders'} className="mt-4 inline-block text-xs uppercase tracking-widest font-semibold text-sand-600 underline">
+          {mode === 'guest' ? 'Email me my order link' : 'Back to my orders'}
         </Link>
       </div>
     );
@@ -49,7 +54,7 @@ export const OrderReceiptPage: React.FC = () => {
     <div className="py-10 bg-ivory-100 min-h-[80vh] print:bg-white print:py-0">
       <div className="max-w-3xl mx-auto px-4 sm:px-6">
         <div className="flex items-center justify-between mb-5 print:hidden">
-          <Link to={`/account/orders/${order._id}`} className="inline-flex items-center gap-1 text-[11px] text-charcoal-500 hover:text-charcoal-900 py-2">
+          <Link to={`${base}/${order._id}`} className="inline-flex items-center gap-1 text-[11px] text-charcoal-500 hover:text-charcoal-900 py-2">
             <ArrowLeft className="w-3.5 h-3.5" /> Back to order
           </Link>
           {paid && (

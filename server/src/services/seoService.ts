@@ -64,7 +64,7 @@ export const injectSeo = (template: string, seo: PageSeo): string =>
     .replace(SEO_BLOCK, () => `<!--seo:start-->\n    ${renderSeoBlock(seo)}\n    <!--seo:end-->`);
 
 // Pages that belong to one customer or to staff are kept out of search results
-const PRIVATE_PREFIXES = ['/account', '/admin', '/checkout', '/cart', '/login', '/register', '/forgot-password', '/reset-password', '/wishlist'];
+const PRIVATE_PREFIXES = ['/account', '/order', '/track-order', '/admin', '/checkout', '/cart', '/login', '/register', '/forgot-password', '/reset-password', '/wishlist'];
 
 const STATIC_PAGES: Record<string, { title: string; description: string }> = {
   '/shop': {

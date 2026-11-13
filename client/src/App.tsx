@@ -21,6 +21,7 @@ const CheckoutPage = page(() => import('@/pages/CheckoutPage'), 'CheckoutPage');
 const AccountPage = page(() => import('@/pages/AccountPage'), 'AccountPage');
 const OrderDetailPage = page(() => import('@/pages/OrderDetailPage'), 'OrderDetailPage');
 const OrderReceiptPage = page(() => import('@/pages/OrderReceiptPage'), 'OrderReceiptPage');
+const TrackOrderPage = page(() => import('@/pages/TrackOrderPage'), 'TrackOrderPage');
 const AdminDashboardPage = page(() => import('@/pages/AdminDashboardPage'), 'AdminDashboardPage');
 const LoginPage = page(() => import('@/pages/LoginPage'), 'LoginPage');
 const RegisterPage = page(() => import('@/pages/RegisterPage'), 'RegisterPage');
@@ -67,15 +68,19 @@ export const App: React.FC = () => {
               path="account/orders/:id"
               element={
                 <ProtectedRoute>
-                  <OrderDetailPage />
+                  <OrderDetailPage mode="account" />
                 </ProtectedRoute>
               }
             />
+            {/* Guest orders: the private link from the order email opens these, no sign-in needed */}
+            <Route path="order/:id" element={<OrderDetailPage mode="guest" />} />
+            <Route path="order/:id/receipt" element={<OrderReceiptPage mode="guest" />} />
+            <Route path="track-order" element={<TrackOrderPage />} />
             <Route
               path="account/orders/:id/receipt"
               element={
                 <ProtectedRoute>
-                  <OrderReceiptPage />
+                  <OrderReceiptPage mode="account" />
                 </ProtectedRoute>
               }
             />

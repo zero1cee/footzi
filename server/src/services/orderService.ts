@@ -9,9 +9,14 @@ import { refundService } from './refundService.js';
 import { couponService } from './couponService.js';
 import { emailService } from './emailService.js';
 import { restock } from './returnService.js';
+import { OrderActor, orderFilterFor, ownerFilter } from './orderAccess.js';
+
+const MAX_UNPAID_GUEST_ORDERS = 3;
 
 export interface CreateOrderDTO {
-  userId: string;
+  /** Absent for a guest order. */
+  userId?: string;
+  isGuest?: boolean;
   customerName: string;
   customerEmail: string;
   customerPhone: string;
@@ -28,6 +33,19 @@ export interface CreateOrderDTO {
 
 export class OrderService {
   async createOrder(data: CreateOrderDTO): Promise<IOrder> {
+    // Placing an order holds stock for 30 minutes without paying. A guest needs no account, so the number of
+    // unpaid orders one email can hold at a time is capped, or someone could lock up the shelves for free.
+    if (data.isGuest) {
+      const waiting = await Order.countDocuments({
+        isGuest: true,
+        customerEmail: data.customerEmail.trim().toLowerCase(),
+        orderStatus: 'pending_payment',
+      });
+      if (waiting >= MAX_UNPAID_GUEST_ORDERS) {
+        throw new Error('You already have unpaid orders waiting. Please complete or cancel one before placing another.');
+      }
+    }
+
     const reservations: { inventory: IInventory; quantity: number }[] = [];
 
     let order: IOrder;
@@ -41,8 +59,8 @@ export class OrderService {
       throw error;
     }
 
-    // Clear customer's server cart upon order placement
-    await Cart.findOneAndUpdate({ user: data.userId }, { items: [], subtotal: 0 });
+    // Clear the customer's saved bag once the order is placed (guests keep their bag in the browser only)
+    if (data.userId) await Cart.findOneAndUpdate({ user: data.userId }, { items: [], subtotal: 0 });
 
     return order;
   }
@@ -53,6 +71,7 @@ export class OrderService {
   ): Promise<IOrder> {
     const {
       userId,
+      isGuest,
       customerName,
       customerEmail,
       customerPhone,
@@ -133,7 +152,7 @@ export class OrderService {
     let discount = 0;
     let cleanCoupon: string | undefined;
     if (couponCode && couponCode.trim()) {
-      const check = await couponService.evaluate(couponCode, subtotal, userId);
+      const check = await couponService.evaluate(couponCode, subtotal, userId, customerEmail);
       if (!check.ok) throw new Error(check.reason);
       discount = check.discount;
       cleanCoupon = check.coupon.code;
@@ -147,6 +166,7 @@ export class OrderService {
     return Order.create({
       orderNumber,
       user: userId,
+      isGuest: Boolean(isGuest),
       customerName,
       customerEmail,
       customerPhone,
@@ -169,21 +189,46 @@ export class OrderService {
     });
   }
 
+  /**
+   * Moves a guest order into the account of a signed-in customer who holds the order's link. Possession of the
+   * link (it was emailed to the address on the order) is the proof, so no email matching is needed. Once claimed,
+   * the guest link stops working and the account owns the order.
+   */
+  async claimGuestOrder(orderId: string, userId: string, token: string): Promise<IOrder> {
+    const filter = orderFilterFor(orderId, { guestToken: token });
+    const claimed = filter
+      ? await Order.findOneAndUpdate(filter, { $set: { user: userId, isGuest: false }, $push: { statusHistory: { status: 'claimed', timestamp: new Date(), note: 'Order added to a customer account.' } } }, { new: true })
+      : null;
+    if (!claimed) throw new Error('This order link is not valid, or the order already belongs to an account.');
+    return claimed;
+  }
+
+  /**
+   * Emails a way back to an order. The reply never says whether the order exists, so this cannot be used to
+   * find out which emails or order numbers are real.
+   */
+  async sendOrderLink(orderNumber: string, email: string): Promise<void> {
+    const order = await Order.findOne({ orderNumber: orderNumber.trim().toUpperCase(), customerEmail: email.trim().toLowerCase() });
+    if (order) await emailService.orderLink(order);
+  }
+
   async getUserOrders(userId: string): Promise<any[]> {
     return Order.find({ user: userId }).select('-paymentDetails.gatewaySignature').sort({ createdAt: -1 }).lean();
   }
 
-  async getOrderById(orderId: string, userId?: string): Promise<any | null> {
-    const query: any = { _id: orderId };
-    if (userId) {
-      query.user = userId;
-    }
+  /**
+   * One order. With no actor the caller is staff and sees everything. A customer (signed in, or a guest
+   * holding the order's link) sees only their own order, with tracking but not the supplier's wholesale
+   * costs or the payment signature.
+   */
+  async getOrderById(orderId: string, actor?: OrderActor): Promise<any | null> {
     if (!mongoose.isValidObjectId(orderId)) return null;
+    const query = actor ? orderFilterFor(orderId, actor) : { _id: orderId };
+    if (!query) return null;
 
-    // Customers see tracking only: the supplier's wholesale costs and margins stay internal
-    const supplierFields = userId ? 'status trackingNumber carrier shipmentEvents shippedAt deliveredAt' : undefined;
+    const supplierFields = actor ? 'status trackingNumber carrier shipmentEvents shippedAt deliveredAt' : undefined;
     const order = await Order.findOne(query).populate('supplierOrderId', supplierFields).lean();
-    if (order && userId && order.paymentDetails) {
+    if (order && actor && order.paymentDetails) {
       delete (order.paymentDetails as any).gatewaySignature;
     }
     return order;
@@ -219,21 +264,22 @@ export class OrderService {
     return order;
   }
 
-  async cancelOrder(orderId: string, userId: string, reason?: string): Promise<IOrder & { refund?: { amount: number; pending: boolean } }> {
-    const order = await Order.findOne({ _id: orderId, user: userId });
+  async cancelOrder(orderId: string, actor: OrderActor, reason?: string): Promise<IOrder & { refund?: { amount: number; pending: boolean } }> {
+    const filter = orderFilterFor(orderId, actor);
+    const order = filter ? await Order.findOne(filter) : null;
     if (!order) {
       throw new Error('Order not found.');
     }
 
     // Paid orders can be cancelled until they ship, with a full refund
     if (order.paymentStatus === 'paid') {
-      return this.cancelPaidOrder(order._id, { userId, reason });
+      return this.cancelPaidOrder(order._id, { actor, reason });
     }
 
     const cancelled = await this.cancelUnpaidOrder(
       order._id,
       reason || 'Customer requested order cancellation.',
-      { user: userId }
+      ownerFilter(actor)
     );
     if (!cancelled) {
       const current = await Order.findById(order._id);
@@ -248,14 +294,14 @@ export class OrderService {
    * If the gateway refuses the refund the order stays cancelled (the stock is already
    * back) and is flagged for an admin to retry, rather than leaving a half-done state.
    */
-  async cancelPaidOrder(orderId: unknown, opts: { userId?: string; reason?: string; byWorkshop?: boolean } = {}) {
+  async cancelPaidOrder(orderId: unknown, opts: { actor?: OrderActor; reason?: string; byWorkshop?: boolean } = {}) {
     const note = opts.reason || (opts.byWorkshop ? 'Cancelled by the workshop before dispatch.' : 'Customer cancelled before dispatch.');
     const filter: Record<string, unknown> = {
       _id: orderId,
       paymentStatus: 'paid',
       orderStatus: { $in: ['confirmed', 'processing'] },
     };
-    if (opts.userId) filter.user = opts.userId;
+    if (opts.actor) Object.assign(filter, ownerFilter(opts.actor));
 
     const order = await Order.findOneAndUpdate(
       filter,

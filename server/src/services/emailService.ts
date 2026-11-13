@@ -1,4 +1,5 @@
 import { getCorsOrigins } from '../config/env.js';
+import { orderAccessToken } from './orderAccess.js';
 
 /**
  * Transactional email through an HTTP API (Brevo or Resend). Render's free tier blocks
@@ -22,9 +23,21 @@ export const testOutbox: OutgoingEmail[] = [];
 const esc = (value: unknown): string =>
   String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
+/**
+ * Where a customer opens their order. A signed-in customer's order lives in their account; a guest's opens by
+ * a link whose secret sits after the # so it is never sent to the server or written to its logs.
+ */
+export const orderUrl = (order: any): string =>
+  order.isGuest
+    ? `${appUrlSafe()}/order/${order._id}#t=${orderAccessToken(order._id)}`
+    : `${appUrlSafe()}/account/orders/${order._id}`;
+
 const inr = (n: number): string => `₹${Math.round(n).toLocaleString('en-IN')}`;
 
 /** Public base URL used in email links. */
+function appUrlSafe(): string {
+  return appUrl();
+}
 export const appUrl = (): string =>
   (process.env.APP_URL || process.env.RENDER_EXTERNAL_URL || getCorsOrigins()[0] || 'http://localhost:5173').replace(/\/$/, '');
 
@@ -166,9 +179,33 @@ export const emailService = {
            <tr><td style="padding-top:10px;border-top:1px solid #e8e0d2"><strong>Total</strong></td><td style="text-align:right;padding-top:10px;border-top:1px solid #e8e0d2"><strong>${inr(order.total)}</strong></td></tr>
          </table>
          <p style="font-size:13px;color:#5a554b">Shipping to ${esc(order.shippingAddress.name)}, ${esc(order.shippingAddress.addressLine)}, ${esc(order.shippingAddress.city)} ${esc(order.shippingAddress.pincode)}</p>
-         ${button(`${appUrl()}/account/orders/${order._id}`, 'View your order')}`
+         ${button(`${orderUrl(order)}`, 'View your order')}`
       ),
-      text: `Order ${order.orderNumber} is confirmed. Total ${inr(order.total)}. Track it: ${appUrl()}/account/orders/${order._id}`,
+      text: `Order ${order.orderNumber} is confirmed. Total ${inr(order.total)}. Track it: ${orderUrl(order)}`,
+    });
+  },
+
+  orderLink(order: any) {
+    return this.send({
+      to: order.customerEmail,
+      subject: `Your Footzi order ${order.orderNumber}`,
+      html: layout(
+        'Here is your order',
+        `<p>You asked for a link to order <strong>${esc(order.orderNumber)}</strong>. Keep this email: the link works for as long as the order exists.</p>${button(orderUrl(order), 'View your order')}`
+      ),
+      text: `Your Footzi order ${order.orderNumber}: ${orderUrl(order)}`,
+    });
+  },
+
+  backInStock(item: { to: string; productName: string; size: string; color: string }, link: string) {
+    return this.send({
+      to: item.to,
+      subject: `Back in stock: ${item.productName} in ${item.size}`,
+      html: layout(
+        'Your size is back',
+        `<p>You asked us to tell you when <strong>${esc(item.productName)}</strong> (${esc(item.size)}, ${esc(item.color)}) returned. It's available again. Pairs are limited and sell out, so don't wait too long.</p>${button(link, 'View the style')}<p style="font-size:12px;color:#8a8478">This is a one-time message because you asked for it. You won't hear from us about it again.</p>`
+      ),
+      text: `Back in stock: ${item.productName} (${item.size}, ${item.color}). View it: ${link}\n\nThis is a one-time message because you asked for it.`,
     });
   },
 
@@ -178,9 +215,9 @@ export const emailService = {
       subject: `Order ${order.orderNumber} has shipped`,
       html: layout(
         'Your order is on its way',
-        `<p>Order <strong>${esc(order.orderNumber)}</strong> was dispatched${order.carrier ? ` with ${esc(order.carrier)}` : ''}.</p>${order.trackingNumber ? `<p>Tracking number: <strong>${esc(order.trackingNumber)}</strong></p>` : ''}${button(`${appUrl()}/account/orders/${order._id}`, 'Track your order')}`
+        `<p>Order <strong>${esc(order.orderNumber)}</strong> was dispatched${order.carrier ? ` with ${esc(order.carrier)}` : ''}.</p>${order.trackingNumber ? `<p>Tracking number: <strong>${esc(order.trackingNumber)}</strong></p>` : ''}${button(`${orderUrl(order)}`, 'Track your order')}`
       ),
-      text: `Order ${order.orderNumber} has shipped. Tracking: ${order.trackingNumber ?? 'pending'}. ${appUrl()}/account/orders/${order._id}`,
+      text: `Order ${order.orderNumber} has shipped. Tracking: ${order.trackingNumber ?? 'pending'}. ${orderUrl(order)}`,
     });
   },
 
@@ -190,9 +227,9 @@ export const emailService = {
       subject: `Order ${order.orderNumber} delivered`,
       html: layout(
         'Delivered',
-        `<p>Order <strong>${esc(order.orderNumber)}</strong> has been delivered. If the fit isn't right you have 7 days to request an exchange or return.</p>${button(`${appUrl()}/account/orders/${order._id}`, 'View your order')}`
+        `<p>Order <strong>${esc(order.orderNumber)}</strong> has been delivered. If the fit isn't right you have 7 days to request an exchange or return.${order.isGuest ? ' To start one, sign in (or create an account) and use "Add this order to my account" on the order page first.' : ''}</p>${button(`${orderUrl(order)}`, 'View your order')}`
       ),
-      text: `Order ${order.orderNumber} was delivered. You have 7 days to request an exchange or return: ${appUrl()}/account/orders/${order._id}`,
+      text: `Order ${order.orderNumber} was delivered. You have 7 days to request an exchange or return: ${orderUrl(order)}`,
     });
   },
 

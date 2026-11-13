@@ -37,7 +37,9 @@ export interface IShippingAddressSnapshot {
 
 export interface IOrder extends Document {
   orderNumber: string;
-  user: mongoose.Types.ObjectId;
+  /** Absent for a guest order until the customer claims it into an account. */
+  user?: mongoose.Types.ObjectId;
+  isGuest: boolean;
   customerName: string;
   customerEmail: string;
   customerPhone: string;
@@ -106,7 +108,16 @@ const ShippingAddressSnapshotSchema = new Schema<IShippingAddressSnapshot>(
 const OrderSchema = new Schema<IOrder>(
   {
     orderNumber: { type: String, required: true, unique: true, index: true },
-    user: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    user: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      index: true,
+      // Every order belongs to an account, except one placed as a guest
+      required: function (this: any) {
+        return !this.isGuest;
+      },
+    },
+    isGuest: { type: Boolean, default: false, index: true },
     customerName: { type: String, required: true },
     customerEmail: { type: String, required: true },
     customerPhone: { type: String, required: true },

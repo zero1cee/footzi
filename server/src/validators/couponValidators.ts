@@ -33,4 +33,6 @@ export const updateCouponSchema = base
 export const validateCouponSchema = z.object({
   code: z.string().trim().min(1, 'Enter a coupon code').max(40),
   subtotal: z.number({ invalid_type_error: 'Subtotal must be a number' }).min(0),
+  // A guest has no account, so their first-order and per-customer limits are checked against this email
+  email: z.string().trim().toLowerCase().email().optional(),
 });

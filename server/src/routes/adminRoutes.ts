@@ -19,6 +19,7 @@ import {
   updateReturnStatusAdmin,
 } from '../controllers/returnController.js';
 import { listCouponsAdmin, createCouponAdmin, updateCouponAdmin } from '../controllers/couponController.js';
+import { getSalesReport, getCustomers, exportOrdersCsv, exportCustomersCsv } from '../controllers/reportController.js';
 import { authenticate, requireAdmin } from '../middleware/auth.js';
 
 const router = Router();
@@ -30,6 +31,12 @@ router.use(authenticate, requireAdmin);
 router.get('/analytics', getDashboardAnalytics);
 router.get('/orders', getAllOrdersAdmin);
 router.post('/orders/:id/refund', refundCancelledOrderAdmin);
+
+// Sales reports, customers and spreadsheet exports
+router.get('/reports/sales', getSalesReport);
+router.get('/customers', getCustomers);
+router.get('/export/orders.csv', exportOrdersCsv);
+router.get('/export/customers.csv', exportCustomersCsv);
 
 // Inventory Control
 router.get('/inventory', getInventoryOverview);

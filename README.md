@@ -10,7 +10,7 @@
 ![Express.js](https://img.shields.io/badge/Express.js-000000?style=for-the-badge&logo=express&logoColor=white)
 ![MongoDB](https://img.shields.io/badge/MongoDB-4EA94B?style=for-the-badge&logo=mongodb&logoColor=white)
 ![Razorpay](https://img.shields.io/badge/Razorpay_Sandbox-02042B?style=for-the-badge&logo=razorpay&logoColor=3395FF)
-![Vitest](https://img.shields.io/badge/Vitest-202_Tests_Passed-6E9F18?style=for-the-badge&logo=vitest&logoColor=white)
+![Vitest](https://img.shields.io/badge/Vitest-275_Tests_Passed-6E9F18?style=for-the-badge&logo=vitest&logoColor=white)
 [![CI](https://github.com/zero1cee/footzi/actions/workflows/ci.yml/badge.svg)](https://github.com/zero1cee/footzi/actions/workflows/ci.yml)
 
 <p align="center">
@@ -45,6 +45,11 @@ Built as a portfolio demonstration for **Software Development Engineer (SDE)** i
 - **Guest and signed-in bags**: a guest bag lives in the browser (Zustand). On sign-in it is merged into the saved bag in MongoDB (the larger quantity wins, so repeating it is safe), and it is cleared on sign-out so the next person on a shared device never sees it.
 - **Server-Authoritative Pricing**: subtotals, coupons and free delivery ($\ge ₹1,999$) are recalculated on the backend; prices sent by the browser are ignored. Coupons live in the database and are managed from the admin panel: percent or flat, minimum order, maximum discount, first-order-only, total and per-customer limits, and an expiry date. A cancelled or expired order gives its coupon use back.
 
+**Guest checkout**
+- A customer can buy with just an email. Placing a guest order returns a secret that proves the order is theirs for paying, viewing and cancelling it. The same secret is in the confirmation email's link, after a `#` so it is never sent to the server or written to its logs, and it is remembered on the device that placed the order.
+- A guest can find an order again with its number and email (a link is emailed; the reply never says whether an order exists), and can add it to an account later (possession of the link is the proof). Returns and exchanges need an account.
+- Safeguards: one email can hold at most three unpaid guest orders, guest ordering is rate limited, and first-order and per-customer coupon limits follow the email address, so a guest order counts toward a later account.
+
 **Payments and orders**
 - **Razorpay**: gateway orders in paise, HMAC-SHA256 signature verification, an authenticated webhook for customers who close the tab before returning, and idempotent confirmation (a payment can only confirm an order once). With placeholder keys the app runs in **demo mode** with a sandbox payment sheet and simulated refunds; with real keys only a genuine signature is accepted.
 - **Stock safety**: stock is reserved atomically when an order is created, deducted on payment, and released when payment fails, the order is cancelled, or it goes unpaid for 30 minutes.
@@ -54,10 +59,11 @@ Built as a portfolio demonstration for **Software Development Engineer (SDE)** i
 - **7-Day Size Exchange & Returns**: delivered orders only, priced from the order itself, with stock held for the replacement pair and reverse-pickup tracking.
 
 **Accounts**
+- **Back-in-stock alerts**: a sold-out size offers "tell me when it's back". One email is sent, once, when the size returns (a background sweep every five minutes, plus right away when an admin adds stock). Requests are capped per address and deleted automatically after sending or after six months.
 - Registration, sign-in, forgot and reset password (single-use emailed link), change password (signs out other devices), profile and address management, and role-based access (`customer`, `admin`, and a read-only `demo_admin` with customer contact details masked).
 
 **Operations deck (`/admin`)**
-- Analytics, an orders screen (search, filters, detail, refund retry), the workshop pipeline, a catalogue editor (create, edit, archive and restore styles, images), size-level inventory, coupons, and returns.
+- Sales reports (revenue kept after refunds by day or week, best sellers, coupon results, conversion), a customer list (members and guests, searchable and sortable), CSV exports, analytics, an orders screen (search, filters, detail, refund retry), the workshop pipeline, a catalogue editor (create, edit, archive and restore styles, images), size-level inventory, coupons, and returns.
 
 **Quality**
 - Fast first load (lazy-loaded screens, compression), search and link-preview tags served by the server, a sitemap, keyboard-accessible dialogs, and a continuous-integration pipeline that builds and tests every change.
@@ -263,6 +269,16 @@ Passwords and profiles of the two shared demo accounts (`patron@footzi.in`, `dem
 | :--- | :--- | :--- | :--- |
 | `POST` | `/api/coupons/validate` | Public | Check a code against the bag. Guests get the general rules; signed-in customers also get their first-order and per-customer limits. Limited to 40 attempts per 15 minutes |
 
+### Guest orders and alerts
+| Method | Endpoint | Access | Description |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/api/orders/guest` | Public | Place an order without an account; returns the order and its `accessToken`. 15 per hour per connection |
+| `POST` | `/api/orders/lookup` | Public | Email a link back to an order for a matching number and email. Always answers the same. 10 per 15 minutes |
+| `POST` | `/api/orders/:id/claim` | Authenticated | Add a guest order to the signed-in account, using the order secret |
+| `POST` | `/api/stock-alerts` | Public | Ask to be emailed once when a sold-out size returns (refused for sizes in stock; 10 waiting per address; 20 per hour per connection) |
+
+Guest requests about an order (`GET /api/orders/:id`, `POST /api/orders/:id/cancel`, `/api/payments/create-order`, `/api/payments/verify`) send the secret in an `X-Order-Token` header instead of signing in.
+
 ### Orders & Payments
 | Method | Endpoint | Access | Description |
 | :--- | :--- | :--- | :--- |
@@ -285,6 +301,9 @@ Requests move one step at a time (`requested → approved → pickup_scheduled �
 ### Admin Operations
 | Method | Endpoint | Access | Description |
 | :--- | :--- | :--- | :--- |
+| `GET` | `/api/admin/reports/sales?days=` | Admin Only | Revenue kept (payments minus refunds) per Indian-time day, best sellers, coupon results and the paid/abandoned funnel for 7, 30, 90 or 365 days |
+| `GET` | `/api/admin/customers` | Admin Only | Everyone who paid, grouped by email (guests included), searchable, sortable, paged |
+| `GET` | `/api/admin/export/orders.csv`, `/customers.csv` | Admin Only | Spreadsheet downloads. Refused to the read-only demo admin. Cells that start with `=`, `+`, `-` or `@` are defused so a customer's name cannot run as a spreadsheet formula |
 | `GET` | `/api/admin/analytics` | Admin Only | Dashboard metrics, verified revenue, low stock count, return rates |
 | `GET` | `/api/admin/inventory` | Admin Only | View size-level inventory across all variants |
 | `PATCH`| `/api/admin/inventory/:sku` | Admin Only | Update variant stock count directly |
@@ -342,15 +361,15 @@ Open **[http://localhost:5173](http://localhost:5173)** in your browser.
 
 ### 4. Running Automated Tests
 
-Footzi includes **202 automated unit and integration tests** ensuring test-driven reliability:
+Footzi includes **275 automated unit and integration tests** ensuring test-driven reliability:
 
 ```bash
-# Client Vitest Suite (80 tests: Cart and server-checked coupons, bag merge on sign-in, password reset and order pages, admin panels, page titles and meta tags, dialog keyboard behaviour, automated accessibility checks with axe, browser error reporting, wishlist sync, search suggestions, receipts, recently viewed, UI components, return service)
+# Client Vitest Suite (115 tests: Cart and server-checked coupons, bag merge on sign-in, password reset and order pages, admin panels, page titles and meta tags, dialog keyboard behaviour, automated accessibility checks with axe, browser error reporting, wishlist sync, search suggestions, receipts, recently viewed, guest checkout, back-in-stock form, admin sales and customers, UI components, return service)
 cd client
 npm test
 
-# Server Integration Suite (122 tests: Auth, Cart, Orders, Razorpay HMAC and webhook, Dropship Pipeline,
-# Returns, Reviews, Order expiry, Demo admin, Password reset, Refunds, Email providers, Coupons, Product editing, Workshop pipeline, SEO (page tags, sitemap, robots), Monitoring (health checks, request ids, error responses), Wishlist, Search suggestions, Cloudinary, Inventory). Needs a seeded MongoDB; point
+# Server Integration Suite (160 tests: Auth, Cart, Orders, Razorpay HMAC and webhook, Dropship Pipeline,
+# Returns, Reviews, Order expiry, Demo admin, Password reset, Refunds, Email providers, Coupons, Product editing, Workshop pipeline, SEO (page tags, sitemap, robots), Monitoring (health checks, request ids, error responses), Wishlist, Search suggestions, Guest checkout, Back-in-stock alerts, Admin reports and exports, Cloudinary, Inventory). Needs a seeded MongoDB; point
 # MONGODB_URI at a scratch database, because the tests create and delete orders.
 cd server
 npx vitest run
@@ -425,7 +444,7 @@ MONGODB_URI="<atlas connection string>" npm run seed:demo-admin
 
 ### Production behaviour
 - The server exits at startup if `MONGODB_URI` is missing, `JWT_SECRET` is weak, or the database is unreachable.
-- **Rate limits** (per IP, per 15 minutes): 600 requests on `/api`; 20 on login, register, forgot, reset and change password; 40 on coupon checks; 30 on crash reports.
+- **Rate limits** (per IP): 600 requests per 15 minutes on `/api`; 20 per 15 minutes on login, register, forgot, reset and change password; 40 on coupon checks; 30 on crash reports; 15 guest orders per hour; 10 order-link requests per 15 minutes; 20 stock alerts per hour.
 - **Request size:** 100 kB for every route except the admin image upload (8 MB).
 - **Errors and logs:** every response carries an `X-Request-Id`, the access log prints it, and failures are logged as one JSON line each (`"level":"error"`, the request id, route, message and stack). In production a 500 never shows its internals to the caller; it returns a generic message plus the request id, so a customer can quote the id and you can find the exact lines. Unhandled rejections are logged, and an uncaught exception logs and exits so Render restarts a clean process. Browser crashes arrive in the same log as `"event":"client_error"`.
 - Free Render services sleep after 15 minutes idle; the first request afterwards takes up to a minute.
@@ -441,6 +460,8 @@ MONGODB_URI="<atlas connection string>" npm run seed:demo-admin
 - **Email reaches only verified senders and recipients** until you have a domain (see the table above).
 - **Sessions are JWTs kept in the browser's local storage**, the usual trade-off for a separately deployable front end: a cross-site-scripting bug would expose them. Content-Security-Policy and escaped output are the defences.
 - **Dependency advisories.** `npm audit` reports a `zod` advisory (server) and a `react-router` advisory (client) whose fixes are major-version upgrades. The `zod` risk (oversized lists exhausting memory) is mitigated by the 100 kB request cap; the `react-router` one concerns open redirects through user-controlled link targets, which this app does not use. Dependabot will propose the upgrades.
+- **Guest checkout has no CAPTCHA.** It is limited per connection and per email, but a determined attacker could still tie up stock for the 30 minutes an unpaid order holds it. Add a CAPTCHA (for example Cloudflare Turnstile) if you see abuse.
+- With no email provider set, the server log prints each email's text, including guest order links and password-reset links. That is only meant for development.
 - The order receipt is not a GST tax invoice. If you are GST-registered you will need proper invoices (with your GSTIN and tax breakdown) before selling for real.
 - The admin panel uses fixed demo supplier data; there is no real workshop integration.
 

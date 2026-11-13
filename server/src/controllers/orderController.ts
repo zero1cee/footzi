@@ -1,11 +1,12 @@
 import { Response } from 'express';
 import { orderService } from '../services/orderService.js';
+import { orderAccessToken } from '../services/orderAccess.js';
 import { AuthRequest, isAdminRole } from '../middleware/auth.js';
 import { z } from 'zod';
 
 const createOrderSchema = z.object({
   customerName: z.string().min(2),
-  customerEmail: z.string().email(),
+  customerEmail: z.string().trim().toLowerCase().email('Please enter a valid email address'),
   customerPhone: z.string().min(10),
   items: z.array(
     z.object({
@@ -54,6 +55,56 @@ export const createOrder = async (req: AuthRequest, res: Response): Promise<void
   }
 };
 
+/** Places an order without an account. The response carries the secret that proves the order is theirs. */
+export const createGuestOrder = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const validated = createOrderSchema.parse(req.body);
+    const order = await orderService.createOrder({ ...validated, isGuest: true });
+    res.status(201).json({
+      message: 'Order created successfully. Ready for payment.',
+      order,
+      accessToken: orderAccessToken(order._id),
+    });
+  } catch (error: any) {
+    if (error.name === 'ZodError') {
+      res.status(400).json({ error: error.errors[0]?.message || 'Order validation failed', details: error.errors });
+      return;
+    }
+    res.status(400).json({ error: error.message });
+  }
+};
+
+const lookupSchema = z.object({
+  orderNumber: z.string().trim().min(6).max(30),
+  email: z.string().trim().toLowerCase().email(),
+});
+
+/** "Email me my order link". Always answers the same, whether or not the order exists. */
+export const lookupOrder = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { orderNumber, email } = lookupSchema.parse(req.body);
+    await orderService.sendOrderLink(orderNumber, email).catch((e) => console.error('[Footzi Orders] Link email failed:', e.message));
+    res.status(200).json({ message: 'If that order number and email match, we have just emailed a link to the order.' });
+  } catch (error: any) {
+    if (error.name === 'ZodError') {
+      res.status(400).json({ error: 'Enter your order number and the email address you used.' });
+      return;
+    }
+    res.status(400).json({ error: error.message });
+  }
+};
+
+/** Adds a guest order to the signed-in customer's account, proving ownership with the order link's secret. */
+export const claimOrder = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { token } = z.object({ token: z.string().min(10).max(200) }).parse(req.body);
+    const order = await orderService.claimGuestOrder(req.params.id as string, req.user!.id, token);
+    res.status(200).json({ message: 'This order is now in your account.', order });
+  } catch (error: any) {
+    res.status(400).json({ error: error.name === 'ZodError' ? 'Order link is missing.' : error.message });
+  }
+};
+
 export const getMyOrders = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     if (!req.user) {
@@ -71,7 +122,8 @@ export const getMyOrders = async (req: AuthRequest, res: Response): Promise<void
 export const getOrderById = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const id = req.params.id as string;
-    const order = await orderService.getOrderById(id, isAdminRole(req.user?.role) ? undefined : req.user?.id);
+    // Staff see everything; customers (signed in, or a guest with the order link) see only their own order
+    const order = await orderService.getOrderById(id, isAdminRole(req.user?.role) ? undefined : req.orderActor);
 
     if (!order) {
       res.status(404).json({ error: 'Order not found' });
@@ -86,14 +138,9 @@ export const getOrderById = async (req: AuthRequest, res: Response): Promise<voi
 
 export const cancelOrder = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    if (!req.user) {
-      res.status(401).json({ error: 'Authentication required' });
-      return;
-    }
-
     const id = req.params.id as string;
     const { reason } = req.body;
-    const cancelled = await orderService.cancelOrder(id, req.user.id, reason);
+    const cancelled = await orderService.cancelOrder(id, req.orderActor!, typeof reason === 'string' ? reason.slice(0, 200) : undefined);
 
     const refund = (cancelled as any).refund as { amount: number; pending: boolean } | undefined;
     res.status(200).json({

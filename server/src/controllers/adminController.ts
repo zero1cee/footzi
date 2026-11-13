@@ -8,6 +8,7 @@ import { ReturnRequest } from '../models/ReturnRequest.js';
 import { supplierFulfillmentService } from '../services/supplierFulfillmentService.js';
 import { orderService } from '../services/orderService.js';
 import { productService } from '../services/productService.js';
+import { stockAlertService } from '../services/stockAlertService.js';
 import { refundService } from '../services/refundService.js';
 import { createProductSchema, updateProductSchema } from '../validators/productValidators.js';
 import { cloudinaryService, UploadError } from '../services/cloudinaryService.js';
@@ -212,6 +213,8 @@ export const updateInventoryStockAdmin = async (req: AuthRequest, res: Response)
     }
 
     const updated = await productService.updateInventoryStock(sku, availableStock);
+    // Anyone waiting on this size hears about it straight away rather than at the next sweep
+    if (updated && availableStock > 0) void stockAlertService.sweep().catch(() => {});
     if (!updated) {
       res.status(404).json({ error: `Variant with SKU ${sku} not found` });
       return;

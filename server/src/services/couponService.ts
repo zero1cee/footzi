@@ -19,6 +19,20 @@ export type CouponCheck =
 const redemptions = (filter: Record<string, unknown>) =>
   Order.countDocuments({ ...filter, orderStatus: { $ne: 'cancelled' } });
 
+/**
+ * Whose orders count as "this customer's". A signed-in customer: their account's orders, plus any guest order
+ * placed with the email they typed (so becoming a member does not reset a first-order coupon). A guest: every
+ * order placed with their email.
+ */
+const customerFilter = (userId?: string, email?: string): Record<string, unknown> | null => {
+  const cleanEmail = email?.trim().toLowerCase();
+  const hasUser = Boolean(userId && mongoose.isValidObjectId(userId));
+  if (hasUser && cleanEmail) return { $or: [{ user: userId }, { isGuest: true, customerEmail: cleanEmail }] };
+  if (hasUser) return { user: userId };
+  if (cleanEmail) return { customerEmail: cleanEmail };
+  return null;
+};
+
 /** Starter codes, created once and never overwritten, so admin edits survive restarts. */
 export const DEFAULT_COUPONS = [
   { code: 'FOOTZI10', description: '10% off your order', type: 'percent' as const, value: 10 },
@@ -37,7 +51,7 @@ export class CouponService {
    * per-user limit) are enforced; without one (a guest previewing) only the general
    * rules are checked, and the order itself re-checks everything.
    */
-  async evaluate(rawCode: unknown, subtotal: number, userId?: string): Promise<CouponCheck> {
+  async evaluate(rawCode: unknown, subtotal: number, userId?: string, email?: string): Promise<CouponCheck> {
     const code = normalizeCode(rawCode);
     const coupon = code ? await Coupon.findOne({ code }) : null;
     if (!coupon || !coupon.isActive) return { ok: false, reason: 'This coupon code is not valid.' };
@@ -46,11 +60,12 @@ export class CouponService {
       return { ok: false, reason: `Add ₹${coupon.minOrderValue - subtotal} more to use this coupon (minimum order ₹${coupon.minOrderValue}).` };
     }
 
-    if (userId && mongoose.isValidObjectId(userId)) {
-      if (coupon.firstOrderOnly && (await redemptions({ user: userId })) > 0) {
+    const who = customerFilter(userId, email);
+    if (who) {
+      if (coupon.firstOrderOnly && (await redemptions(who)) > 0) {
         return { ok: false, reason: 'This coupon is only for your first order.' };
       }
-      if (coupon.perUserLimit && (await redemptions({ user: userId, couponCode: code })) >= coupon.perUserLimit) {
+      if (coupon.perUserLimit && (await redemptions({ ...who, couponCode: code })) >= coupon.perUserLimit) {
         return { ok: false, reason: 'You have already used this coupon.' };
       }
     }

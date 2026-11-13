@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { rememberGuestOrder } from '@/lib/guestOrders';
 import { Lock, CheckCircle2, ArrowRight, Truck, CreditCard, Sparkles, AlertCircle, ShieldCheck } from 'lucide-react';
 import { useCartStore } from '@/store/useCartStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { couponService } from '@/services/couponService';
-import { orderService } from '@/services/orderService';
+import { orderService, OrderAuth } from '@/services/orderService';
 import { formatINR, isBackendUnreachable } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 import { useDocumentMeta } from '@/hooks/useDocumentMeta';
@@ -12,7 +13,8 @@ import { useDocumentMeta } from '@/hooks/useDocumentMeta';
 interface PendingPayment {
   createdOrder: any;
   gatewayOrder: any;
-  activeToken: string;
+  /** An account's sign-in token, or the order secret for a guest order. */
+  auth: OrderAuth;
 }
 
 const RAZORPAY_SCRIPT = 'https://checkout.razorpay.com/v1/checkout.js';
@@ -30,17 +32,18 @@ const loadRazorpayScript = (): Promise<void> =>
 export const CheckoutPage: React.FC = () => {
   useDocumentMeta({ title: 'Checkout — Footzi', noindex: true });
   const { items, getSubtotal, getDiscountAmount, getShippingFee, getTotal, clearCart, couponCode, removeCoupon } = useCartStore();
-  const { user, token, loginAsDemo } = useAuthStore();
+  const { user, token } = useAuthStore();
 
   const [formData, setFormData] = useState({
-    firstName: user?.name ? user.name.split(' ')[0] : 'Arjun',
-    lastName: user?.name && user.name.split(' ').length > 1 ? user.name.split(' ').slice(1).join(' ') : 'Kapoor',
-    email: user?.email || 'patron@footzi.in',
-    phone: user?.phone || '+91 98765 43210',
-    address: '42 Heritage Enclave, Civil Lines',
-    city: 'Agra',
-    state: 'Uttar Pradesh',
-    pincode: '282001',
+    // A guest starts with an empty form; a signed-in customer's details are filled from their account below
+    firstName: user?.name ? user.name.split(' ')[0] : '',
+    lastName: user?.name && user.name.split(' ').length > 1 ? user.name.split(' ').slice(1).join(' ') : '',
+    email: user?.email || '',
+    phone: user?.phone || '',
+    address: '',
+    city: '',
+    state: '',
+    pincode: '',
     paymentMethod: 'razorpay',
   });
 
@@ -50,6 +53,10 @@ export const CheckoutPage: React.FC = () => {
     orderNumber: string;
     trackingNumber: string;
     total: number;
+    /** Where this customer reopens the order: their account, or for a guest the private link. */
+    orderLink: string | null;
+    isGuest: boolean;
+    email: string;
   } | null>(null);
 
   // Interactive Payment Sheet Modal State
@@ -91,11 +98,9 @@ export const CheckoutPage: React.FC = () => {
     setIsProcessing(true);
 
     try {
-      // Orders belong to an account: never place one under someone else's session
-      const activeToken = token;
-      if (!activeToken) {
-        throw new Error('Please sign in to place your order. You can use 1-Click Patron Sign-In above.');
-      }
+      // Signed in: the order goes on the account. Otherwise it is a guest order, and the server hands back a
+      // secret (below) that proves it is theirs for paying, viewing and cancelling.
+      let auth: OrderAuth = token;
 
       // 1. Create order on backend with server-computed prices and stock reservation
       const orderPayload = {
@@ -125,14 +130,18 @@ export const CheckoutPage: React.FC = () => {
         // A coupon can stop applying between the bag and checkout (used up, expired, first-order only)
         if (couponCode) {
           try {
-            await couponService.validate(couponCode, getSubtotal(), activeToken);
+            await couponService.validate(couponCode, getSubtotal(), token, formData.email.trim());
           } catch (couponErr: any) {
             if (isBackendUnreachable(couponErr)) throw couponErr;
             removeCoupon();
             throw new Error(`${couponErr.message} The coupon was removed from your bag; review the total and place the order again.`);
           }
         }
-        createdOrder = await orderService.createOrder(orderPayload, activeToken);
+        createdOrder = await orderService.createOrder(orderPayload, auth);
+        if (createdOrder.accessToken) {
+          auth = { orderToken: createdOrder.accessToken };
+          rememberGuestOrder(createdOrder._id, createdOrder.accessToken);
+        }
       } catch (err: any) {
         // A real rejection from the API (out of stock, validation, auth) must reach the patron
         if (!isBackendUnreachable(err)) throw err;
@@ -155,17 +164,17 @@ export const CheckoutPage: React.FC = () => {
         };
       } else {
         try {
-          gatewayOrder = await orderService.createPaymentOrder(createdOrder._id, activeToken);
+          gatewayOrder = await orderService.createPaymentOrder(createdOrder._id, auth);
         } catch (err) {
           // The order exists and holds stock; release it before reporting the failure
           await orderService
-            .cancelOrder(createdOrder._id, 'Payment could not be initiated', activeToken)
+            .cancelOrder(createdOrder._id, 'Payment could not be initiated', auth)
             .catch(() => {});
           throw err;
         }
       }
 
-      const pending = { createdOrder, gatewayOrder, activeToken };
+      const pending = { createdOrder, gatewayOrder, auth };
 
       if (!createdOrder.simulated && gatewayOrder.demoMode === false) {
         // Live Razorpay credentials: hand over to the real hosted checkout
@@ -183,10 +192,10 @@ export const CheckoutPage: React.FC = () => {
 
   // Real Razorpay hosted checkout (used only when the server runs on live/test keys)
   const openRazorpayCheckout = async (pending: PendingPayment) => {
-    const { createdOrder, gatewayOrder, activeToken } = pending;
+    const { createdOrder, gatewayOrder, auth } = pending;
 
     const releaseOrder = (reason: string) =>
-      orderService.cancelOrder(createdOrder._id, reason, activeToken).catch(() => {});
+      orderService.cancelOrder(createdOrder._id, reason, auth).catch(() => {});
 
     try {
       await loadRazorpayScript();
@@ -241,7 +250,7 @@ export const CheckoutPage: React.FC = () => {
     setIsVerifyingPayment(true);
     setErrorMessage(null);
 
-    const { createdOrder, gatewayOrder, activeToken } = pending;
+    const { createdOrder, gatewayOrder, auth } = pending;
 
     try {
       // Only an order that was simulated offline skips server verification.
@@ -255,7 +264,7 @@ export const CheckoutPage: React.FC = () => {
               razorpayPaymentId,
               razorpaySignature,
             },
-            activeToken
+            auth
           );
 
       const assignedTracking =
@@ -266,6 +275,13 @@ export const CheckoutPage: React.FC = () => {
         orderNumber: createdOrder.orderNumber,
         trackingNumber: assignedTracking,
         total: createdOrder.total || total,
+        isGuest: !!(auth && typeof auth === 'object' && auth.orderToken),
+        orderLink: createdOrder.simulated
+          ? null
+          : auth && typeof auth === 'object' && auth.orderToken
+            ? `/order/${createdOrder._id}#t=${auth.orderToken}`
+            : `/account/orders/${createdOrder._id}`,
+        email: formData.email.trim(),
       });
 
       setPendingPayment(null);
@@ -284,11 +300,11 @@ export const CheckoutPage: React.FC = () => {
   // Cancel Payment & Release Reserved Stock
   const handleCancelPayment = async () => {
     if (!pendingPayment) return;
-    const { createdOrder, activeToken } = pendingPayment;
+    const { createdOrder, auth } = pendingPayment;
 
     try {
       if (!createdOrder.simulated) {
-        await orderService.cancelOrder(createdOrder._id, 'Customer aborted payment sheet', activeToken);
+        await orderService.cancelOrder(createdOrder._id, 'Customer aborted payment sheet', auth);
       }
     } catch {
       // Ignored
@@ -355,10 +371,19 @@ export const CheckoutPage: React.FC = () => {
             </div>
           </div>
 
+          {completedOrderData.isGuest && (
+            <p className="text-xs text-charcoal-600 leading-relaxed bg-ivory-50 border border-ivory-300 rounded-xs p-4 text-left">
+              We've emailed your confirmation to <strong>{completedOrderData.email}</strong>, with a private link to track this
+              order. Keep that email: it is how you come back to your order. To request an exchange or return later,{' '}
+              <Link to="/register" className="font-semibold text-charcoal-900 underline">create an account</Link> and add this
+              order to it.
+            </p>
+          )}
+
           <div className="pt-2 flex flex-col sm:flex-row gap-3">
-            <Link to="/account" className="flex-1">
+            <Link to={completedOrderData.orderLink || '/account'} className="flex-1">
               <Button variant="primary" size="md" className="w-full">
-                Track in Patron Portal
+                Track your order
               </Button>
             </Link>
             <Link to="/shop" className="flex-1">
@@ -403,31 +428,22 @@ export const CheckoutPage: React.FC = () => {
           </p>
         </div>
 
-        {/* 1-Click Patron Sign-In for Guests */}
+        {/* Guests can check out without an account */}
         {!user && (
           <div className="mb-8 p-4 bg-sand-50/90 border border-sand-300 rounded-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
-            <div className="flex items-center gap-3">
-              <Sparkles className="w-5 h-5 text-sand-600 shrink-0" />
-              <div>
-                <p className="text-xs font-semibold text-charcoal-900">
-                  Testing as an Interviewer or Reviewer?
-                </p>
-                <p className="text-[11px] text-charcoal-600">
-                  1-Click sign in as Demo Patron to auto-fill verified address details, bind this order to your account, and track BlueDart fulfillment.
-                </p>
-              </div>
+            <div>
+              <p className="text-xs font-semibold text-charcoal-900">You're checking out as a guest</p>
+              <p className="text-[11px] text-charcoal-600">
+                No account needed. We'll email your confirmation and a private link to track the order.
+              </p>
             </div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={async () => {
-                await loginAsDemo('patron');
-              }}
-              className="text-xs whitespace-nowrap self-start sm:self-center"
+            <Link
+              to="/login"
+              state={{ from: { pathname: '/checkout' } }}
+              className="text-xs font-semibold text-charcoal-900 underline whitespace-nowrap self-start sm:self-center py-2"
             >
-              1-Click Patron Sign-In
-            </Button>
+              Have an account? Sign in
+            </Link>
           </div>
         )}
 
@@ -490,10 +506,10 @@ export const CheckoutPage: React.FC = () => {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[11px] uppercase tracking-wider font-semibold text-charcoal-700 mb-1">
+                  <label htmlFor="checkout-firstName" className="block text-[11px] uppercase tracking-wider font-semibold text-charcoal-700 mb-1">
                     First Name
                   </label>
-                  <input
+                  <input id="checkout-firstName"
                     type="text"
                     required
                     name="firstName"
@@ -503,10 +519,10 @@ export const CheckoutPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] uppercase tracking-wider font-semibold text-charcoal-700 mb-1">
+                  <label htmlFor="checkout-lastName" className="block text-[11px] uppercase tracking-wider font-semibold text-charcoal-700 mb-1">
                     Last Name
                   </label>
-                  <input
+                  <input id="checkout-lastName"
                     type="text"
                     required
                     name="lastName"
@@ -519,10 +535,10 @@ export const CheckoutPage: React.FC = () => {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[11px] uppercase tracking-wider font-semibold text-charcoal-700 mb-1">
+                  <label htmlFor="checkout-email" className="block text-[11px] uppercase tracking-wider font-semibold text-charcoal-700 mb-1">
                     Email Address
                   </label>
-                  <input
+                  <input id="checkout-email"
                     type="email"
                     required
                     name="email"
@@ -532,10 +548,10 @@ export const CheckoutPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] uppercase tracking-wider font-semibold text-charcoal-700 mb-1">
+                  <label htmlFor="checkout-phone" className="block text-[11px] uppercase tracking-wider font-semibold text-charcoal-700 mb-1">
                     Mobile Number (for SMS & WhatsApp Dispatch Alerts)
                   </label>
-                  <input
+                  <input id="checkout-phone"
                     type="tel"
                     required
                     name="phone"
@@ -547,10 +563,10 @@ export const CheckoutPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-[11px] uppercase tracking-wider font-semibold text-charcoal-700 mb-1">
+                <label htmlFor="checkout-address" className="block text-[11px] uppercase tracking-wider font-semibold text-charcoal-700 mb-1">
                   Street Address & Apartment
                 </label>
-                <input
+                <input id="checkout-address"
                   type="text"
                   required
                   name="address"
@@ -562,10 +578,10 @@ export const CheckoutPage: React.FC = () => {
 
               <div className="grid grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-[11px] uppercase tracking-wider font-semibold text-charcoal-700 mb-1">
+                  <label htmlFor="checkout-city" className="block text-[11px] uppercase tracking-wider font-semibold text-charcoal-700 mb-1">
                     City
                   </label>
-                  <input
+                  <input id="checkout-city"
                     type="text"
                     required
                     name="city"
@@ -575,10 +591,10 @@ export const CheckoutPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] uppercase tracking-wider font-semibold text-charcoal-700 mb-1">
+                  <label htmlFor="checkout-state" className="block text-[11px] uppercase tracking-wider font-semibold text-charcoal-700 mb-1">
                     State
                   </label>
-                  <input
+                  <input id="checkout-state"
                     type="text"
                     required
                     name="state"
@@ -588,10 +604,10 @@ export const CheckoutPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] uppercase tracking-wider font-semibold text-charcoal-700 mb-1">
+                  <label htmlFor="checkout-pincode" className="block text-[11px] uppercase tracking-wider font-semibold text-charcoal-700 mb-1">
                     PIN Code
                   </label>
-                  <input
+                  <input id="checkout-pincode"
                     type="text"
                     required
                     name="pincode"

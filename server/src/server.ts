@@ -7,6 +7,7 @@ import { connectDB } from './config/db.js';
 import { validateEnv } from './config/env.js';
 import { orderService } from './services/orderService.js';
 import { logEvent } from './middleware/errorHandler.js';
+import { stockAlertService } from './services/stockAlertService.js';
 
 const PORT = process.env.PORT || 5001;
 
@@ -33,6 +34,16 @@ const startServer = async () => {
       .catch((error) => console.error('[Footzi Orders] Expiry sweep failed:', error.message));
   void sweepExpiredOrders();
   setInterval(sweepExpiredOrders, 5 * 60 * 1000).unref();
+
+  // Tell people waiting on a sold-out size when it comes back (a cancelled order, a restock, a return)
+  const sweepStockAlerts = () =>
+    stockAlertService
+      .sweep()
+      .then((count) => {
+        if (count > 0) logEvent('info', 'stock_alerts_sent', { count });
+      })
+      .catch((error) => logEvent('error', 'stock_alert_sweep_failed', { message: error.message }));
+  setInterval(sweepStockAlerts, 5 * 60 * 1000).unref();
 
   // Finish in-flight requests and close the database before the host stops the process
   const shutdown = (signal: string) => {

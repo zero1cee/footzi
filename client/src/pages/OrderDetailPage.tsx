@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, CheckCircle2, Circle, MapPin, Truck, XCircle } from 'lucide-react';
-import { useAuthStore } from '@/store/useAuthStore';
+import { useOrderAccess } from '@/hooks/useOrderAccess';
 import { orderService } from '@/services/orderService';
 import { formatINR } from '@/lib/utils';
 import { Badge } from '@/components/ui/Badge';
@@ -29,10 +29,18 @@ const canCancel = (order: any) =>
   order.orderStatus === 'pending_payment' ||
   (order.paymentStatus === 'paid' && ['confirmed', 'processing'].includes(order.orderStatus));
 
-export const OrderDetailPage: React.FC = () => {
+interface Props {
+  /** 'account' inside the signed-in area; 'guest' for the private link in a guest's order email. */
+  mode?: 'account' | 'guest';
+}
+
+export const OrderDetailPage: React.FC<Props> = ({ mode = 'account' }) => {
   useDocumentMeta({ title: 'Order details — Footzi', noindex: true });
   const { id } = useParams<{ id: string }>();
-  const token = useAuthStore((s) => s.token);
+  const { auth, bearer, orderToken } = useOrderAccess(id, mode);
+  const navigate = useNavigate();
+  const [isClaiming, setIsClaiming] = useState(false);
+  const base = mode === 'guest' ? '/order' : '/account/orders';
 
   const [order, setOrder] = useState<any | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -43,27 +51,32 @@ export const OrderDetailPage: React.FC = () => {
   const [cancelError, setCancelError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!id || !token) return;
+    if (!id) return;
+    if (!auth) {
+      setError('This order link is incomplete. Use the link from your order email, or request a new one.');
+      setIsLoading(false);
+      return;
+    }
     let active = true;
     setIsLoading(true);
     orderService
-      .getOrderById(id, token)
+      .getOrderById(id, auth)
       .then((data) => active && setOrder(data))
       .catch((err) => active && setError(err.message || 'Order not found'))
       .finally(() => active && setIsLoading(false));
     return () => {
       active = false;
     };
-  }, [id, token]);
+  }, [id, bearer, orderToken]);
 
   const handleCancel = async () => {
-    if (!id || !token) return;
+    if (!id || !auth) return;
     setCancelError(null);
     setIsCancelling(true);
     try {
-      const result = await orderService.cancelOrder(id, 'Cancelled by customer from order page', token);
+      const result = await orderService.cancelOrder(id, 'Cancelled by customer from order page', auth);
       setNotice(result.message);
-      setOrder(await orderService.getOrderById(id, token));
+      setOrder(await orderService.getOrderById(id, auth));
       setConfirmingCancel(false);
     } catch (err: any) {
       setCancelError(err.message || 'This order could not be cancelled.');
@@ -72,18 +85,46 @@ export const OrderDetailPage: React.FC = () => {
     }
   };
 
+  const handleClaim = async () => {
+    if (!id || !bearer || !orderToken) return;
+    setCancelError(null);
+    setIsClaiming(true);
+    try {
+      await orderService.claimOrder(id, orderToken, bearer);
+      navigate(`/account/orders/${id}`, { replace: true });
+    } catch (err: any) {
+      setCancelError(err.message || 'Could not add this order to your account.');
+    } finally {
+      setIsClaiming(false);
+    }
+  };
+
   if (isLoading) {
-    return <div className="py-24 text-center text-xs text-charcoal-500">Loading your order…</div>;
+    return <div role="status" className="py-24 text-center text-xs text-charcoal-500">Loading your order…</div>;
   }
 
   if (error || !order) {
     return (
       <div className="py-24 text-center">
         <h1 className="font-serif text-2xl text-charcoal-900">We couldn't find that order</h1>
-        <p className="text-xs text-charcoal-500 mt-2">{error}</p>
-        <Link to="/account/orders" className="mt-4 inline-block text-xs uppercase tracking-widest font-semibold text-sand-600 underline">
-          Back to my orders
-        </Link>
+        <p className="text-xs text-charcoal-500 mt-2">
+          {error}
+          {mode === 'guest' && ' If you added this order to an account, sign in to see it there.'}
+        </p>
+        {mode === 'guest' ? (
+          <div className="mt-4 flex flex-wrap justify-center gap-x-6">
+            <Link to="/track-order" className="inline-block py-2 text-xs uppercase tracking-widest font-semibold text-sand-600 underline">
+              Email me my order link
+            </Link>
+            <Link to="/login" className="inline-block py-2 text-xs uppercase tracking-widest font-semibold text-sand-600 underline">
+              Sign in
+            </Link>
+          </div>
+        ) : (
+          <Link to="/account/orders" className="mt-4 inline-block text-xs uppercase tracking-widest font-semibold text-sand-600 underline">
+            Back to my orders
+          </Link>
+        )}
       </div>
     );
   }
@@ -97,9 +138,37 @@ export const OrderDetailPage: React.FC = () => {
   return (
     <div className="py-10 md:py-14 bg-ivory-100 min-h-[85vh]">
       <div className="max-w-4xl mx-auto px-4 sm:px-6">
-        <Link to="/account/orders" className="inline-flex items-center gap-1 text-[11px] text-charcoal-500 hover:text-charcoal-900 mb-5">
-          <ArrowLeft className="w-3.5 h-3.5" /> My orders
+        <Link
+          to={mode === 'guest' ? '/shop' : '/account/orders'}
+          className="inline-flex items-center gap-1 text-[11px] text-charcoal-500 hover:text-charcoal-900 mb-5 py-2"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" /> {mode === 'guest' ? 'Continue shopping' : 'My orders'}
         </Link>
+
+        {mode === 'guest' && order.isGuest && (
+          <div className="mb-5 p-4 bg-sand-50 border border-sand-300 rounded-xs text-xs text-charcoal-700 space-y-2">
+            <p>
+              <strong>This order isn't in an account.</strong> Keep your order email: its link is how you come back here. To
+              request an exchange or return later, add the order to an account.
+            </p>
+            {bearer ? (
+              <Button variant="primary" size="sm" isLoading={isClaiming} onClick={handleClaim}>
+                Add this order to my account
+              </Button>
+            ) : (
+              <p>
+                <Link to="/login" state={{ from: { pathname: `/order/${order._id}`, hash: `#t=${orderToken ?? ''}` } }} className="font-semibold text-charcoal-900 underline">
+                  Sign in
+                </Link>{' '}
+                or{' '}
+                <Link to="/register" state={{ from: { pathname: `/order/${order._id}`, hash: `#t=${orderToken ?? ''}` } }} className="font-semibold text-charcoal-900 underline">
+                  create an account
+                </Link>
+                , then come back to this page to add it.
+              </p>
+            )}
+          </div>
+        )}
 
         {notice && (
           <div className="mb-5 p-4 bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs rounded-xs flex items-center gap-2" role="status">
@@ -246,7 +315,7 @@ export const OrderDetailPage: React.FC = () => {
           <div className="mt-8 pt-5 border-t border-ivory-200">
             {(order.paymentStatus === 'paid' || order.paymentStatus === 'refunded') && (
               <p className="text-xs text-charcoal-600 mb-3">
-                <Link to={`/account/orders/${order._id}/receipt`} className="font-semibold text-charcoal-900 underline">
+                <Link to={`${base}/${order._id}/receipt`} className="font-semibold text-charcoal-900 underline">
                   View or print your receipt
                 </Link>
               </p>
@@ -259,10 +328,16 @@ export const OrderDetailPage: React.FC = () => {
             {order.orderStatus === 'delivered' && (
               <p className="text-xs text-charcoal-600">
                 Not the right fit?{' '}
-                <Link to="/account/orders" className="font-semibold text-charcoal-900 underline">
-                  Request an exchange or return
-                </Link>{' '}
-                from your orders list within 7 days of delivery.
+                {mode === 'guest' ? (
+                  <>Add this order to an account (above) to request an exchange or return within 7 days of delivery.</>
+                ) : (
+                  <>
+                    <Link to="/account/orders" className="font-semibold text-charcoal-900 underline">
+                      Request an exchange or return
+                    </Link>{' '}
+                    from your orders list within 7 days of delivery.
+                  </>
+                )}
               </p>
             )}
 

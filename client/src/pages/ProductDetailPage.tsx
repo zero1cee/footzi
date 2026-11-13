@@ -29,6 +29,7 @@ import { Badge } from '@/components/ui/Badge';
 import { ProductCard } from '@/components/ui/ProductCard';
 import { SizeGuideModal } from '@/components/common/SizeGuideModal';
 import { RecentlyViewed } from '@/components/ui/RecentlyViewed';
+import { NotifyWhenBack } from '@/components/ui/NotifyWhenBack';
 import { useRecentStore } from '@/store/useRecentStore';
 
 const NotFound: React.FC = () => {
@@ -339,14 +340,16 @@ const ProductDetailContent: React.FC<{ product: Product }> = ({ product }) => {
                   return (
                     <button
                       key={size}
-                      disabled={!isAvailable}
+                      // A sold-out size stays selectable: choosing it offers "tell me when it's back"
+                      aria-label={isAvailable ? size : `${size}, sold out`}
+                      aria-pressed={selectedSize === size}
                       onClick={() => setSelectedSize(size)}
                       className={`py-2.5 text-xs font-semibold rounded-xs border transition-all ${
                         selectedSize === size
                           ? 'bg-charcoal-900 text-white border-charcoal-900 shadow-sm'
                           : isAvailable
                           ? 'bg-white text-charcoal-800 border-ivory-300 hover:border-charcoal-700'
-                          : 'bg-ivory-200 text-charcoal-400 border-ivory-200 line-through cursor-not-allowed opacity-40'
+                          : 'bg-ivory-200 text-charcoal-500 border-ivory-200 line-through hover:border-charcoal-500'
                       }`}
                     >
                       {size}
@@ -358,9 +361,12 @@ const ProductDetailContent: React.FC<{ product: Product }> = ({ product }) => {
               {/* Stock status indicator */}
               <div className="pt-1">
                 {isOutOfStock ? (
-                  <span className="text-xs font-semibold text-red-600">
-                    Currently out of stock for this size/color combination.
-                  </span>
+                  <>
+                    <span className="text-xs font-semibold text-red-600">
+                      Currently out of stock for this size/color combination.
+                    </span>
+                    {currentVariant?.sku && <NotifyWhenBack key={currentVariant.sku} sku={currentVariant.sku} sizeLabel={selectedSize} />}
+                  </>
                 ) : availableStock <= 5 ? (
                   <span className="text-xs font-medium text-amber-700">
                     ⚡ Low Inventory Alert: Only {availableStock} pairs left in Agra warehouse!

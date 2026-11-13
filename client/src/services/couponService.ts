@@ -23,11 +23,11 @@ export const computeCouponDiscount = (coupon: AppliedCoupon | null, subtotal: nu
 
 export const couponService = {
   /** Asks the server whether a code works for this bag. Throws with the server's reason when it does not. */
-  async validate(code: string, subtotal: number, token?: string | null): Promise<AppliedCoupon & { discount: number }> {
+  async validate(code: string, subtotal: number, token?: string | null, email?: string): Promise<AppliedCoupon & { discount: number }> {
     const res = await fetch('/api/coupons/validate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-      body: JSON.stringify({ code, subtotal }),
+      body: JSON.stringify({ code, subtotal, ...(email ? { email } : {}) }),
     });
     return parseApiJson(res, 'This coupon code is not valid.');
   },

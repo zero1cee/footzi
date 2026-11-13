@@ -14,8 +14,8 @@ const fail = (res: Response, error: any, status = 400): void => {
 /** Lets the bag check a code against the server's rules. Guests get the general checks only. */
 export const validateCoupon = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { code, subtotal } = validateCouponSchema.parse(req.body);
-    const check = await couponService.evaluate(code, subtotal, req.user?.id);
+    const { code, subtotal, email } = validateCouponSchema.parse(req.body);
+    const check = await couponService.evaluate(code, subtotal, req.user?.id, email);
     if (!check.ok) {
       res.status(400).json({ valid: false, error: check.reason });
       return;

@@ -16,7 +16,9 @@ export const LoginPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
 
   // Return to previous target or account
-  const from = (location.state as any)?.from?.pathname || '/account';
+  // Return to where the visitor was heading, including the order secret after a "#" on a guest order link
+  const fromState = (location.state as any)?.from;
+  const from = fromState?.pathname ? `${fromState.pathname}${fromState.search || ''}${fromState.hash || ''}` : '/account';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

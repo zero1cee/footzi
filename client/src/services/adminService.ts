@@ -159,4 +159,42 @@ export const adminService = {
     });
     return parseApiJson(res, 'Failed to update the product');
   },
+
+  async getSalesReport(days: number, token: string) {
+    const res = await fetch(`/api/admin/reports/sales?days=${days}`, { headers: { Authorization: `Bearer ${token}` } });
+    return parseApiJson(res, 'Failed to load the sales report');
+  },
+
+  async getCustomers(params: { search?: string; sort?: string; page?: number }, token: string) {
+    const q = new URLSearchParams();
+    if (params.search) q.set('search', params.search);
+    if (params.sort) q.set('sort', params.sort);
+    q.set('page', String(params.page ?? 1));
+    q.set('limit', '20');
+    const res = await fetch(`/api/admin/customers?${q.toString()}`, { headers: { Authorization: `Bearer ${token}` } });
+    return parseApiJson(res, 'Failed to load customers');
+  },
+
+  /** Downloads a spreadsheet. It goes through fetch so the sign-in token is sent, then saves the file. */
+  async downloadCsv(path: string, token: string): Promise<void> {
+    const res = await fetch(path, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) {
+      let message = 'The export failed';
+      try {
+        message = (await res.json()).error || message;
+      } catch {
+        // Keep the generic message
+      }
+      throw new Error(message);
+    }
+    const name = /filename="([^"]+)"/.exec(res.headers.get('content-disposition') || '')?.[1] || 'footzi-export.csv';
+    const url = URL.createObjectURL(await res.blob());
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = name;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  },
 };

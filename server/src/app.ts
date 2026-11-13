@@ -15,6 +15,7 @@ import adminRoutes from './routes/adminRoutes.js';
 import returnRoutes from './routes/returnRoutes.js';
 import couponRoutes from './routes/couponRoutes.js';
 import wishlistRoutes from './routes/wishlistRoutes.js';
+import stockAlertRoutes from './routes/stockAlertRoutes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { requestContext } from './middleware/requestContext.js';
 import { reportClientError } from './controllers/clientErrorController.js';
@@ -124,6 +125,19 @@ export const createApp = (): Express => {
       '/api/coupons',
       rateLimit({ ...limiterDefaults, windowMs: 15 * 60 * 1000, limit: 40, message: { error: 'Too many coupon attempts. Please try again later.' } })
     );
+    // Guests need no account, so placing an order and asking for an order link are limited per address
+    app.use(
+      '/api/orders/guest',
+      rateLimit({ ...limiterDefaults, windowMs: 60 * 60 * 1000, limit: 15, message: { error: 'Too many orders from this connection. Please try again later.' } })
+    );
+    app.use(
+      '/api/orders/lookup',
+      rateLimit({ ...limiterDefaults, windowMs: 15 * 60 * 1000, limit: 10, message: { error: 'Too many requests. Please try again shortly.' } })
+    );
+    app.use(
+      '/api/stock-alerts',
+      rateLimit({ ...limiterDefaults, windowMs: 60 * 60 * 1000, limit: 20, message: { error: 'Too many requests. Please try again later.' } })
+    );
     app.use(
       '/api/client-errors',
       rateLimit({ ...limiterDefaults, windowMs: 15 * 60 * 1000, limit: 30, message: { error: 'Too many reports.' } })
@@ -145,6 +159,7 @@ export const createApp = (): Express => {
   app.use('/api/returns', returnRoutes);
   app.use('/api/coupons', couponRoutes);
   app.use('/api/wishlist', wishlistRoutes);
+  app.use('/api/stock-alerts', stockAlertRoutes);
   app.use('/api/admin', adminRoutes);
 
   // Unknown API routes are always JSON 404s

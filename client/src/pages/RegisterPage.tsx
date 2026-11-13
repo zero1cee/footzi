@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Lock, Mail, User, Phone, ShieldCheck, ArrowRight, Sparkles } from 'lucide-react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { Button } from '@/components/ui/Button';
@@ -8,6 +8,7 @@ import { useDocumentMeta } from '@/hooks/useDocumentMeta';
 export const RegisterPage: React.FC = () => {
   useDocumentMeta({ title: 'Create your account — Footzi', noindex: true });
   const navigate = useNavigate();
+  const location = useLocation();
   const { register, isLoading, error, clearError } = useAuthStore();
 
   const [name, setName] = useState('');
@@ -20,7 +21,8 @@ export const RegisterPage: React.FC = () => {
     clearError();
     const success = await register(name, email, password, phone);
     if (success) {
-      navigate('/account');
+      const fromState = (location.state as any)?.from;
+      navigate(fromState?.pathname ? `${fromState.pathname}${fromState.search || ''}${fromState.hash || ''}` : '/account');
     }
   };
 

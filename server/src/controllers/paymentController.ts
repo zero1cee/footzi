@@ -16,13 +16,8 @@ const verifyPaymentSchema = z.object({
 
 export const createPaymentOrder = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    if (!req.user) {
-      res.status(401).json({ error: 'Authentication required' });
-      return;
-    }
-
     const { orderId } = createPaymentOrderSchema.parse(req.body);
-    const gatewayOrder = await paymentService.createGatewayOrder(orderId, req.user.id);
+    const gatewayOrder = await paymentService.createGatewayOrder(orderId, req.orderActor!);
 
     res.status(200).json(gatewayOrder);
   } catch (error: any) {
@@ -36,15 +31,10 @@ export const createPaymentOrder = async (req: AuthRequest, res: Response): Promi
 
 export const verifyPayment = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    if (!req.user) {
-      res.status(401).json({ error: 'Authentication required' });
-      return;
-    }
-
     const validated = verifyPaymentSchema.parse(req.body);
     const result = await paymentService.verifyPaymentSignature({
       ...validated,
-      userId: req.user.id,
+      actor: req.orderActor!,
     });
 
     if (!result.verified) {
