@@ -1,5 +1,5 @@
 import dotenv from 'dotenv';
-dotenv.config();
+dotenv.config({ quiet: true }); // dotenv 17 prints a tip on every start unless told to be quiet
 
 import mongoose from 'mongoose';
 import { createApp } from './app.js';
