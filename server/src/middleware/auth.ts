@@ -12,6 +12,7 @@ interface JwtPayload {
   id: string;
   email: string;
   role: string;
+  iat?: number;
 }
 
 export const authenticate = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
@@ -40,6 +41,15 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
       res.status(401).json({
         error: 'Invalid session',
         message: 'The patron account associated with this token no longer exists.',
+      });
+      return;
+    }
+
+    // A password change or reset invalidates every token issued before it
+    if (user.passwordChangedAt && decoded.iat && decoded.iat < Math.floor(user.passwordChangedAt.getTime() / 1000)) {
+      res.status(401).json({
+        error: 'Session expired',
+        message: 'Your password was changed. Please log in again.',
       });
       return;
     }

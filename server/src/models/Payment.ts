@@ -1,5 +1,16 @@
 import mongoose, { Schema, Document, Model } from 'mongoose';
 
+export interface IPaymentRefund {
+  refundId: string;
+  amount: number;
+  reason: string;
+  // Idempotency key: the return request or order action this refund was issued for
+  reference: string;
+  simulated: boolean;
+  status: 'processed' | 'pending';
+  createdAt: Date;
+}
+
 export interface IPayment extends Document {
   order: mongoose.Types.ObjectId;
   orderNumber: string;
@@ -13,6 +24,7 @@ export interface IPayment extends Document {
   signatureVerified: boolean;
   failureReason?: string;
   webhookEvents: any[];
+  refunds: IPaymentRefund[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -36,6 +48,18 @@ const PaymentSchema = new Schema<IPayment>(
     signatureVerified: { type: Boolean, default: false },
     failureReason: { type: String },
     webhookEvents: [{ type: Schema.Types.Mixed }],
+    refunds: [
+      {
+        _id: false,
+        refundId: { type: String, required: true },
+        amount: { type: Number, required: true },
+        reason: { type: String, default: '' },
+        reference: { type: String, required: true },
+        simulated: { type: Boolean, default: false },
+        status: { type: String, enum: ['processed', 'pending'], default: 'processed' },
+        createdAt: { type: Date, default: Date.now },
+      },
+    ],
   },
   {
     timestamps: true,

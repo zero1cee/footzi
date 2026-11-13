@@ -12,7 +12,7 @@ export const registerSchema = z.object({
     .trim(),
   password: z
     .string({ required_error: 'Password is required' })
-    .min(6, 'Password must be at least 6 characters long'),
+    .min(8, 'Password must be at least 8 characters long'),
   phone: z.string().optional(),
 });
 
@@ -36,3 +36,31 @@ export const addressSchema = z.object({
   pincode: z.string().regex(/^\d{6}$/, 'Must be a valid 6-digit Indian PIN code'),
   isDefault: z.boolean().optional(),
 });
+
+const newPassword = z
+  .string({ required_error: 'A new password is required' })
+  .min(8, 'Password must be at least 8 characters long')
+  .max(128, 'Password is too long');
+
+export const changePasswordSchema = z.object({
+  currentPassword: z.string({ required_error: 'Your current password is required' }).min(1, 'Your current password is required'),
+  newPassword,
+});
+
+export const forgotPasswordSchema = z.object({
+  email: z.string({ required_error: 'Email is required' }).email('Please provide a valid email address').toLowerCase().trim(),
+});
+
+export const resetPasswordSchema = z.object({
+  token: z.string({ required_error: 'Reset token is required' }).min(32, 'This reset link is invalid').max(200),
+  newPassword,
+});
+
+export const updateProfileSchema = z
+  .object({
+    name: z.string().min(2, 'Name must be at least 2 characters').max(60, 'Name must be under 60 characters').optional(),
+    phone: z.string().regex(/^(\+?\d[\d\s-]{8,14})?$/, 'Enter a valid phone number').optional(),
+  })
+  .refine((d) => d.name !== undefined || d.phone !== undefined, { message: 'Nothing to update' });
+
+export const updateAddressSchema = addressSchema.partial();

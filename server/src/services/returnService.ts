@@ -3,6 +3,8 @@ import { ReturnRequest, IReturnRequest, ReturnStatus, ReturnType, IReturnItem } 
 import { Order } from '../models/Order.js';
 import { Product } from '../models/Product.js';
 import { Inventory } from '../models/Inventory.js';
+import { refundService } from './refundService.js';
+import { emailService } from './emailService.js';
 
 export const RETURN_WINDOW_DAYS = 7;
 
@@ -52,7 +54,7 @@ const deliveredAt = (order: any): Date => {
 };
 
 /** Puts returned or replaced-out pairs back on the shelf, in both the inventory ledger and the catalog. */
-const restock = async (sku: string, quantity: number) => {
+export const restock = async (sku: string, quantity: number) => {
   await Inventory.updateOne({ variantSku: sku }, { $inc: { availableStock: quantity } });
   await Product.updateOne({ 'variants.sku': sku }, { $inc: { 'variants.$.stock': quantity } });
 };
@@ -236,8 +238,24 @@ export class ReturnService {
       );
     }
 
+    // Money goes back before the request is closed. The refund is idempotent per
+    // return request, so if closing fails or is retried the customer is never paid twice,
+    // and if the gateway refuses, the request simply stays open for another attempt.
+    let refundNote = '';
+    if (status === 'refund_processed') {
+      const refund = await refundService.refundOrder({
+        orderId: request.order,
+        reference: `return:${request._id}`,
+        reason: `Return ${request.returnNumber}`,
+        amount: request.refundAmount,
+        notify: false,
+      });
+      refundNote = `Refund of ₹${refund.amount} issued (${refund.refundId}).`;
+    }
+
     const update: Record<string, unknown> = { status };
-    if (adminNotes) update.adminNotes = adminNotes;
+    if (refundNote) update.adminNotes = [adminNotes, refundNote].filter(Boolean).join(' ');
+    if (adminNotes && !refundNote) update.adminNotes = adminNotes;
     if (status === 'replacement_dispatched') {
       update.replacementTrackingNumber =
         replacementTrackingNumber || `BD-EXC-${Math.floor(10000000 + Math.random() * 90000000)}IN`;
@@ -280,7 +298,23 @@ export class ReturnService {
       }
     }
 
+    void this.notifyCustomer(moved);
     return moved;
+  }
+
+  private async notifyCustomer(request: IReturnRequest): Promise<void> {
+    const order = await Order.findById(request.order).select('customerEmail orderNumber');
+    if (!order) return;
+    const copy: Partial<Record<ReturnStatus, [string, string]>> = {
+      approved: ['Request approved', 'We approved your request. A pickup will be scheduled shortly.'],
+      pickup_scheduled: ['Pickup scheduled', 'Our courier will collect the pair from your address. Please keep it in its original box.'],
+      inspected: ['Pair received and inspected', 'Your pair reached the workshop and passed inspection.'],
+      replacement_dispatched: ['Replacement on its way', 'Your replacement pair has been dispatched.'],
+      refund_processed: ['Refund issued', `₹${request.refundAmount ?? 0} has been refunded to your original payment method. Allow 5–7 working days.`],
+      rejected: ['Request declined', request.adminNotes || 'We could not approve this request.'],
+    };
+    const entry = copy[request.status];
+    if (entry) await emailService.returnUpdate(order.customerEmail, request, entry[0], entry[1]);
   }
 }
 

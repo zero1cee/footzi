@@ -11,6 +11,7 @@ import {
   deleteProductAdmin,
   toggleProductActiveAdmin,
   uploadProductImageAdmin,
+  refundCancelledOrderAdmin,
 } from '../controllers/adminController.js';
 import {
   getAllReturnsAdmin,
@@ -26,6 +27,7 @@ router.use(authenticate, requireAdmin);
 // Analytics & Orders
 router.get('/analytics', getDashboardAnalytics);
 router.get('/orders', getAllOrdersAdmin);
+router.post('/orders/:id/refund', refundCancelledOrderAdmin);
 
 // Inventory Control
 router.get('/inventory', getInventoryOverview);

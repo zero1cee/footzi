@@ -48,6 +48,7 @@ export interface IOrder extends Document {
   couponCode?: string;
   shippingFee: number;
   total: number;
+  refundedAmount: number;
   paymentStatus: PaymentStatus;
   paymentDetails?: {
     gatewayOrderId?: string;
@@ -116,6 +117,7 @@ const OrderSchema = new Schema<IOrder>(
     couponCode: { type: String },
     shippingFee: { type: Number, default: 0 },
     total: { type: Number, required: true, min: 0 },
+    refundedAmount: { type: Number, default: 0, min: 0 },
     paymentStatus: {
       type: String,
       enum: ['pending', 'paid', 'failed', 'refunded'],

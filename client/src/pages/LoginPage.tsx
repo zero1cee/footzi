@@ -117,9 +117,9 @@ export const LoginPage: React.FC = () => {
                 <label className="block text-[11px] uppercase tracking-wider font-semibold text-charcoal-700">
                   Password
                 </label>
-                <span className="text-[11px] text-sand-600 hover:text-sand-800 cursor-pointer">
-                  Forgot?
-                </span>
+                <Link to="/forgot-password" className="text-[11px] text-sand-600 hover:text-sand-800">
+                  Forgot password?
+                </Link>
               </div>
               <div className="relative">
                 <input

@@ -94,7 +94,16 @@ export const cancelOrder = async (req: AuthRequest, res: Response): Promise<void
     const { reason } = req.body;
     const cancelled = await orderService.cancelOrder(id, req.user.id, reason);
 
-    res.status(200).json({ message: 'Order cancelled and stock released', order: cancelled });
+    const refund = (cancelled as any).refund as { amount: number; pending: boolean } | undefined;
+    res.status(200).json({
+      message: refund
+        ? refund.pending
+          ? 'Order cancelled. Your refund is being processed by our team.'
+          : `Order cancelled. A refund of ₹${refund.amount} has been issued to your original payment method.`
+        : 'Order cancelled and stock released',
+      order: cancelled,
+      refund: refund ?? null,
+    });
   } catch (error: any) {
     res.status(400).json({ error: error.message });
   }

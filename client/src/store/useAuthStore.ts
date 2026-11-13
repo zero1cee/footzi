@@ -14,6 +14,11 @@ interface AuthState {
   loginAsDemo: (role?: 'patron' | 'admin') => Promise<boolean>;
   register: (name: string, email: string, password: string, phone?: string) => Promise<boolean>;
   addAddress: (address: SavedAddress) => Promise<boolean>;
+  updateProfile: (data: { name?: string; phone?: string }) => Promise<string | null>;
+  updateAddress: (id: string, address: Partial<SavedAddress>) => Promise<string | null>;
+  removeAddress: (id: string) => Promise<string | null>;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<string | null>;
+  resetPassword: (resetToken: string, newPassword: string) => Promise<string | null>;
   logout: () => void;
   checkAuth: () => Promise<void>;
   clearError: () => void;
@@ -125,6 +130,63 @@ export const useAuthStore = create<AuthState>()(
           }
           set({ error: err.message || 'Failed to save address' });
           return false;
+        }
+      },
+
+      // Account edits resolve to null on success or to a message the page can show
+      updateProfile: async (data) => {
+        const { token } = get();
+        if (!token) return 'Please sign in again.';
+        try {
+          set({ user: await authService.updateProfile(data, token) });
+          return null;
+        } catch (err: any) {
+          return err.message || 'Failed to update your profile';
+        }
+      },
+
+      updateAddress: async (id, address) => {
+        const { token } = get();
+        if (!token) return 'Please sign in again.';
+        try {
+          set({ user: await authService.updateAddress(id, address, token) });
+          return null;
+        } catch (err: any) {
+          return err.message || 'Failed to update the address';
+        }
+      },
+
+      removeAddress: async (id) => {
+        const { token } = get();
+        if (!token) return 'Please sign in again.';
+        try {
+          set({ user: await authService.deleteAddress(id, token) });
+          return null;
+        } catch (err: any) {
+          return err.message || 'Failed to remove the address';
+        }
+      },
+
+      changePassword: async (currentPassword, newPassword) => {
+        const { token } = get();
+        if (!token) return 'Please sign in again.';
+        try {
+          const res = await authService.changePassword(currentPassword, newPassword, token);
+          // The server voids older tokens, so keep this device signed in with the fresh one
+          set({ user: res.user, token: res.token, isAuthenticated: true });
+          return null;
+        } catch (err: any) {
+          return err.message || 'Failed to change your password';
+        }
+      },
+
+      resetPassword: async (resetToken, newPassword) => {
+        try {
+          const res = await authService.resetPassword(resetToken, newPassword);
+          set({ user: res.user, token: res.token, isAuthenticated: true, error: null });
+          return null;
+        } catch (err: any) {
+          return err.message || 'Could not reset your password';
         }
       },
 

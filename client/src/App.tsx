@@ -13,6 +13,9 @@ import { AccountPage } from '@/pages/AccountPage';
 import { AdminDashboardPage } from '@/pages/AdminDashboardPage';
 import { LoginPage } from '@/pages/LoginPage';
 import { RegisterPage } from '@/pages/RegisterPage';
+import { ForgotPasswordPage } from '@/pages/ForgotPasswordPage';
+import { ResetPasswordPage } from '@/pages/ResetPasswordPage';
+import { OrderDetailPage } from '@/pages/OrderDetailPage';
 import { WishlistPage } from '@/pages/WishlistPage';
 import { SizeGuidePage } from '@/pages/SizeGuidePage';
 import { LeatherCarePage } from '@/pages/LeatherCarePage';
@@ -39,6 +42,14 @@ export const App: React.FC = () => {
             <Route path="cart" element={<CartPage />} />
             <Route path="checkout" element={<CheckoutPage />} />
             <Route
+              path="account/orders/:id"
+              element={
+                <ProtectedRoute>
+                  <OrderDetailPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="account/*"
               element={
                 <ProtectedRoute>
@@ -51,6 +62,8 @@ export const App: React.FC = () => {
             <Route path="leather-care" element={<LeatherCarePage />} />
             <Route path="login" element={<LoginPage />} />
             <Route path="register" element={<RegisterPage />} />
+            <Route path="forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="reset-password" element={<ResetPasswordPage />} />
             <Route path="brand-story" element={<Navigate to="/#heritage" replace />} />
             <Route
               path="admin"

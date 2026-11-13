@@ -116,10 +116,10 @@ export const RegisterPage: React.FC = () => {
                 <input
                   type="password"
                   required
-                  minLength={6}
+                  minLength={8}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="At least 6 characters"
+                  placeholder="At least 8 characters"
                   className="w-full bg-ivory-50 border border-ivory-300 px-3 py-2 pl-9 text-xs text-charcoal-900 rounded-xs focus:outline-none focus:border-charcoal-900"
                 />
                 <Lock className="w-4 h-4 text-charcoal-400 absolute left-2.5 top-2.5" />

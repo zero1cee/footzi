@@ -10,7 +10,7 @@
 ![Express.js](https://img.shields.io/badge/Express.js-000000?style=for-the-badge&logo=express&logoColor=white)
 ![MongoDB](https://img.shields.io/badge/MongoDB-4EA94B?style=for-the-badge&logo=mongodb&logoColor=white)
 ![Razorpay](https://img.shields.io/badge/Razorpay_Sandbox-02042B?style=for-the-badge&logo=razorpay&logoColor=3395FF)
-![Vitest](https://img.shields.io/badge/Vitest-62_Tests_Passed-6E9F18?style=for-the-badge&logo=vitest&logoColor=white)
+![Vitest](https://img.shields.io/badge/Vitest-88_Tests_Passed-6E9F18?style=for-the-badge&logo=vitest&logoColor=white)
 
 <p align="center">
   <strong>Architectural footwear inspired by the generational leathercraft of Agra, engineered for modern Indian luxury.</strong>
@@ -234,6 +234,12 @@ For evaluation, three pre-configured accounts are seeded into MongoDB. The patro
 | `POST` | `/api/auth/register` | Public | Register new customer account |
 | `POST` | `/api/auth/login` | Public | Authenticate patron/admin and obtain JWT |
 | `GET` | `/api/auth/me` | Authenticated | Retrieve sanitized profile of logged-in user |
+| `PATCH` | `/api/auth/profile` | Authenticated | Edit name and mobile number |
+| `POST` | `/api/auth/addresses` | Authenticated | Save a delivery address (the first one becomes the default) |
+| `PUT` / `DELETE` | `/api/auth/addresses/:id` | Authenticated | Edit, make default, or remove one of your own addresses |
+| `POST` | `/api/auth/change-password` | Authenticated | Needs the current password; signs out every other device and returns a fresh token |
+| `POST` | `/api/auth/forgot-password` | Public | Emails a single-use link valid for 60 minutes. Always answers the same, so it never reveals which emails have accounts |
+| `POST` | `/api/auth/reset-password` | Public | Sets a new password from the emailed token, signs the user in, and voids older sessions |
 | `GET` | `/api/cart` | Authenticated | Fetch server-persisted shopping bag |
 | `POST` | `/api/cart/items` | Authenticated | Add variant to bag with stock check |
 | `PATCH` | `/api/cart/items/:id`| Authenticated | Update item quantity in bag |
@@ -245,7 +251,8 @@ For evaluation, three pre-configured accounts are seeded into MongoDB. The patro
 | :--- | :--- | :--- | :--- |
 | `POST` | `/api/orders` | Authenticated | Create customer order with server price calculation & stock hold |
 | `GET` | `/api/orders/my-orders` | Authenticated | View logged-in patron order history |
-| `POST` | `/api/orders/:id/cancel`| Authenticated | Cancel order and release reserved inventory |
+| `GET` | `/api/orders/:id` | Owner / Admin | Order with tracking events. Customers never see supplier costs or payment signatures |
+| `POST` | `/api/orders/:id/cancel`| Authenticated | Cancel an unpaid order, or a paid one before it ships (full refund, stock returned, workshop job cancelled) |
 | `POST` | `/api/payments/create-order`| Authenticated | Generate Razorpay gateway order in paise |
 | `POST` | `/api/payments/verify` | Authenticated | Verify HMAC-SHA256 signature and trigger dropship pipeline |
 
@@ -256,7 +263,7 @@ For evaluation, three pre-configured accounts are seeded into MongoDB. The patro
 | `GET` | `/api/returns/my-returns` | Authenticated | The patron's own requests |
 | `GET` | `/api/returns/:id` | Owner / Admin | One request |
 
-Requests move one step at a time (`requested → approved → pickup_scheduled → inspected → replacement_dispatched` or `refund_processed`, or `rejected` along the way). Finished pairs are restocked and held replacements are released on rejection. Recording a refund does not move money; that still needs Razorpay's refund API.
+Requests move one step at a time (`requested → approved → pickup_scheduled → inspected → replacement_dispatched` or `refund_processed`, or `rejected` along the way). Finished pairs are restocked and held replacements are released on rejection. Completing a return (`refund_processed`) refunds the customer through Razorpay before the request is closed. Each refund is tied to its return, so a retry can never pay twice, and a gateway failure leaves the request open for another attempt.
 
 ### Admin Operations
 | Method | Endpoint | Access | Description |
@@ -268,6 +275,7 @@ Requests move one step at a time (`requested → approved → pickup_scheduled �
 | `POST` | `/api/admin/supplier-orders/:id/fulfill` | Admin Only | Advance supplier fulfillment pipeline state |
 | `POST` | `/api/admin/products` | Admin Only | Handcraft and publish new footwear style |
 | `PATCH`| `/api/admin/products/:id/toggle-active` | Admin Only | Toggle product visibility in catalog |
+| `POST` | `/api/admin/orders/:id/refund` | Admin Only | Retry the refund of a cancelled paid order whose automatic refund failed (safe to repeat) |
 | `GET` | `/api/admin/returns` | Admin Only | View customer return/exchange requests |
 | `PATCH`| `/api/admin/returns/:id` | Admin Only | Approve return or dispatch replacement footwear |
 
@@ -311,15 +319,15 @@ Open **[http://localhost:5173](http://localhost:5173)** in your browser.
 
 ### 4. Running Automated Tests
 
-Footzi includes **62 automated unit and integration tests** ensuring test-driven reliability:
+Footzi includes **88 automated unit and integration tests** ensuring test-driven reliability:
 
 ```bash
-# Client Vitest Suite (14 tests: Cart calculations, coupon math, bag merge on sign-in, UI components, return service)
+# Client Vitest Suite (24 tests: Cart calculations, coupon math, bag merge on sign-in, password reset and order pages, UI components, return service)
 cd client
 npm test
 
-# Server Integration Suite (48 tests: Auth, Cart, Orders, Razorpay HMAC and webhook, Dropship Pipeline,
-# Returns, Reviews, Order expiry, Demo admin, Cloudinary, Inventory). Needs a seeded MongoDB; point
+# Server Integration Suite (64 tests: Auth, Cart, Orders, Razorpay HMAC and webhook, Dropship Pipeline,
+# Returns, Reviews, Order expiry, Demo admin, Password reset, Refunds, Email, Cloudinary, Inventory). Needs a seeded MongoDB; point
 # MONGODB_URI at a scratch database, because the tests create and delete orders.
 cd server
 npx vitest run
@@ -375,8 +383,11 @@ MONGODB_URI="<atlas connection string>" npm run seed:demo-admin
 | `NODE_ENV` | yes (`production`) | Enables fail-fast config checks and production logging |
 | `MONGODB_URI` | yes | Atlas connection string |
 | `JWT_SECRET` | yes | At least 32 random characters; the server refuses to start otherwise |
-| `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` | no | Real Razorpay keys. Unset = demo mode with the sandbox payment sheet |
+| `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` | no | Real Razorpay keys (use `rzp_test_...` to try it with test money). Unset = demo mode: the sandbox payment sheet, and refunds are simulated |
 | `RAZORPAY_WEBHOOK_SECRET` | with real keys | Webhook URL: `https://<service>.onrender.com/api/payments/webhook` |
+| `RESEND_API_KEY` | no | Sends order, shipping, refund and password-reset emails through [Resend](https://resend.com). Unset = emails are only written to the server log, so **password reset cannot reach customers** until this is set |
+| `EMAIL_FROM` | with Resend | Sender, e.g. `Footzi <orders@yourdomain.com>`. Resend's default sender can only mail your own address until you verify a domain |
+| `APP_URL` | no | Public site URL used in email links (defaults to Render's `RENDER_EXTERNAL_URL`) |
 | `CLOUDINARY_*` | no | Real image uploads; unset = uploads are simulated |
 | `CORS_ORIGIN` | no | Only if a separately hosted frontend calls this API |
 | `ORDER_EXPIRY_MINUTES` | no | Unpaid orders are cancelled and their stock released after this long (default 30) |

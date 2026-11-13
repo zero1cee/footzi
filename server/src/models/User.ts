@@ -21,6 +21,9 @@ export interface IUser extends Document {
   role: 'customer' | 'admin' | 'demo_admin';
   phone?: string;
   addresses: IUserAddress[];
+  passwordChangedAt?: Date;
+  resetTokenHash?: string;
+  resetTokenExpires?: Date;
   createdAt: Date;
   updatedAt: Date;
   comparePassword(candidatePassword: string): Promise<boolean>;
@@ -72,12 +75,19 @@ const UserSchema = new Schema<IUser>(
       trim: true,
     },
     addresses: [AddressSchema],
+    // Tokens issued before this moment are rejected, so a password change signs out other devices
+    passwordChangedAt: { type: Date },
+    // Only a SHA-256 hash of the emailed reset token is stored
+    resetTokenHash: { type: String, select: false },
+    resetTokenExpires: { type: Date, select: false },
   },
   {
     timestamps: true,
     toJSON: {
       transform(_doc, ret: Record<string, any>) {
         delete ret.passwordHash;
+        delete ret.resetTokenHash;
+        delete ret.resetTokenExpires;
         delete ret.__v;
         return ret;
       },

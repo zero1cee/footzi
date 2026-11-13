@@ -8,6 +8,7 @@ import { ReturnRequest } from '../models/ReturnRequest.js';
 import { supplierFulfillmentService } from '../services/supplierFulfillmentService.js';
 import { orderService } from '../services/orderService.js';
 import { productService } from '../services/productService.js';
+import { refundService } from '../services/refundService.js';
 import { cloudinaryService } from '../services/cloudinaryService.js';
 
 export const getDashboardAnalytics = async (_req: AuthRequest, res: Response): Promise<void> => {
@@ -226,5 +227,32 @@ export const uploadProductImageAdmin = async (req: AuthRequest, res: Response): 
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
+  }
+};
+
+/** Retries the refund for a cancelled order whose automatic refund failed. Safe to repeat. */
+export const refundCancelledOrderAdmin = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const order = await Order.findById(req.params.id);
+    if (!order) {
+      res.status(404).json({ error: 'Order not found' });
+      return;
+    }
+    if (order.orderStatus !== 'cancelled' || order.paymentStatus === 'pending') {
+      res.status(400).json({ error: 'Only cancelled orders that were paid can be refunded here.' });
+      return;
+    }
+
+    const result = await refundService.refundOrder({
+      orderId: order._id,
+      reference: `cancel:${order._id}`,
+      reason: `Cancelled order ${order.orderNumber}`,
+    });
+    res.status(200).json({
+      message: result.alreadyIssued ? 'This order was already refunded.' : `Refund of ₹${result.amount} issued.`,
+      refund: result,
+    });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
   }
 };

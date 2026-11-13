@@ -12,6 +12,7 @@ import {
   Truck,
   X,
   Plus,
+  UserCog,
 } from 'lucide-react';
 import { useCartStore } from '@/store/useCartStore';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -24,13 +25,15 @@ import { Button } from '@/components/ui/Button';
 import { orderService } from '@/services/orderService';
 import { returnService } from '@/services/returnService';
 import { ShoeSize } from '@/types';
+import { ProfileSettings } from '@/components/account/ProfileSettings';
 
-type AccountTab = 'orders' | 'wishlist' | 'addresses' | 'returns';
+type AccountTab = 'orders' | 'wishlist' | 'addresses' | 'returns' | 'profile';
 
 const resolveTabFromPath = (pathname: string): AccountTab => {
   if (pathname.includes('/returns')) return 'returns';
   if (pathname.includes('/wishlist')) return 'wishlist';
   if (pathname.includes('/addresses')) return 'addresses';
+  if (pathname.includes('/profile')) return 'profile';
   return 'orders';
 };
 
@@ -54,7 +57,7 @@ export const AccountPage: React.FC = () => {
   const location = useLocation();
   const [activeTab, setActiveTab] = useState<AccountTab>(() => resolveTabFromPath(location.pathname));
   const { wishlist } = useCartStore();
-  const { user, token, isAuthenticated, logout, addAddress } = useAuthStore();
+  const { user, token, isAuthenticated, logout, addAddress, updateAddress, removeAddress } = useAuthStore();
   const { data: catalogData } = useProducts({ limit: 100 });
 
   useEffect(() => {
@@ -88,6 +91,57 @@ export const AccountPage: React.FC = () => {
   });
   const [addrError, setAddrError] = useState<string | null>(null);
   const [isSavingAddr, setIsSavingAddr] = useState(false);
+  const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+  const emptyAddress = (isDefault = false) => ({
+    name: user?.name || '',
+    phone: user?.phone || '',
+    addressLine: '',
+    city: '',
+    state: '',
+    pincode: '',
+    isDefault,
+  });
+
+  const flash = (message: string) => {
+    setFeedback(message);
+    setTimeout(() => setFeedback(null), 4000);
+  };
+
+  const startEditingAddress = (addr: any) => {
+    setEditingAddressId(addr._id);
+    setAddrForm({
+      name: addr.name,
+      phone: addr.phone,
+      addressLine: addr.addressLine,
+      city: addr.city,
+      state: addr.state,
+      pincode: addr.pincode,
+      isDefault: Boolean(addr.isDefault),
+    });
+    setAddrError(null);
+    setIsAddAddressOpen(true);
+  };
+
+  const closeAddressForm = () => {
+    setIsAddAddressOpen(false);
+    setEditingAddressId(null);
+    setAddrError(null);
+  };
+
+  const handleDeleteAddress = async (id: string) => {
+    const failure = await removeAddress(id);
+    setConfirmDeleteId(null);
+    if (failure) setAddrError(failure);
+    else flash('Address removed.');
+  };
+
+  const handleMakeDefault = async (id: string) => {
+    const failure = await updateAddress(id, { isDefault: true });
+    if (failure) setAddrError(failure);
+    else flash('Default delivery address updated.');
+  };
 
   // Exchange/Return Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -163,25 +217,22 @@ export const AccountPage: React.FC = () => {
     setAddrError(null);
     setIsSavingAddr(true);
 
-    const ok = await addAddress(addrForm);
+    let failure: string | null = null;
+    if (editingAddressId) {
+      failure = await updateAddress(editingAddressId, addrForm);
+    } else if (!(await addAddress(addrForm))) {
+      failure = useAuthStore.getState().error || 'Please check address fields (10-digit phone & 6-digit PIN code).';
+    }
     setIsSavingAddr(false);
 
-    if (ok) {
-      setIsAddAddressOpen(false);
-      setAddrForm({
-        name: user?.name || '',
-        phone: user?.phone || '',
-        addressLine: '',
-        city: '',
-        state: '',
-        pincode: '',
-        isDefault: false,
-      });
-      setFeedback('Delivery address saved to your Footzi profile.');
-      setTimeout(() => setFeedback(null), 4000);
-    } else {
-      setAddrError(useAuthStore.getState().error || 'Please check address fields (10-digit phone & 6-digit PIN code).');
+    if (failure) {
+      setAddrError(failure);
+      return;
     }
+    const wasEditing = Boolean(editingAddressId);
+    closeAddressForm();
+    setAddrForm(emptyAddress());
+    flash(wasEditing ? 'Address updated.' : 'Delivery address saved to your Footzi profile.');
   };
 
   const modalItem = selectedOrder?.items?.[selectedItemIdx] ?? selectedOrder?.items?.[0];
@@ -261,7 +312,8 @@ export const AccountPage: React.FC = () => {
                 </Badge>
               </div>
               <p className="text-xs text-charcoal-500 mt-0.5">
-                {user?.email || 'patron@footzi.in'} • {user?.phone || '+91 98765 43210'}
+                {user?.email}
+                {user?.phone ? ` • ${user.phone}` : ''}
               </p>
             </div>
           </div>
@@ -350,6 +402,17 @@ export const AccountPage: React.FC = () => {
           >
             <MapPin className="w-4 h-4" /> Saved Addresses ({user?.addresses?.length || 0})
           </button>
+
+          <button
+            onClick={() => handleTabChange('profile')}
+            className={`pb-3 px-4 text-xs uppercase tracking-wider font-semibold transition-all border-b-2 flex items-center gap-2 whitespace-nowrap ${
+              activeTab === 'profile'
+                ? 'border-charcoal-900 text-charcoal-950'
+                : 'border-transparent text-charcoal-500 hover:text-charcoal-800'
+            }`}
+          >
+            <UserCog className="w-4 h-4" /> Profile & Security
+          </button>
         </div>
 
         {/* Tab 1: Orders */}
@@ -393,6 +456,14 @@ export const AccountPage: React.FC = () => {
                         <span className="font-serif text-sm font-semibold text-charcoal-900">
                           {formatINR(order.total)}
                         </span>
+                        {order._id && !String(order._id).startsWith('ord_fallback') && (
+                          <Link
+                            to={`/account/orders/${order._id}`}
+                            className="text-[11px] font-semibold text-sand-700 hover:text-sand-900 underline"
+                          >
+                            View details
+                          </Link>
+                        )}
                       </div>
                     </div>
 
@@ -572,6 +643,9 @@ export const AccountPage: React.FC = () => {
           </div>
         )}
 
+        {/* Tab 5: Profile & Security */}
+        {activeTab === 'profile' && <ProfileSettings />}
+
         {/* Tab 4: Addresses */}
         {activeTab === 'addresses' && (
           <div className="space-y-6">
@@ -583,12 +657,14 @@ export const AccountPage: React.FC = () => {
                 variant="primary"
                 size="sm"
                 onClick={() => {
-                  setAddrForm((prev) => ({
-                    ...prev,
-                    name: prev.name || user?.name || '',
-                    phone: prev.phone || user?.phone || '',
-                  }));
-                  setIsAddAddressOpen(!isAddAddressOpen);
+                  if (isAddAddressOpen && !editingAddressId) {
+                    closeAddressForm();
+                    return;
+                  }
+                  setEditingAddressId(null);
+                  setAddrError(null);
+                  setAddrForm(emptyAddress((user?.addresses?.length ?? 0) === 0));
+                  setIsAddAddressOpen(true);
                 }}
                 className="gap-1.5 text-xs"
               >
@@ -602,7 +678,7 @@ export const AccountPage: React.FC = () => {
                 className="bg-white p-6 rounded-xs border border-ivory-300 shadow-sm space-y-4 text-xs animate-fade-in"
               >
                 <h3 className="font-serif text-lg font-medium text-charcoal-950 border-b border-ivory-200 pb-2">
-                  New Delivery Destination
+                  {editingAddressId ? 'Edit Delivery Destination' : 'New Delivery Destination'}
                 </h3>
 
                 {addrError && (
@@ -692,11 +768,11 @@ export const AccountPage: React.FC = () => {
                 </label>
 
                 <div className="flex justify-end gap-2 pt-2">
-                  <Button type="button" variant="outline" size="sm" onClick={() => setIsAddAddressOpen(false)}>
+                  <Button type="button" variant="outline" size="sm" onClick={closeAddressForm}>
                     Cancel
                   </Button>
                   <Button type="submit" variant="primary" size="sm" isLoading={isSavingAddr}>
-                    Save Address
+                    {editingAddressId ? 'Save Changes' : 'Save Address'}
                   </Button>
                 </div>
               </form>
@@ -735,6 +811,30 @@ export const AccountPage: React.FC = () => {
                       India
                     </p>
                     <p className="text-xs text-charcoal-500 mt-2">Mobile: {addr.phone}</p>
+
+                    {addr._id && (
+                      <div className="mt-4 pt-3 border-t border-ivory-200 flex flex-wrap items-center gap-3 text-[11px] font-semibold">
+                        <button onClick={() => startEditingAddress(addr)} className="text-charcoal-800 hover:text-sand-700 underline">
+                          Edit
+                        </button>
+                        {!addr.isDefault && (
+                          <button onClick={() => handleMakeDefault(addr._id!)} className="text-charcoal-800 hover:text-sand-700 underline">
+                            Make default
+                          </button>
+                        )}
+                        {confirmDeleteId === addr._id ? (
+                          <span className="flex items-center gap-2 text-red-700">
+                            Remove this address?
+                            <button onClick={() => handleDeleteAddress(addr._id!)} className="underline">Yes, remove</button>
+                            <button onClick={() => setConfirmDeleteId(null)} className="text-charcoal-600 underline">Keep</button>
+                          </span>
+                        ) : (
+                          <button onClick={() => setConfirmDeleteId(addr._id!)} className="text-red-700 hover:text-red-800 underline">
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

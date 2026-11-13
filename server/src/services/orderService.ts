@@ -1,8 +1,13 @@
+import mongoose from 'mongoose';
 import { Order, IOrder, IOrderItemSnapshot, IShippingAddressSnapshot } from '../models/Order.js';
 import { Product } from '../models/Product.js';
 import { Inventory, IInventory } from '../models/Inventory.js';
 import { Cart } from '../models/Cart.js';
+import { SupplierOrder } from '../models/SupplierOrder.js';
 import { escapeRegex } from './productService.js';
+import { refundService } from './refundService.js';
+import { emailService } from './emailService.js';
+import { restock } from './returnService.js';
 
 export interface CreateOrderDTO {
   userId: string;
@@ -163,7 +168,7 @@ export class OrderService {
   }
 
   async getUserOrders(userId: string): Promise<any[]> {
-    return Order.find({ user: userId }).sort({ createdAt: -1 }).lean();
+    return Order.find({ user: userId }).select('-paymentDetails.gatewaySignature').sort({ createdAt: -1 }).lean();
   }
 
   async getOrderById(orderId: string, userId?: string): Promise<any | null> {
@@ -171,7 +176,15 @@ export class OrderService {
     if (userId) {
       query.user = userId;
     }
-    return Order.findOne(query).populate('supplierOrderId').lean();
+    if (!mongoose.isValidObjectId(orderId)) return null;
+
+    // Customers see tracking only: the supplier's wholesale costs and margins stay internal
+    const supplierFields = userId ? 'status trackingNumber carrier shipmentEvents shippedAt deliveredAt' : undefined;
+    const order = await Order.findOne(query).populate('supplierOrderId', supplierFields).lean();
+    if (order && userId && order.paymentDetails) {
+      delete (order.paymentDetails as any).gatewaySignature;
+    }
+    return order;
   }
 
   /**
@@ -204,16 +217,15 @@ export class OrderService {
     return order;
   }
 
-  async cancelOrder(orderId: string, userId: string, reason?: string): Promise<IOrder> {
+  async cancelOrder(orderId: string, userId: string, reason?: string): Promise<IOrder & { refund?: { amount: number; pending: boolean } }> {
     const order = await Order.findOne({ _id: orderId, user: userId });
     if (!order) {
       throw new Error('Order not found.');
     }
 
-    // A paid order has already had its stock deducted and money captured; undoing
-    // that needs a refund, which goes through the returns workflow instead.
+    // Paid orders can be cancelled until they ship, with a full refund
     if (order.paymentStatus === 'paid') {
-      throw new Error('A paid order cannot be cancelled here. Please request a return instead.');
+      return this.cancelPaidOrder(order._id, userId, reason);
     }
 
     const cancelled = await this.cancelUnpaidOrder(
@@ -226,6 +238,59 @@ export class OrderService {
       throw new Error(`Order in '${current?.orderStatus ?? order.orderStatus}' state cannot be cancelled.`);
     }
     return cancelled;
+  }
+
+  /**
+   * Cancels a paid order that has not shipped yet: one atomic claim, then the pairs
+   * go back on the shelf, the workshop job is cancelled and the money is refunded.
+   * If the gateway refuses the refund the order stays cancelled (the stock is already
+   * back) and is flagged for an admin to retry, rather than leaving a half-done state.
+   */
+  private async cancelPaidOrder(orderId: unknown, userId: string, reason?: string) {
+    const note = reason || 'Customer cancelled before dispatch.';
+    const order = await Order.findOneAndUpdate(
+      { _id: orderId, user: userId, paymentStatus: 'paid', orderStatus: { $in: ['confirmed', 'processing'] } },
+      { $set: { orderStatus: 'cancelled' }, $push: { statusHistory: { status: 'cancelled', timestamp: new Date(), note } } },
+      { new: true }
+    );
+    if (!order) {
+      const current = await Order.findById(orderId);
+      throw new Error(
+        `Order in '${current?.orderStatus}' state can no longer be cancelled. Once an order has shipped, request a return after delivery.`
+      );
+    }
+
+    for (const item of order.items) {
+      await restock(item.sku, item.quantity);
+    }
+    await SupplierOrder.updateOne(
+      { customerOrder: order._id, status: { $nin: ['shipped', 'delivered', 'cancelled'] } },
+      {
+        $set: { status: 'cancelled' },
+        $push: { shipmentEvents: { timestamp: new Date(), status: 'CANCELLED', location: 'Footzi Central Atelier, Agra', note: 'Cancelled by the customer before dispatch.' } },
+      }
+    );
+
+    let refund = { amount: 0, pending: false };
+    try {
+      const result = await refundService.refundOrder({
+        orderId: order._id,
+        reference: `cancel:${order._id}`,
+        reason: `Cancelled order ${order.orderNumber}`,
+        notify: false,
+      });
+      refund = { amount: result.amount, pending: false };
+    } catch (error: any) {
+      refund = { amount: 0, pending: true };
+      await Order.updateOne(
+        { _id: order._id },
+        { $push: { statusHistory: { status: 'cancelled', timestamp: new Date(), note: `Refund could not be issued automatically (${error.message}). Awaiting manual retry.` } } }
+      );
+    }
+
+    const fresh = (await Order.findById(order._id))!;
+    void emailService.orderCancelled(fresh, refund.amount);
+    return Object.assign(fresh, { refund });
   }
 
   /**

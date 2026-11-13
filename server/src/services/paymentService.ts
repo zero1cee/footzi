@@ -6,6 +6,8 @@ import { Inventory } from '../models/Inventory.js';
 import { Product } from '../models/Product.js';
 import { SupplierOrder } from '../models/SupplierOrder.js';
 import { supplierFulfillmentService } from './supplierFulfillmentService.js';
+import { refundService } from './refundService.js';
+import { emailService } from './emailService.js';
 
 // Demo mode = the server is running on the placeholder Razorpay credentials.
 const isDemoMode = (): boolean =>
@@ -118,10 +120,6 @@ export class PaymentService {
       return this.alreadyPaidResult(order);
     }
 
-    if (order.orderStatus !== 'pending_payment') {
-      throw new Error(`Order in '${order.orderStatus}' state cannot be paid for.`);
-    }
-
     // Compute HMAC SHA256 signature
     const generatedSignature = crypto
       .createHmac('sha256', RAZORPAY_CONFIG.key_secret)
@@ -134,6 +132,15 @@ export class PaymentService {
     const isSignatureValid =
       safeEqual(generatedSignature, razorpaySignature) ||
       (isDemoMode() && razorpaySignature === 'mock_valid_signature_test_mode');
+
+    if (order.orderStatus !== 'pending_payment') {
+      // A genuine payment for an order that expired or was cancelled meanwhile: the
+      // customer was charged for nothing, so it is refunded rather than just rejected.
+      if (isSignatureValid && order.orderStatus === 'cancelled') {
+        return this.rejectLatePayment(payment, razorpayPaymentId);
+      }
+      throw new Error(`Order in '${order.orderStatus}' state cannot be paid for.`);
+    }
 
     if (!isSignatureValid) {
       payment.status = 'failed';
@@ -170,13 +177,7 @@ export class PaymentService {
     }
     if (outcome.status === 'not_payable') {
       // The order expired or was cancelled while the customer was paying
-      payment.status = 'captured';
-      payment.gatewayPaymentId = razorpayPaymentId;
-      payment.failureReason = 'Payment received after the order was cancelled; refund required';
-      await payment.save();
-      throw new Error(
-        'This order expired before the payment completed. If you were charged, the amount will be refunded.'
-      );
+      return this.rejectLatePayment(payment, razorpayPaymentId);
     }
 
     return {
@@ -264,7 +265,37 @@ export class PaymentService {
       await fresh.save();
     }
 
+    void emailService.orderConfirmed(fresh);
     return { status: 'fulfilled', order: fresh, supplierOrder };
+  }
+
+  /**
+   * A genuine payment arrived for an order that had already expired or been
+   * cancelled. The customer was charged for nothing, so the money goes straight back.
+   */
+  private async rejectLatePayment(payment: any, gatewayPaymentId: string): Promise<never> {
+    payment.status = 'captured';
+    payment.gatewayPaymentId = gatewayPaymentId;
+    await payment.save();
+    const outcome = await this.refundLatePayment(payment);
+    await Payment.updateOne({ _id: payment._id }, { $set: { failureReason: outcome } });
+    throw new Error(
+      'This order expired before the payment completed. Your payment is being refunded to your original payment method.'
+    );
+  }
+
+  private async refundLatePayment(payment: any): Promise<string> {
+    try {
+      await refundService.refundOrder({
+        orderId: payment.order,
+        reference: `late-payment:${payment._id}`,
+        reason: `Payment received after order ${payment.orderNumber} expired`,
+      });
+      return 'Payment received after the order was cancelled; refunded automatically';
+    } catch (error: any) {
+      console.error(`[Footzi Payment] Auto-refund failed for ${payment.orderNumber}: ${error.message}`);
+      return 'Payment received after the order was cancelled; automatic refund failed, refund required';
+    }
   }
 
   private async alreadyPaidResult(order: any) {
@@ -331,8 +362,10 @@ export class PaymentService {
           );
           if (outcome.status === 'not_payable') {
             payment.status = 'captured';
-            payment.failureReason = 'Payment received after the order was cancelled; refund required';
-            console.error(`[Razorpay Webhook] Payment for cancelled order ${order.orderNumber} needs a refund`);
+            payment.gatewayPaymentId = paymentEntity.id;
+            await payment.save();
+            payment.failureReason = await this.refundLatePayment(payment);
+            console.error(`[Razorpay Webhook] Payment for cancelled order ${order.orderNumber}: ${payment.failureReason}`);
           }
         }
       } else {

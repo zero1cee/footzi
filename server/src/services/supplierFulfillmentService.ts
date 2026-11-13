@@ -1,3 +1,4 @@
+import { emailService } from './emailService.js';
 import { IOrder, Order } from '../models/Order.js';
 import { Supplier } from '../models/Supplier.js';
 import { SupplierOrder, ISupplierOrder, SupplierOrderStatus } from '../models/SupplierOrder.js';
@@ -61,7 +62,7 @@ export class SupplierFulfillmentService {
           note: `Customer order ${customerOrder.orderNumber} successfully received and verified.`,
         },
         {
-          timestamp: new Date(Date.now() + 1000 * 60 * 15),
+          timestamp: new Date(),
           status: 'Supplier Accepted',
           location: 'Agra Master Artisan Guild Workshop',
           note: 'Master shoemaker accepted build order and allocated certified leather stock.',
@@ -137,6 +138,9 @@ export class SupplierFulfillmentService {
         note: `[Supplier Update] ${defaultNote}`,
       });
       await customerOrder.save();
+
+      if (nextStatus === 'shipped') void emailService.orderShipped(customerOrder);
+      if (nextStatus === 'delivered') void emailService.orderDelivered(customerOrder);
     }
 
     return supplierOrder;
