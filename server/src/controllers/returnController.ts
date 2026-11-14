@@ -2,7 +2,7 @@ import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth.js';
 import { z } from 'zod';
 import { returnService, RETURN_REASONS } from '../services/returnService.js';
-import { isAdminRole } from '../middleware/auth.js';
+import { isAdminRole, forViewer } from '../middleware/auth.js';
 
 const SHOE_SIZES = ['UK 6', 'UK 7', 'UK 8', 'UK 9', 'UK 10', 'UK 11'] as const;
 
@@ -61,7 +61,7 @@ export const getMyReturns = async (req: AuthRequest, res: Response): Promise<voi
   try {
     const userId = req.user!._id.toString();
     const requests = await returnService.getUserReturns(userId);
-    res.status(200).json(requests);
+    res.status(200).json(forViewer(req.user, requests));
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -86,7 +86,7 @@ export const getReturnById = async (req: AuthRequest, res: Response): Promise<vo
       return;
     }
 
-    res.status(200).json(request);
+    res.status(200).json(forViewer(req.user, request));
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

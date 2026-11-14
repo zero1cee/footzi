@@ -1,7 +1,7 @@
 import { Response } from 'express';
 import { orderService } from '../services/orderService.js';
 import { orderAccessToken } from '../services/orderAccess.js';
-import { AuthRequest, isAdminRole } from '../middleware/auth.js';
+import { AuthRequest, isAdminRole, forViewer } from '../middleware/auth.js';
 import { z } from 'zod';
 
 const createOrderSchema = z.object({
@@ -113,7 +113,7 @@ export const getMyOrders = async (req: AuthRequest, res: Response): Promise<void
     }
 
     const orders = await orderService.getUserOrders(req.user.id);
-    res.status(200).json(orders);
+    res.status(200).json(forViewer(req.user, orders));
   } catch (error: any) {
     res.status(500).json({ error: 'Failed to retrieve orders', message: error.message });
   }
@@ -130,7 +130,7 @@ export const getOrderById = async (req: AuthRequest, res: Response): Promise<voi
       return;
     }
 
-    res.status(200).json(order);
+    res.status(200).json(forViewer(req.user, order));
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -149,7 +149,7 @@ export const cancelOrder = async (req: AuthRequest, res: Response): Promise<void
           ? 'Order cancelled. Your refund is being processed by our team.'
           : `Order cancelled. A refund of ₹${refund.amount} has been issued to your original payment method.`
         : 'Order cancelled and stock released',
-      order: cancelled,
+      order: forViewer(req.user, cancelled),
       refund: refund ?? null,
     });
   } catch (error: any) {

@@ -4,7 +4,8 @@ import { User, IUser, IUserAddress } from '../models/User.js';
 import { emailService } from './emailService.js';
 
 // Shared public demo logins: anyone may use them, so nobody may change their credentials
-export const DEMO_ACCOUNT_EMAILS = new Set(['patron@footzi.in', 'demo-admin@footzi.in']);
+import { DEMO_ACCOUNT_EMAILS } from '../config/demo.js';
+export { DEMO_ACCOUNT_EMAILS };
 
 const RESET_TOKEN_MINUTES = 60;
 const hashToken = (token: string): string => crypto.createHash('sha256').update(token).digest('hex');
@@ -67,6 +68,9 @@ export class AuthService {
   async addAddress(userId: string, address: IUserAddress): Promise<IUser | null> {
     const user = await User.findById(userId);
     if (!user) return null;
+    if (DEMO_ACCOUNT_EMAILS.has(user.email)) {
+      throw new AuthError('Demo accounts are shared, so addresses cannot be saved to them. Create your own account to save addresses.');
+    }
 
     if (address.isDefault) {
       user.addresses.forEach((addr) => {
@@ -97,6 +101,7 @@ export class AuthService {
   async updateAddress(userId: string, addressId: string, data: Partial<IUserAddress>): Promise<IUser | null> {
     const user = await User.findById(userId);
     if (!user) return null;
+    if (DEMO_ACCOUNT_EMAILS.has(user.email)) throw new AuthError('Demo accounts are shared, so their addresses cannot be changed.');
     const address = user.addresses.find((a) => a._id?.toString() === addressId);
     if (!address) throw new AuthError('Address not found.');
 
@@ -114,6 +119,7 @@ export class AuthService {
   async deleteAddress(userId: string, addressId: string): Promise<IUser | null> {
     const user = await User.findById(userId);
     if (!user) return null;
+    if (DEMO_ACCOUNT_EMAILS.has(user.email)) throw new AuthError('Demo accounts are shared, so their addresses cannot be changed.');
     const index = user.addresses.findIndex((a) => a._id?.toString() === addressId);
     if (index === -1) throw new AuthError('Address not found.');
 

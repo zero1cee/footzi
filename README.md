@@ -10,7 +10,7 @@
 ![Express.js](https://img.shields.io/badge/Express.js-000000?style=for-the-badge&logo=express&logoColor=white)
 ![MongoDB](https://img.shields.io/badge/MongoDB-4EA94B?style=for-the-badge&logo=mongodb&logoColor=white)
 ![Razorpay](https://img.shields.io/badge/Razorpay_Sandbox-02042B?style=for-the-badge&logo=razorpay&logoColor=3395FF)
-![Vitest](https://img.shields.io/badge/Vitest-275_Tests_Passed-6E9F18?style=for-the-badge&logo=vitest&logoColor=white)
+![Vitest](https://img.shields.io/badge/Vitest-279_Tests_Passed-6E9F18?style=for-the-badge&logo=vitest&logoColor=white)
 [![CI](https://github.com/zero1cee/footzi/actions/workflows/ci.yml/badge.svg)](https://github.com/zero1cee/footzi/actions/workflows/ci.yml)
 
 <p align="center">
@@ -214,7 +214,7 @@ For evaluation, three pre-configured accounts are seeded into MongoDB. The patro
 | **Demo Admin (read-only)** | `demo-admin@footzi.in` | `Footzi@2026` | Browse the whole operations deck. Every change is refused and customer contact details are masked |
 | **Admin (Operations)** | `admin@footzi.in` | `Footzi@2026` locally; the `SEED_ADMIN_PASSWORD` you set on a deployment | Full control: fulfillment pipeline, returns, catalog creator, inventory adjustment |
 
-Passwords and profiles of the two shared demo accounts (`patron@footzi.in`, `demo-admin@footzi.in`) cannot be changed, so nobody can lock others out.
+The two shared demo accounts (`patron@footzi.in`, `demo-admin@footzi.in`) are public, so they are locked down: their password, profile and saved addresses cannot be changed, and every order or return they view has names, emails, phone numbers and street addresses masked. A visitor who places a test order as the demo patron therefore never leaves their details for the next visitor to read. For a real test purchase, check out as a guest or use your own account.
 
 ---
 
@@ -361,14 +361,14 @@ Open **[http://localhost:5173](http://localhost:5173)** in your browser.
 
 ### 4. Running Automated Tests
 
-Footzi includes **275 automated unit and integration tests** ensuring test-driven reliability:
+Footzi includes **279 automated unit and integration tests** ensuring test-driven reliability:
 
 ```bash
 # Client Vitest Suite (115 tests: Cart and server-checked coupons, bag merge on sign-in, password reset and order pages, admin panels, page titles and meta tags, dialog keyboard behaviour, automated accessibility checks with axe, browser error reporting, wishlist sync, search suggestions, receipts, recently viewed, guest checkout, back-in-stock form, admin sales and customers, UI components, return service)
 cd client
 npm test
 
-# Server Integration Suite (160 tests: Auth, Cart, Orders, Razorpay HMAC and webhook, Dropship Pipeline,
+# Server Integration Suite (164 tests: Auth, Cart, Orders, Razorpay HMAC and webhook, Dropship Pipeline,
 # Returns, Reviews, Order expiry, Demo admin, Password reset, Refunds, Email providers, Coupons, Product editing, Workshop pipeline, SEO (page tags, sitemap, robots), Monitoring (health checks, request ids, error responses), Wishlist, Search suggestions, Guest checkout, Back-in-stock alerts, Admin reports and exports, Cloudinary, Inventory). Needs a seeded MongoDB; point
 # MONGODB_URI at a scratch database, because the tests create and delete orders.
 cd server

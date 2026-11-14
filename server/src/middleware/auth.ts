@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { User, IUser } from '../models/User.js';
 import { getJwtSecret } from '../config/env.js';
+import { isSharedDemoAccount } from '../config/demo.js';
 
 // Extend Express Request interface to include authenticated user
 export interface AuthRequest extends Request {
@@ -109,6 +110,13 @@ const maskDeep = (node: any, parentKey = ''): any => {
   }
   return node;
 };
+
+/** Hides names, emails, phones and street addresses in anything shown to a shared demo account. */
+export const maskPersonalData = <T>(body: T): T => maskDeep(JSON.parse(JSON.stringify(body)));
+
+/** Returns the response unchanged for real customers and staff, masked for the public demo accounts. */
+export const forViewer = <T>(user: { email?: string; role?: string } | undefined | null, body: T): T =>
+  isSharedDemoAccount(user) ? maskPersonalData(body) : body;
 
 export const requireAdmin = (req: AuthRequest, res: Response, next: NextFunction): void => {
   if (!req.user) {
