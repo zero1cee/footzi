@@ -41,6 +41,12 @@ export const createApp = (): Express => {
   // Security & Utility Middlewares
   app.use(
     helmet({
+      // Razorpay opens its bank / UPI / card-authentication pages in a popup and talks back to the page that
+      // opened it. Helmet's default (same-origin) cuts that link, so the popup is blank and the payment fails.
+      // same-origin-allow-popups keeps every other protection and lets payment popups reconnect.
+      crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' },
+      // Sends only our origin (never a full URL) to other sites, which payment providers expect to see
+      referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
       contentSecurityPolicy: {
         directives: {
           defaultSrc: ["'self'"],

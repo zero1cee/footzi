@@ -40,6 +40,20 @@ describe('monitoring and safe failures', () => {
     });
   });
 
+  describe('security headers that payments depend on', () => {
+    it('lets the Razorpay popup reconnect to the page, and still protects it', async () => {
+      const res = await request(app).get('/api/health');
+      // "same-origin" (the Helmet default) leaves the payment popup blank and the payment failed
+      expect(res.headers['cross-origin-opener-policy']).toBe('same-origin-allow-popups');
+      expect(res.headers['referrer-policy']).toBe('strict-origin-when-cross-origin');
+      // The rest of the protection is untouched
+      expect(res.headers['content-security-policy']).toContain("frame-src https://api.razorpay.com https://checkout.razorpay.com");
+      expect(res.headers['content-security-policy']).toContain("script-src 'self' https://checkout.razorpay.com");
+      expect(res.headers['x-content-type-options']).toBe('nosniff');
+      expect(res.headers['strict-transport-security']).toBeDefined();
+    });
+  });
+
   describe('request ids', () => {
     it('gives every response an id', async () => {
       const res = await request(app).get('/api/health');
