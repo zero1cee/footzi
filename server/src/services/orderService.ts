@@ -7,6 +7,7 @@ import { SupplierOrder } from '../models/SupplierOrder.js';
 import { escapeRegex } from './productService.js';
 import { refundService } from './refundService.js';
 import { couponService } from './couponService.js';
+import { settingsService, shippingFor } from './settingsService.js';
 import { emailService } from './emailService.js';
 import { restock } from './returnService.js';
 import { OrderActor, orderFilterFor, ownerFilter } from './orderAccess.js';
@@ -158,8 +159,8 @@ export class OrderService {
       cleanCoupon = check.coupon.code;
     }
 
-    // 3. Shipping Fee (Complimentary for >= ₹1,999)
-    const shippingFee = subtotal >= 1999 ? 0 : 149;
+    // 3. Shipping fee, from the shop's settings (free at or above the threshold)
+    const shippingFee = shippingFor(subtotal, await settingsService.get());
     const total = Math.max(0, subtotal - discount + shippingFee);
 
     // 4. Create Order document
@@ -354,7 +355,8 @@ export class OrderService {
    * abandoned checkout cannot hold stock forever. Safe to run from several
    * instances at once.
    */
-  async expireStaleOrders(maxAgeMinutes = Number(process.env.ORDER_EXPIRY_MINUTES) || 30): Promise<number> {
+  async expireStaleOrders(maxAgeInput?: number): Promise<number> {
+    const maxAgeMinutes = maxAgeInput ?? (await settingsService.get()).orderExpiryMinutes;
     const cutoff = new Date(Date.now() - maxAgeMinutes * 60 * 1000);
     const stale = await Order.find({
       orderStatus: 'pending_payment',

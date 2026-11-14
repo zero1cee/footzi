@@ -19,6 +19,7 @@ import {
   Receipt,
   BarChart3,
   Users,
+  Settings,
 } from 'lucide-react';
 import { formatINR } from '@/lib/utils';
 import { Badge } from '@/components/ui/Badge';
@@ -31,6 +32,7 @@ import { OrdersPanel } from '@/components/admin/OrdersPanel';
 import { CouponsPanel } from '@/components/admin/CouponsPanel';
 import { SalesPanel } from '@/components/admin/SalesPanel';
 import { CustomersPanel } from '@/components/admin/CustomersPanel';
+import { SettingsPanel } from '@/components/admin/SettingsPanel';
 import { ProductEditor } from '@/components/admin/ProductEditor';
 import { useDocumentMeta } from '@/hooks/useDocumentMeta';
 
@@ -60,7 +62,7 @@ export const AdminDashboardPage: React.FC = () => {
   const activeToken = token || '';
 
   const [activeTab, setActiveTab] = useState<
-    'overview' | 'sales' | 'orders' | 'customers' | 'suppliers' | 'products' | 'coupons' | 'returns' | 'inventory'
+    'overview' | 'sales' | 'orders' | 'customers' | 'suppliers' | 'products' | 'coupons' | 'returns' | 'inventory' | 'settings'
   >('overview');
   const [editingProduct, setEditingProduct] = useState<any | null>(null);
   const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null);
@@ -88,16 +90,7 @@ export const AdminDashboardPage: React.FC = () => {
 
   // Product Management State
   const [productsList, setProductsList] = useState<any[]>(MOCK_PRODUCTS);
-  const [isAddProductOpen, setIsAddProductOpen] = useState(false);
-  const [newProductName, setNewProductName] = useState('');
-  const [newProductCategory, setNewProductCategory] = useState<'Loafers' | 'Sneakers' | 'Oxfords' | 'Boots' | 'Slip-ons'>('Loafers');
-  const [newProductPrice, setNewProductPrice] = useState(3999);
-  const [newProductOriginalPrice, setNewProductOriginalPrice] = useState(5999);
-  const [newProductImageUrl, setNewProductImageUrl] = useState('https://images.unsplash.com/photo-1614252235316-8c857d38b5f4?auto=format&fit=crop&w=800&q=80');
-  const [newProductMaterial, setNewProductMaterial] = useState('Full-Grain Agra Calfskin');
-  const [newProductSole, setNewProductSole] = useState('Hand-stitched Argentine Leather Sole');
-  const [newProductDescription, setNewProductDescription] = useState('Artisanal silhouette handcrafted by generational Agra craftsmen with subtle Mughal archway contours.');
-  const [newProductStock, setNewProductStock] = useState(12);
+  const [isCreatingProduct, setIsCreatingProduct] = useState(false);
 
   // Stock edit state
   const [editingSku, setEditingSku] = useState<string | null>(null);
@@ -217,53 +210,6 @@ export const AdminDashboardPage: React.FC = () => {
     }
   };
 
-  const handleAddNewProduct = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newProductName) return;
-
-    const discountPercent = Math.round(
-      ((newProductOriginalPrice - newProductPrice) / newProductOriginalPrice) * 100
-    );
-
-    const baseSku = `FTZ-${newProductName.replace(/[^a-z0-9]/gi, '').slice(0, 3).toUpperCase().padEnd(3, 'X')}-${Date.now().toString(36).toUpperCase()}-UK8`;
-
-    const productPayload = {
-      name: newProductName,
-      category: newProductCategory,
-      description: newProductDescription,
-      price: newProductPrice,
-      originalPrice: newProductOriginalPrice,
-      discountPercent,
-      images: [newProductImageUrl],
-      colors: [{ name: 'Onyx Noir', hex: '#1C1C1C', imageIndex: 0 }],
-      sizes: ['UK 7', 'UK 8', 'UK 9', 'UK 10'],
-      variants: [
-        {
-          sku: baseSku,
-          size: 'UK 8',
-          color: 'Onyx Noir',
-          colorHex: '#1C1C1C',
-          stock: newProductStock,
-          supplierRef: 'SUP-AGR-01',
-        },
-      ],
-      material: newProductMaterial,
-      sole: newProductSole,
-      craftsmanshipLocation: 'Handcrafted in Agra, Uttar Pradesh',
-      features: ['Blake Stitched Construction', 'Hand-buffed Agra finish', 'Comfort Ergonomic Insole'],
-    };
-
-    try {
-      const res = await adminService.createProduct(productPayload, activeToken);
-      setProductsList((prev) => [normalizeProduct(res.product), ...prev]);
-      setIsAddProductOpen(false);
-      flash(`Product "${newProductName}" handcrafted & added to catalog!`, 4000);
-      setNewProductName('');
-    } catch (err: any) {
-      flash(err.message || 'Could not create the product', 4000);
-    }
-  };
-
   return (
     <div className="py-8 md:py-12 bg-ivory-100 min-h-screen">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -319,7 +265,7 @@ export const AdminDashboardPage: React.FC = () => {
         {isOfflineFallback && (
           <div className="mb-6 p-3.5 bg-amber-50 border border-amber-300 text-amber-900 text-xs rounded-xs flex items-center justify-between gap-2">
             <span>
-              Backend analytics unreachable — ensure the Footzi API server on port 5001 is running and refresh.
+              The dashboard figures could not be loaded. Check your connection and refresh.
             </span>
             <Button variant="outline" size="sm" onClick={fetchAdminData}>
               Retry
@@ -427,6 +373,17 @@ export const AdminDashboardPage: React.FC = () => {
           >
             <ShoppingBag className="w-4 h-4" /> Variant Inventory Matrix
           </button>
+
+          <button
+            onClick={() => setActiveTab('settings')}
+            className={`pb-3 px-4 text-xs uppercase tracking-wider font-semibold transition-all border-b-2 flex items-center gap-2 whitespace-nowrap ${
+              activeTab === 'settings'
+                ? 'border-charcoal-900 text-charcoal-950'
+                : 'border-transparent text-charcoal-500 hover:text-charcoal-800'
+            }`}
+          >
+            <Settings className="w-4 h-4" /> Settings
+          </button>
         </div>
 
         {/* Tab 1: Overview & Metrics */}
@@ -435,13 +392,13 @@ export const AdminDashboardPage: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="bg-white p-6 rounded-xs border border-ivory-200 shadow-sm">
                 <div className="flex items-center justify-between text-charcoal-400 mb-2">
-                  <span className="text-xs uppercase tracking-wider font-semibold">Net Verified Revenue</span>
+                  <span className="text-xs uppercase tracking-wider font-semibold">Revenue Kept</span>
                   <TrendingUp className="w-4 h-4 text-emerald-600" />
                 </div>
                 <div className="text-2xl font-serif font-bold text-charcoal-950">
                   {formatINR(analytics.metrics.totalRevenue)}
                 </div>
-                <p className="text-[11px] text-emerald-700 mt-1">100% Verified via Razorpay HMAC</p>
+                <p className="text-[11px] text-emerald-700 mt-1">After refunds{analytics.metrics.refundedFromPaid > 0 ? ` (${formatINR(analytics.metrics.refundedFromPaid)} refunded)` : ''}</p>
               </div>
 
               <div className="bg-white p-6 rounded-xs border border-ivory-200 shadow-sm">
@@ -718,6 +675,7 @@ export const AdminDashboardPage: React.FC = () => {
         )}
 
         {activeTab === 'sales' && <SalesPanel token={activeToken} />}
+        {activeTab === 'settings' && <SettingsPanel token={activeToken} isReadOnly={isReadOnly} onMessage={flash} />}
         {activeTab === 'customers' && <CustomersPanel token={activeToken} isReadOnly={isReadOnly} onMessage={flash} />}
         {activeTab === 'orders' && <OrdersPanel token={activeToken} isReadOnly={isReadOnly} onMessage={flash} />}
         {activeTab === 'coupons' && <CouponsPanel token={activeToken} isReadOnly={isReadOnly} onMessage={flash} />}
@@ -738,142 +696,12 @@ export const AdminDashboardPage: React.FC = () => {
               <Button
                 variant="primary"
                 size="sm"
-                onClick={() => setIsAddProductOpen(!isAddProductOpen)}
+                onClick={() => setIsCreatingProduct(true)}
                 className="flex items-center gap-1.5"
               >
                 <Plus className="w-4 h-4" /> Add New Footwear Style
               </Button>
             </div>
-
-            {/* Add New Product Form */}
-            {isAddProductOpen && (
-              <form onSubmit={handleAddNewProduct} className="p-6 bg-ivory-50 border border-ivory-300 rounded-xs space-y-4 text-xs">
-                <h4 className="font-serif text-base font-semibold text-charcoal-950">
-                  Handcraft New Footwear Style
-                </h4>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block font-semibold text-charcoal-800 mb-1">Product Title</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. The Taj Sovereign Tassel Loafer"
-                      value={newProductName}
-                      onChange={(e) => setNewProductName(e.target.value)}
-                      className="w-full border border-ivory-300 p-2 rounded-xs bg-white text-charcoal-900"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block font-semibold text-charcoal-800 mb-1">Category</label>
-                    <select
-                      value={newProductCategory}
-                      onChange={(e) => setNewProductCategory(e.target.value as any)}
-                      className="w-full border border-ivory-300 p-2 rounded-xs bg-white text-charcoal-900"
-                    >
-                      <option value="Loafers">Loafers</option>
-                      <option value="Sneakers">Sneakers</option>
-                      <option value="Oxfords">Oxfords</option>
-                      <option value="Boots">Boots</option>
-                      <option value="Slip-ons">Slip-ons</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block font-semibold text-charcoal-800 mb-1">Selling Price (₹)</label>
-                    <input
-                      type="number"
-                      required
-                      value={newProductPrice}
-                      onChange={(e) => setNewProductPrice(Number(e.target.value))}
-                      className="w-full border border-ivory-300 p-2 rounded-xs bg-white text-charcoal-900"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block font-semibold text-charcoal-800 mb-1">Original Price (₹)</label>
-                    <input
-                      type="number"
-                      required
-                      value={newProductOriginalPrice}
-                      onChange={(e) => setNewProductOriginalPrice(Number(e.target.value))}
-                      className="w-full border border-ivory-300 p-2 rounded-xs bg-white text-charcoal-900"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block font-semibold text-charcoal-800 mb-1">Cloudinary Image URL / CDN</label>
-                    <input
-                      type="url"
-                      required
-                      value={newProductImageUrl}
-                      onChange={(e) => setNewProductImageUrl(e.target.value)}
-                      className="w-full border border-ivory-300 p-2 rounded-xs bg-white text-charcoal-900"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block font-semibold text-charcoal-800 mb-1">Initial Agra Stock (Pairs)</label>
-                    <input
-                      type="number"
-                      required
-                      value={newProductStock}
-                      onChange={(e) => setNewProductStock(Number(e.target.value))}
-                      className="w-full border border-ivory-300 p-2 rounded-xs bg-white text-charcoal-900"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block font-semibold text-charcoal-800 mb-1">Leather & Material</label>
-                    <input
-                      type="text"
-                      value={newProductMaterial}
-                      onChange={(e) => setNewProductMaterial(e.target.value)}
-                      className="w-full border border-ivory-300 p-2 rounded-xs bg-white text-charcoal-900"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block font-semibold text-charcoal-800 mb-1">Sole Construction</label>
-                    <input
-                      type="text"
-                      value={newProductSole}
-                      onChange={(e) => setNewProductSole(e.target.value)}
-                      className="w-full border border-ivory-300 p-2 rounded-xs bg-white text-charcoal-900"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-charcoal-800 mb-1">Editorial Description</label>
-                  <textarea
-                    rows={2}
-                    value={newProductDescription}
-                    onChange={(e) => setNewProductDescription(e.target.value)}
-                    className="w-full border border-ivory-300 p-2 rounded-xs bg-white text-charcoal-900"
-                  />
-                </div>
-
-                <div className="flex items-center justify-end gap-3 pt-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setIsAddProductOpen(false)}
-                  >
-                    Cancel
-                  </Button>
-                  <Button type="submit" variant="primary" size="sm">
-                    Publish Footwear Style
-                  </Button>
-                </div>
-              </form>
-            )}
 
             {/* Products Table */}
             <div className="overflow-x-auto">
@@ -1141,6 +969,21 @@ export const AdminDashboardPage: React.FC = () => {
 
       </div>
 
+      {isCreatingProduct && (
+        <ProductEditor
+          product={null}
+          token={activeToken}
+          onClose={() => setIsCreatingProduct(false)}
+          onSaved={(saved) => {
+            const created = normalizeProduct(saved);
+            setProductsList((prev) => [created, ...prev]);
+            setIsCreatingProduct(false);
+            flash(`"${created.name}" published to the catalogue`, 4000);
+            void fetchAdminData();
+          }}
+        />
+      )}
+
       {editingProduct && (
         <ProductEditor
           product={editingProduct}
@@ -1151,6 +994,7 @@ export const AdminDashboardPage: React.FC = () => {
             setProductsList((prev) => prev.map((p) => ((p.id || p._id) === updated.id ? updated : p)));
             setEditingProduct(null);
             flash(`"${updated.name}" updated`);
+            void fetchAdminData(); // new sizes and colours also show up in the inventory screen
           }}
         />
       )}

@@ -16,12 +16,22 @@ import { cloudinaryService, UploadError } from '../services/cloudinaryService.js
 export const getDashboardAnalytics = async (_req: AuthRequest, res: Response): Promise<void> => {
   try {
     // 1. Total revenue & orders from paid orders
+    // Money kept: paid orders at what customers paid, minus anything refunded from them (a partial return),
+    // so this agrees with the Sales tab. Orders refunded in full have already left the 'paid' group.
     const revenueAgg = await Order.aggregate([
       { $match: { paymentStatus: 'paid' } },
-      { $group: { _id: null, totalRevenue: { $sum: '$total' }, count: { $sum: 1 } } },
+      {
+        $group: {
+          _id: null,
+          totalRevenue: { $sum: { $subtract: ['$total', { $ifNull: ['$refundedAmount', 0] }] } },
+          refunded: { $sum: { $ifNull: ['$refundedAmount', 0] } },
+          count: { $sum: 1 },
+        },
+      },
     ]);
 
-    const totalRevenue = revenueAgg[0]?.totalRevenue || 0;
+    const totalRevenue = Math.round(revenueAgg[0]?.totalRevenue || 0);
+    const refundedFromPaid = Math.round(revenueAgg[0]?.refunded || 0);
     const totalPaidOrders = revenueAgg[0]?.count || 0;
     const totalOrdersCount = await Order.countDocuments();
 
@@ -57,6 +67,7 @@ export const getDashboardAnalytics = async (_req: AuthRequest, res: Response): P
     res.status(200).json({
       metrics: {
         totalRevenue,
+        refundedFromPaid,
         totalPaidOrders,
         totalOrdersCount,
         totalProducts,

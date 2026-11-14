@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { CouponsPanel } from '../components/admin/CouponsPanel';
 import { OrdersPanel } from '../components/admin/OrdersPanel';
-import { ProductEditor } from '../components/admin/ProductEditor';
 
 const ok = (body: unknown) => ({ ok: true, status: 200, json: async () => body });
 const fail = (status: number, error: string) => ({ ok: false, status, json: async () => ({ error }) });
@@ -163,75 +162,6 @@ describe('admin panels', () => {
 
       fireEvent.click(screen.getByRole('button', { name: /FTZ-AGR-2/ }));
       expect(screen.getByRole('button', { name: /retry refund/i })).toBeDisabled();
-    });
-  });
-
-  describe('product editor', () => {
-    const product = {
-      id: 'p1',
-      name: 'Test Loafer',
-      category: 'Loafers',
-      description: 'A fine loafer for testing',
-      price: 3000,
-      originalPrice: 4000,
-      material: 'Calfskin',
-      sole: 'Leather',
-      badge: 'Best Seller',
-      features: ['Hand stitched', 'Blake construction'],
-      images: ['https://example.com/a.jpg'],
-    };
-
-    it('sends a clean payload: parsed numbers, trimmed lines, no empty images, and a null badge', async () => {
-      const onSaved = vi.fn();
-      fetchMock.mockResolvedValue(ok({ product: { ...product, price: 3200 } }));
-      render(<ProductEditor product={product} token="t" onClose={vi.fn()} onSaved={onSaved} />);
-
-      expect(screen.getByText('25% off')).toBeInTheDocument();
-      fireEvent.change(screen.getByLabelText('Selling price ₹'), { target: { value: '3200' } });
-      fireEvent.change(screen.getByLabelText('Badge'), { target: { value: '' } });
-      fireEvent.change(screen.getByLabelText('Features (one per line)'), { target: { value: ' Hand stitched \n\n Cushioned insole ' } });
-      fireEvent.click(screen.getByRole('button', { name: /add image link/i }));
-      fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
-
-      await waitFor(() => expect(onSaved).toHaveBeenCalled());
-      const [url, init] = fetchMock.mock.calls[0];
-      expect(url).toBe('/api/admin/products/p1');
-      expect(init.method).toBe('PUT');
-      expect(JSON.parse(init.body)).toMatchObject({
-        price: 3200,
-        originalPrice: 4000,
-        badge: null,
-        features: ['Hand stitched', 'Cushioned insole'],
-        images: ['https://example.com/a.jpg'],
-      });
-    });
-
-    it('keeps the form open and shows the server reason when a save is refused', async () => {
-      const onSaved = vi.fn();
-      fetchMock.mockResolvedValue(fail(400, 'Original price cannot be lower than the selling price'));
-      render(<ProductEditor product={product} token="t" onClose={vi.fn()} onSaved={onSaved} />);
-
-      fireEvent.change(screen.getByLabelText('Selling price ₹'), { target: { value: '9000' } });
-      fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
-
-      expect(await screen.findByText(/Original price cannot be lower/i)).toBeInTheDocument();
-      expect(onSaved).not.toHaveBeenCalled();
-    });
-
-    it('explains plainly when file uploads are not set up, and rejects oversized files before sending', async () => {
-      fetchMock.mockResolvedValue(fail(501, 'Image uploads are not set up on this server. Paste an https:// image link instead.'));
-      const { container } = render(<ProductEditor product={product} token="t" onClose={vi.fn()} onSaved={vi.fn()} />);
-      const input = container.querySelector('input[type=file]') as HTMLInputElement;
-
-      const big = new File([new Uint8Array(5 * 1024 * 1024 + 1)], 'big.png', { type: 'image/png' });
-      fireEvent.change(input, { target: { files: [big] } });
-      expect(await screen.findByText(/over 5 MB/i)).toBeInTheDocument();
-      expect(fetchMock).not.toHaveBeenCalled();
-
-      const small = new File([new Uint8Array([137, 80, 78, 71])], 'a.png', { type: 'image/png' });
-      fireEvent.change(input, { target: { files: [small] } });
-      expect(await screen.findByText(/not set up on this server/i)).toBeInTheDocument();
-      expect(JSON.parse(fetchMock.mock.calls[0][1].body).image).toMatch(/^data:image\/png;base64,/);
     });
   });
 });

@@ -7,6 +7,7 @@ import { formatINR } from '@/lib/utils';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { useDocumentMeta } from '@/hooks/useDocumentMeta';
+import { useSettingsStore } from '@/store/useSettingsStore';
 
 const STATUS_LABELS: Record<string, string> = {
   pending_payment: 'Awaiting payment',
@@ -35,6 +36,7 @@ interface Props {
 }
 
 export const OrderDetailPage: React.FC<Props> = ({ mode = 'account' }) => {
+  const { returnWindowDays, orderExpiryMinutes } = useSettingsStore((s) => s.settings);
   useDocumentMeta({ title: 'Order details — Footzi', noindex: true });
   const { id } = useParams<{ id: string }>();
   const { auth, bearer, orderToken } = useOrderAccess(id, mode);
@@ -322,20 +324,20 @@ export const OrderDetailPage: React.FC<Props> = ({ mode = 'account' }) => {
             )}
             {order.orderStatus === 'pending_payment' && (
               <p className="text-xs text-charcoal-500 mb-3">
-                This order is waiting for payment and is released automatically if it isn't paid within 30 minutes.
+                This order is waiting for payment and is released automatically if it isn't paid within {orderExpiryMinutes} minutes.
               </p>
             )}
             {order.orderStatus === 'delivered' && (
               <p className="text-xs text-charcoal-600">
                 Not the right fit?{' '}
                 {mode === 'guest' ? (
-                  <>Add this order to an account (above) to request an exchange or return within 7 days of delivery.</>
+                  <>Add this order to an account (above) to request an exchange or return within {returnWindowDays} days of delivery.</>
                 ) : (
                   <>
                     <Link to="/account/orders" className="font-semibold text-charcoal-900 underline">
                       Request an exchange or return
                     </Link>{' '}
-                    from your orders list within 7 days of delivery.
+                    from your orders list within {returnWindowDays} days of delivery.
                   </>
                 )}
               </p>

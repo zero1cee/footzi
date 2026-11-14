@@ -20,6 +20,7 @@ import {
 } from '../controllers/returnController.js';
 import { listCouponsAdmin, createCouponAdmin, updateCouponAdmin } from '../controllers/couponController.js';
 import { getSalesReport, getCustomers, exportOrdersCsv, exportCustomersCsv } from '../controllers/reportController.js';
+import { getSettingsAdmin, updateSettingsAdmin } from '../controllers/settingsController.js';
 import { authenticate, requireAdmin } from '../middleware/auth.js';
 
 const router = Router();
@@ -31,6 +32,10 @@ router.use(authenticate, requireAdmin);
 router.get('/analytics', getDashboardAnalytics);
 router.get('/orders', getAllOrdersAdmin);
 router.post('/orders/:id/refund', refundCancelledOrderAdmin);
+
+// Shop settings (shipping rules, expiry, return window, announcement banner)
+router.get('/settings', getSettingsAdmin);
+router.put('/settings', updateSettingsAdmin);
 
 // Sales reports, customers and spreadsheet exports
 router.get('/reports/sales', getSalesReport);

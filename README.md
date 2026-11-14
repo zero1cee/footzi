@@ -10,7 +10,7 @@
 ![Express.js](https://img.shields.io/badge/Express.js-000000?style=for-the-badge&logo=express&logoColor=white)
 ![MongoDB](https://img.shields.io/badge/MongoDB-4EA94B?style=for-the-badge&logo=mongodb&logoColor=white)
 ![Razorpay](https://img.shields.io/badge/Razorpay_Sandbox-02042B?style=for-the-badge&logo=razorpay&logoColor=3395FF)
-![Vitest](https://img.shields.io/badge/Vitest-279_Tests_Passed-6E9F18?style=for-the-badge&logo=vitest&logoColor=white)
+![Vitest](https://img.shields.io/badge/Vitest-321_Tests_Passed-6E9F18?style=for-the-badge&logo=vitest&logoColor=white)
 [![CI](https://github.com/zero1cee/footzi/actions/workflows/ci.yml/badge.svg)](https://github.com/zero1cee/footzi/actions/workflows/ci.yml)
 
 <p align="center">
@@ -63,7 +63,7 @@ Built as a portfolio demonstration for **Software Development Engineer (SDE)** i
 - Registration, sign-in, forgot and reset password (single-use emailed link), change password (signs out other devices), profile and address management, and role-based access (`customer`, `admin`, and a read-only `demo_admin` with customer contact details masked).
 
 **Operations deck (`/admin`)**
-- Sales reports (revenue kept after refunds by day or week, best sellers, coupon results, conversion), a customer list (members and guests, searchable and sortable), CSV exports, analytics, an orders screen (search, filters, detail, refund retry), the workshop pipeline, a catalogue editor (create, edit, archive and restore styles, images), size-level inventory, coupons, and returns.
+- **Settings** (free-shipping threshold, shipping fee, how long unpaid orders hold stock, the return window, and the announcement bar) saved in the database and applied to new orders at once, and a **style editor** that creates and edits styles with their colours, sizes and a colour-by-size grid of opening stock. Sales reports (revenue kept after refunds by day or week, best sellers, coupon results, conversion), a customer list (members and guests, searchable and sortable), CSV exports, analytics, an orders screen (search, filters, detail, refund retry), the workshop pipeline, a catalogue editor (create, edit, archive and restore styles, images), size-level inventory, coupons, and returns.
 
 **Quality**
 - Fast first load (lazy-loaded screens, compression), search and link-preview tags served by the server, a sitemap, keyboard-accessible dialogs, and a continuous-integration pipeline that builds and tests every change.
@@ -223,6 +223,7 @@ The two shared demo accounts (`patron@footzi.in`, `demo-admin@footzi.in`) are pu
 ### Platform
 | Method | Endpoint | Access | Description |
 | :--- | :--- | :--- | :--- |
+| `GET` | `/api/settings` | Public | The shop's rules the storefront needs: shipping threshold and fee, return window, unpaid-order hold, announcement bar. Cached for a minute |
 | `GET` | `/api/health` | Public | Liveness: the process is up (Render's health check uses this) |
 | `GET` | `/api/ready` | Public | Readiness: answers 503 when the database is unreachable. Point your uptime monitor here |
 | `POST` | `/api/client-errors` | Public | Browsers report crashes here; written to the server log. Rate limited, 204 always |
@@ -301,6 +302,7 @@ Requests move one step at a time (`requested → approved → pickup_scheduled �
 ### Admin Operations
 | Method | Endpoint | Access | Description |
 | :--- | :--- | :--- | :--- |
+| `GET` / `PUT` | `/api/admin/settings` | Admin Only | Read or change the shop settings. Values are validated (for example expiry 5 to 1440 minutes, return window 1 to 60 days) and a save only changes the fields sent |
 | `GET` | `/api/admin/reports/sales?days=` | Admin Only | Revenue kept (payments minus refunds) per Indian-time day, best sellers, coupon results and the paid/abandoned funnel for 7, 30, 90 or 365 days |
 | `GET` | `/api/admin/customers` | Admin Only | Everyone who paid, grouped by email (guests included), searchable, sortable, paged |
 | `GET` | `/api/admin/export/orders.csv`, `/customers.csv` | Admin Only | Spreadsheet downloads. Refused to the read-only demo admin. Cells that start with `=`, `+`, `-` or `@` are defused so a customer's name cannot run as a spreadsheet formula |
@@ -311,7 +313,7 @@ Requests move one step at a time (`requested → approved → pickup_scheduled �
 | `POST` | `/api/admin/supplier-orders/:id/fulfill` | Admin Only | Advance the workshop pipeline one step at a time (`accepted → processing → shipped → delivered`). `cancelled` is allowed until it ships and refunds the customer and returns the stock |
 | `GET` | `/api/admin/products` | Admin Only | Every product, including archived ones |
 | `POST` | `/api/admin/products` | Admin Only | Publish a new footwear style (validated; a SKU may belong to only one product) |
-| `PUT` | `/api/admin/products/:id` | Admin Only | Edit details, price, images and badge. Existing variants keep their stock (use the inventory endpoint); new SKUs can be added |
+| `PUT` | `/api/admin/products/:id` | Admin Only | Edit details, price, images, badge, colours and sizes. Existing variants keep their stock (use the inventory endpoint); new colour and size combinations are added with opening stock. A colour or size that still has variants cannot be removed, and every variant must be a real colour and size of the style, once each |
 | `GET` / `POST` | `/api/admin/coupons` | Admin Only | List coupons with their usage, or create one |
 | `PUT` | `/api/admin/coupons/:id` | Admin Only | Edit a coupon (the code itself never changes) or switch it off |
 | `POST` | `/api/admin/products/upload-image` | Admin Only | Store an image on Cloudinary, or reuse an https link. File uploads need the `CLOUDINARY_*` settings; without them the server says so instead of inventing a link |
@@ -361,15 +363,15 @@ Open **[http://localhost:5173](http://localhost:5173)** in your browser.
 
 ### 4. Running Automated Tests
 
-Footzi includes **279 automated unit and integration tests** ensuring test-driven reliability:
+Footzi includes **321 automated unit and integration tests** ensuring test-driven reliability:
 
 ```bash
-# Client Vitest Suite (115 tests: Cart and server-checked coupons, bag merge on sign-in, password reset and order pages, admin panels, page titles and meta tags, dialog keyboard behaviour, automated accessibility checks with axe, browser error reporting, wishlist sync, search suggestions, receipts, recently viewed, guest checkout, back-in-stock form, admin sales and customers, UI components, return service)
+# Client Vitest Suite (140 tests: Cart and server-checked coupons, bag merge on sign-in, password reset and order pages, admin panels, page titles and meta tags, dialog keyboard behaviour, automated accessibility checks with axe, browser error reporting, wishlist sync, search suggestions, receipts, recently viewed, guest checkout, back-in-stock form, admin sales and customers, shop settings, product editor, storefront shape, UI components, return service)
 cd client
 npm test
 
-# Server Integration Suite (164 tests: Auth, Cart, Orders, Razorpay HMAC and webhook, Dropship Pipeline,
-# Returns, Reviews, Order expiry, Demo admin, Password reset, Refunds, Email providers, Coupons, Product editing, Workshop pipeline, SEO (page tags, sitemap, robots), Monitoring (health checks, request ids, error responses), Wishlist, Search suggestions, Guest checkout, Back-in-stock alerts, Admin reports and exports, Cloudinary, Inventory). Needs a seeded MongoDB; point
+# Server Integration Suite (181 tests: Auth, Cart, Orders, Razorpay HMAC and webhook, Dropship Pipeline,
+# Returns, Reviews, Order expiry, Demo admin, Password reset, Refunds, Email providers, Coupons, Product editing, Workshop pipeline, SEO (page tags, sitemap, robots), Monitoring (health checks, request ids, error responses), Wishlist, Search suggestions, Guest checkout, Back-in-stock alerts, Admin reports and exports, Shop settings, Product variants, Demo privacy, Cloudinary, Inventory). Needs a seeded MongoDB; point
 # MONGODB_URI at a scratch database, because the tests create and delete orders.
 cd server
 npx vitest run
@@ -435,7 +437,7 @@ MONGODB_URI="<atlas connection string>" npm run seed:demo-admin
 | `APP_URL` | no | Public site URL used in email links, canonical links, the sitemap and share previews. Set it to your real domain once you have one (defaults to Render's `RENDER_EXTERNAL_URL`) |
 | `CLOUDINARY_*` | no | Real image uploads; unset = uploads are simulated |
 | `CORS_ORIGIN` | no | Only if a separately hosted frontend calls this API |
-| `ORDER_EXPIRY_MINUTES` | no | Unpaid orders are cancelled and their stock released after this long (default 30) |
+| `ORDER_EXPIRY_MINUTES` | no | The starting value for how long an unpaid order holds stock (default 30). Once an admin saves the Settings page, the saved value is used instead |
 
 ### Performance, SEO and accessibility
 - **Fast first load:** only the home page and shared code ship up front. Every other screen (admin, checkout, account...) is fetched when opened. The first load fell from 555 kB to 353 kB (145 kB to 107 kB compressed), the server compresses text responses (the shared React file goes from 165 kB to 54 kB), and images below the fold load lazily.

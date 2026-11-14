@@ -28,6 +28,7 @@ import { ShoeSize } from '@/types';
 import { ProfileSettings } from '@/components/account/ProfileSettings';
 import { useDialogA11y } from '@/hooks/useDialogA11y';
 import { useDocumentMeta } from '@/hooks/useDocumentMeta';
+import { useSettingsStore } from '@/store/useSettingsStore';
 
 type AccountTab = 'orders' | 'wishlist' | 'addresses' | 'returns' | 'profile';
 
@@ -39,22 +40,21 @@ const resolveTabFromPath = (pathname: string): AccountTab => {
   return 'orders';
 };
 
-const RETURN_WINDOW_DAYS = 7;
-
-// Mirrors the server's rule: returns open once the order is delivered and close after 7 days
-const returnEligibility = (order: any): { eligible: boolean; note: string } => {
+// Mirrors the server's rule: returns open once the order is delivered and close after the shop's return window
+const returnEligibility = (order: any, windowDays: number): { eligible: boolean; note: string } => {
   if (order.orderStatus !== 'delivered') {
     return { eligible: false, note: 'Size exchange and returns open once your order is delivered.' };
   }
   const delivered = (order.statusHistory || []).filter((h: any) => h.status === 'delivered');
   const at = new Date(delivered.length ? delivered[delivered.length - 1].timestamp : order.updatedAt || order.createdAt).getTime();
-  const daysLeft = Math.ceil((at + RETURN_WINDOW_DAYS * 86_400_000 - Date.now()) / 86_400_000);
+  const daysLeft = Math.ceil((at + windowDays * 86_400_000 - Date.now()) / 86_400_000);
   return daysLeft > 0
     ? { eligible: true, note: `${daysLeft} day${daysLeft === 1 ? '' : 's'} left to exchange or return` }
-    : { eligible: false, note: `The ${RETURN_WINDOW_DAYS}-day exchange and return window has closed.` };
+    : { eligible: false, note: `The ${windowDays}-day exchange and return window has closed.` };
 };
 
 export const AccountPage: React.FC = () => {
+  const returnWindowDays = useSettingsStore((s) => s.settings.returnWindowDays);
   useDocumentMeta({ title: 'My Account — Footzi', noindex: true });
   const navigate = useNavigate();
   const location = useLocation();
@@ -502,7 +502,7 @@ export const AccountPage: React.FC = () => {
                             </strong>{' '}
                             ({order.carrier || 'BlueDart Air Express'})
                           </p>
-                          {returnEligibility(order).eligible ? (
+                          {returnEligibility(order, returnWindowDays).eligible ? (
                             <div className="flex flex-col sm:items-end gap-1">
                               <button
                                 onClick={() => handleOpenExchangeModal(order)}
@@ -510,11 +510,11 @@ export const AccountPage: React.FC = () => {
                               >
                                 <RotateCcw className="w-3 h-3 text-sand-600" /> Request Size Exchange
                               </button>
-                              <span className="text-[10px] text-charcoal-500">{returnEligibility(order).note}</span>
+                              <span className="text-[10px] text-charcoal-500">{returnEligibility(order, returnWindowDays).note}</span>
                             </div>
                           ) : (
                             <span className="text-[11px] text-charcoal-500 sm:text-right max-w-[16rem]">
-                              {returnEligibility(order).note}
+                              {returnEligibility(order, returnWindowDays).note}
                             </span>
                           )}
                         </div>

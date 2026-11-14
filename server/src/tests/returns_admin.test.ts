@@ -201,7 +201,7 @@ describe('Returns, Exchanges & Admin Operations Suite', () => {
         brand: 'Footzi Atelier',
         images: ['https://images.unsplash.com/photo-1614252235316-8c857d38b5f4'],
         colors: [{ name: 'Deep Mahogany', hex: '#3B2317', imageIndex: 0 }],
-        sizes: ['UK 8', 'UK 9'],
+        sizes: ['UK 8'],
         variants: [
           {
             sku: testVariantSku,

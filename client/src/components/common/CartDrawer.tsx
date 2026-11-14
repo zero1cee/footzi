@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { X, Trash2, Plus, Minus, ArrowRight, ShieldCheck, Tag, ShoppingBag } from 'lucide-react';
 import { useCartStore } from '@/store/useCartStore';
+import { useSettingsStore } from '@/store/useSettingsStore';
 import { formatINR } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 import { useDialogA11y } from '@/hooks/useDialogA11y';
@@ -28,6 +29,8 @@ export const CartDrawer: React.FC = () => {
   const [couponFeedback, setCouponFeedback] = useState<{ success: boolean; text: string } | null>(null);
 
   const dialogRef = useDialogA11y<HTMLDivElement>(isOpen, closeCart);
+  // Hooks must run on every render, so this sits above the early return below
+  const freeShippingThreshold = useSettingsStore((s) => s.settings.freeShippingThreshold);
 
   if (!isOpen) return null;
 
@@ -36,7 +39,6 @@ export const CartDrawer: React.FC = () => {
   const shipping = getShippingFee();
   const total = getTotal();
 
-  const freeShippingThreshold = 1999;
   const remainingForFreeShipping = Math.max(0, freeShippingThreshold - subtotal);
   const progressPercent = Math.min(100, Math.round((subtotal / freeShippingThreshold) * 100));
 

@@ -5,6 +5,7 @@ import { useAuthStore } from './useAuthStore';
 import { cartService } from '@/services/cartService';
 import { couponService, computeCouponDiscount, AppliedCoupon } from '@/services/couponService';
 import { wishlistService } from '@/services/wishlistService';
+import { currentSettings } from '@/store/useSettingsStore';
 import { isBackendUnreachable } from '@/lib/utils';
 
 interface CartState {
@@ -260,8 +261,9 @@ export const useCartStore = create<CartState>()(
 
       getShippingFee: () => {
         const subtotal = get().getSubtotal();
-        if (subtotal === 0 || subtotal >= 1999) return 0;
-        return 149;
+        const { freeShippingThreshold, shippingFee } = currentSettings();
+        if (subtotal === 0 || subtotal >= freeShippingThreshold) return 0;
+        return shippingFee;
       },
 
       getTotal: () => {

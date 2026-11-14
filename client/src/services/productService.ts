@@ -40,6 +40,18 @@ export const normalizeProduct = (p: any): Product => {
   };
 };
 
+/**
+ * What a shopper sees: only colours and sizes the style actually comes in. Older catalogue entries list shades
+ * or sizes that have no stock records, which looked choosable but could not be bought. The admin screens use
+ * the unfiltered style, so those shades can be given stock there.
+ */
+export const storefrontView = (p: Product): Product => {
+  if (!p || !p.variants || p.variants.length === 0) return p;
+  const colors = p.colors.filter((c) => p.variants.some((v) => v.color === c.name));
+  const sizes = p.sizes.filter((size) => p.variants.some((v) => v.size === size));
+  return { ...p, colors: colors.length > 0 ? colors : p.colors, sizes: sizes.length > 0 ? sizes : p.sizes };
+};
+
 export const productService = {
   // Fetch products with comprehensive filtering, sorting & pagination
   async getProducts(params: ProductQueryParams = {}): Promise<ProductsResponse> {
@@ -79,7 +91,7 @@ export const productService = {
         const data = await res.json();
         return {
           ...data,
-          products: (data.products || []).map(normalizeProduct),
+          products: (data.products || []).map((p: any) => storefrontView(normalizeProduct(p))),
         };
       }
     } catch {
@@ -162,7 +174,7 @@ export const productService = {
       const res = await fetch(`/api/products/${slug}`);
       if (res.ok) {
         const data = await res.json();
-        return normalizeProduct(data);
+        return storefrontView(normalizeProduct(data));
       }
       // The server answered: this style does not exist (or was retired), so do not invent one
       if (res.status === 404) return null;

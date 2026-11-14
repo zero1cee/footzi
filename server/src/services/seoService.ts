@@ -69,7 +69,7 @@ const PRIVATE_PREFIXES = ['/account', '/order', '/track-order', '/admin', '/chec
 const STATIC_PAGES: Record<string, { title: string; description: string }> = {
   '/shop': {
     title: 'Shop Handcrafted Leather Footwear — Footzi',
-    description: 'Loafers, sneakers, oxfords, boots and slip-ons handcrafted in Agra from full-grain leather. Free delivery over ₹1,999 and 7-day size exchange.',
+    description: 'Loafers, sneakers, oxfords, boots and slip-ons handcrafted in Agra from full-grain leather, with free delivery on larger orders and easy size exchange.',
   },
   '/size-guide': {
     title: 'Size Guide — Footzi',

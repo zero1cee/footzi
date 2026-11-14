@@ -5,8 +5,7 @@ import { Product } from '../models/Product.js';
 import { Inventory } from '../models/Inventory.js';
 import { refundService } from './refundService.js';
 import { emailService } from './emailService.js';
-
-export const RETURN_WINDOW_DAYS = 7;
+import { settingsService } from './settingsService.js';
 
 export const RETURN_REASONS = [
   'Fit issue - too tight',
@@ -78,9 +77,10 @@ export class ReturnService {
     if (order.paymentStatus !== 'paid' || order.orderStatus !== 'delivered') {
       throw new Error('Returns and size exchanges open once your order has been delivered');
     }
-    const windowEnds = deliveredAt(order).getTime() + RETURN_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+    const { returnWindowDays } = await settingsService.get();
+    const windowEnds = deliveredAt(order).getTime() + returnWindowDays * 24 * 60 * 60 * 1000;
     if (Date.now() > windowEnds) {
-      throw new Error(`The ${RETURN_WINDOW_DAYS}-day return window for this order has closed`);
+      throw new Error(`The ${returnWindowDays}-day return window for this order has closed`);
     }
 
     // 2. Pairs already covered by earlier, non-rejected requests cannot be claimed twice

@@ -197,4 +197,18 @@ export const adminService = {
     link.remove();
     URL.revokeObjectURL(url);
   },
+
+  async getSettings(token: string) {
+    const res = await fetch('/api/admin/settings', { headers: { Authorization: `Bearer ${token}` } });
+    return parseApiJson(res, 'Failed to load the settings');
+  },
+
+  async updateSettings(data: Record<string, unknown>, token: string) {
+    const res = await fetch('/api/admin/settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(data),
+    });
+    return parseApiJson(res, 'Failed to save the settings');
+  },
 };

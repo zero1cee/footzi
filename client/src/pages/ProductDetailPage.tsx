@@ -31,6 +31,7 @@ import { SizeGuideModal } from '@/components/common/SizeGuideModal';
 import { RecentlyViewed } from '@/components/ui/RecentlyViewed';
 import { NotifyWhenBack } from '@/components/ui/NotifyWhenBack';
 import { useRecentStore } from '@/store/useRecentStore';
+import { useSettingsStore } from '@/store/useSettingsStore';
 
 const NotFound: React.FC = () => {
   useDocumentMeta({ title: 'Product not found — Footzi', noindex: true });
@@ -62,6 +63,7 @@ export const ProductDetailPage: React.FC = () => {
 };
 
 const ProductDetailContent: React.FC<{ product: Product }> = ({ product }) => {
+  const returnWindowDays = useSettingsStore((s) => s.settings.returnWindowDays);
   const navigate = useNavigate();
   const { addItem, toggleWishlist, isInWishlist } = useCartStore();
 
@@ -300,6 +302,11 @@ const ProductDetailContent: React.FC<{ product: Product }> = ({ product }) => {
                       onClick={() => {
                         setSelectedColor({ name: c.name, hex: c.hex });
                         setActiveImageIndex(c.imageIndex);
+                        // Keep the size if this colour comes in it; otherwise move to the first size it does come in
+                        const sizesForColour = product.variants.filter((v) => v.color === c.name).map((v) => v.size);
+                        if (sizesForColour.length > 0 && !sizesForColour.includes(selectedSize)) {
+                          setSelectedSize(product.sizes.find((s) => sizesForColour.includes(s)) ?? sizesForColour[0]);
+                        }
                       }}
                       className={`w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all ${
                         selectedColor.name === c.name
@@ -335,13 +342,14 @@ const ProductDetailContent: React.FC<{ product: Product }> = ({ product }) => {
                   const variant = product.variants.find(
                     (v) => v.size === size && v.color === selectedColor.name
                   );
-                  const isAvailable = variant ? variant.stock > 0 : true;
+                  // A size the style is not made in for this colour cannot be bought, however the grid was filled
+                  const isAvailable = variant ? variant.stock > 0 : false;
 
                   return (
                     <button
                       key={size}
                       // A sold-out size stays selectable: choosing it offers "tell me when it's back"
-                      aria-label={isAvailable ? size : `${size}, sold out`}
+                      aria-label={isAvailable ? size : variant ? `${size}, sold out` : `${size}, not made in ${selectedColor.name}`}
                       aria-pressed={selectedSize === size}
                       onClick={() => setSelectedSize(size)}
                       className={`py-2.5 text-xs font-semibold rounded-xs border transition-all ${
@@ -361,12 +369,18 @@ const ProductDetailContent: React.FC<{ product: Product }> = ({ product }) => {
               {/* Stock status indicator */}
               <div className="pt-1">
                 {isOutOfStock ? (
-                  <>
-                    <span className="text-xs font-semibold text-red-600">
-                      Currently out of stock for this size/color combination.
+                  currentVariant ? (
+                    <>
+                      <span className="text-xs font-semibold text-red-600">
+                        Currently out of stock for this size/color combination.
+                      </span>
+                      <NotifyWhenBack key={currentVariant.sku} sku={currentVariant.sku} sizeLabel={selectedSize} />
+                    </>
+                  ) : (
+                    <span className="text-xs font-semibold text-charcoal-600">
+                      {selectedSize} is not made in {selectedColor.name}. Choose another size or colour.
                     </span>
-                    {currentVariant?.sku && <NotifyWhenBack key={currentVariant.sku} sku={currentVariant.sku} sizeLabel={selectedSize} />}
-                  </>
+                  )
                 ) : availableStock <= 5 ? (
                   <span className="text-xs font-medium text-amber-700">
                     ⚡ Low Inventory Alert: Only {availableStock} pairs left in Agra warehouse!
@@ -532,7 +546,7 @@ const ProductDetailContent: React.FC<{ product: Product }> = ({ product }) => {
                 </button>
                 {openAccordion === 'returns' && (
                   <div className="p-4 pt-0 text-xs text-charcoal-600 space-y-2 border-t border-ivory-100 font-light">
-                    <p>• We offer a 7-day complimentary doorstep size exchange if your pair doesn't fit perfectly.</p>
+                    <p>• We offer a {returnWindowDays}-day complimentary doorstep size exchange if your pair doesn't fit perfectly.</p>
                     <p>• Footwear must be unworn, in original packaging with dust bag and authenticity cards intact.</p>
                     <p>• Easy 1-click exchange initiation through your customer dashboard.</p>
                   </div>

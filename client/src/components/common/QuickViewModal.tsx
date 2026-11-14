@@ -163,6 +163,10 @@ export const QuickViewModal: React.FC = () => {
                         onClick={() => {
                           setSelectedColor({ name: c.name, hex: c.hex });
                           setSelectedImageIndex(c.imageIndex);
+                          const sizesForColour = quickViewProduct.variants.filter((v) => v.color === c.name).map((v) => v.size);
+                          if (sizesForColour.length > 0 && !(selectedSize && sizesForColour.includes(selectedSize))) {
+                            setSelectedSize(quickViewProduct.sizes.find((s) => sizesForColour.includes(s)) ?? sizesForColour[0]);
+                          }
                         }}
                         className={`w-7 h-7 rounded-full border-2 flex items-center justify-center transition-all ${
                           selectedColor?.name === c.name
@@ -194,7 +198,7 @@ export const QuickViewModal: React.FC = () => {
                     const variantForSize = quickViewProduct.variants.find(
                       (v) => v.size === size && (!selectedColor || v.color === selectedColor.name)
                     );
-                    const isAvailable = variantForSize ? variantForSize.stock > 0 : true;
+                    const isAvailable = variantForSize ? variantForSize.stock > 0 : false;
 
                     return (
                       <button

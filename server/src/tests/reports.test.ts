@@ -122,6 +122,25 @@ describe('Admin reports', () => {
     });
   });
 
+  describe('overview figures', () => {
+    it('Revenue Kept on the dashboard subtracts refunds, in agreement with the sales report', async () => {
+      // Other test files create orders at the same time, so compare against the database read at the same moment and retry
+      let last: any;
+      for (let attempt = 0; attempt < 6; attempt++) {
+        const res = await request(app).get('/api/admin/analytics').set(auth(adminToken));
+        expect(res.status).toBe(200);
+        const paid = await Order.find({ paymentStatus: 'paid' }).select('total refundedAmount').lean();
+        const expected = Math.round(paid.reduce((sum, o) => sum + o.total - (o.refundedAmount ?? 0), 0));
+        const refunded = Math.round(paid.reduce((sum, o) => sum + (o.refundedAmount ?? 0), 0));
+        last = { got: [res.body.metrics.totalRevenue, res.body.metrics.refundedFromPaid, res.body.metrics.totalPaidOrders], want: [expected, refunded, paid.length] };
+        if (JSON.stringify(last.got) === JSON.stringify(last.want)) break;
+      }
+      expect(last.got).toEqual(last.want);
+      // The partly refunded fixture order (2000 paid, 500 back) is in the paid group and counts as 1500
+      expect(last.got[1]).toBeGreaterThanOrEqual(500);
+    });
+  });
+
   describe('customers', () => {
     const customers = (query = '', token = adminToken) => request(app).get(`/api/admin/customers${query}`).set(auth(token));
 

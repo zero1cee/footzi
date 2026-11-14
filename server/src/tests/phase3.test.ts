@@ -445,6 +445,7 @@ describe('Phase 3 - catalog, coupons and workshop pipeline', () => {
         description: 'Same name again, which would collide on the URL',
         price: 2500,
         images: ['https://images.unsplash.com/photo-1614252235316-8c857d38b5f4'],
+        variants: [{ sku: `FTZ-P3-${stamp}-NEW2`, size: 'UK 10', color: 'Black', colorHex: '#111111', stock: 1 }],
       });
       expect(dup.status).toBe(400);
       expect(dup.body.error).toMatch(/already exists/);

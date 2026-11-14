@@ -174,6 +174,46 @@ export class ProductService {
     return products.map((p) => ({ id: p._id.toString(), name: p.name, slug: p.slug, image: p.images?.[0] ?? '', price: p.price, category: p.category }));
   }
 
+  /**
+   * The rules that keep a style sellable: every variant is a real colour and size of the style, a colour and
+   * size pair exists once, and colours point at images that exist. Colours and sizes in use cannot be taken away.
+   */
+  private assertShape(shape: {
+    colors: { name: string; hex: string; imageIndex: number }[];
+    sizes: string[];
+    images: string[];
+    variants: { sku: string; size: string; color: string }[];
+  }, strict: boolean): void {
+    const { colors, sizes, images, variants } = shape;
+    const colorNames = new Set(colors.map((c) => c.name));
+    if (colorNames.size !== colors.length) throw new Error('Two colours have the same name. Give each colour its own name.');
+    if (new Set(sizes).size !== sizes.length) throw new Error('A size is listed twice.');
+
+    for (const c of colors) {
+      if (c.imageIndex >= images.length) throw new Error(`Colour "${c.name}" points at image ${c.imageIndex + 1}, but the style has ${images.length} image${images.length === 1 ? '' : 's'}.`);
+    }
+
+    const pairs = new Set<string>();
+    for (const v of variants) {
+      if (!colorNames.has(v.color)) throw new Error(`Variant ${v.sku} uses the colour "${v.color}", which the style does not have. Add the colour first.`);
+      if (!sizes.includes(v.size)) throw new Error(`Variant ${v.sku} is size ${v.size}, which the style does not list. Add the size first.`);
+      const key = `${v.color}|${v.size}`;
+      if (pairs.has(key)) throw new Error(`There is more than one ${v.color} variant in ${v.size}. Each colour and size can appear once.`);
+      pairs.add(key);
+    }
+
+    // A new style must be complete. An existing one may carry older gaps, which must not block unrelated edits.
+    if (!strict) return;
+    const usedColors = new Set(variants.map((v) => v.color));
+    const usedSizes = new Set(variants.map((v) => v.size));
+    for (const name of colorNames) {
+      if (!usedColors.has(name)) throw new Error(`Colour "${name}" has no sizes yet. Add at least one size for it, or remove the colour.`);
+    }
+    for (const size of sizes) {
+      if (!usedSizes.has(size)) throw new Error(`Size ${size} has no colours yet. Add it for at least one colour, or remove the size.`);
+    }
+  }
+
   /** Every variant SKU is the key of an inventory record, so a SKU may belong to only one product. */
   private async assertSkusFree(skus: string[], exceptProductId?: unknown): Promise<void> {
     const unique = new Set(skus);
@@ -211,9 +251,34 @@ export class ProductService {
     const originalPrice = data.originalPrice ?? price;
     const discountPercent = originalPrice > price ? Math.round(((originalPrice - price) / originalPrice) * 100) : 0;
 
-    await this.assertSkusFree((data.variants ?? []).map((v) => v.sku));
+    const variants = data.variants ?? [];
+    if (variants.length === 0) throw new Error('Add at least one size and colour with its opening stock, or the style cannot be sold.');
 
-    const product = new Product({ ...data, slug, price, originalPrice, discountPercent, isActive: data.isActive ?? true });
+    // Colours and sizes can simply be read off the variants when the caller does not list them
+    const colors =
+      data.colors && data.colors.length > 0
+        ? data.colors
+        : [...new Map(variants.map((v) => [v.color, { name: v.color, hex: v.colorHex, imageIndex: 0 }])).values()];
+    const sizeOrder = ['UK 6', 'UK 7', 'UK 8', 'UK 9', 'UK 10', 'UK 11'];
+    const sizes =
+      data.sizes && data.sizes.length > 0 ? data.sizes : sizeOrder.filter((size) => variants.some((v) => v.size === size));
+
+    this.assertShape({ colors, sizes, images: data.images ?? [], variants }, true);
+    await this.assertSkusFree(variants.map((v) => v.sku));
+
+    // A variant carries its colour's swatch, so the two can never disagree
+    const hexOf = new Map(colors.map((c) => [c.name, c.hex]));
+    const product = new Product({
+      ...data,
+      colors,
+      sizes,
+      variants: variants.map((v) => ({ ...v, colorHex: hexOf.get(v.color) ?? v.colorHex })),
+      slug,
+      price,
+      originalPrice,
+      discountPercent,
+      isActive: data.isActive ?? true,
+    });
     try {
       await product.save();
     } catch (error: any) {
@@ -236,7 +301,23 @@ export class ProductService {
     if (!product) return null;
 
     const { variants: incoming, ...fields } = data;
+    const colorsBefore = product.colors.map((c) => c.name);
+    const sizesBefore = [...product.sizes];
     Object.assign(product, fields);
+
+    // Taking away a colour or size that still has variants would orphan their stock and orders
+    for (const name of colorsBefore) {
+      const uses = product.variants.filter((v) => v.color === name).length;
+      if (uses > 0 && !product.colors.some((c) => c.name === name)) {
+        throw new Error(`Colour "${name}" is used by ${uses} variant${uses === 1 ? '' : 's'}, so it cannot be removed.`);
+      }
+    }
+    for (const size of sizesBefore) {
+      const uses = product.variants.filter((v) => v.size === size).length;
+      if (uses > 0 && !product.sizes.includes(size as any)) {
+        throw new Error(`Size ${size} is used by ${uses} variant${uses === 1 ? '' : 's'}, so it cannot be removed.`);
+      }
+    }
 
     if (product.originalPrice < product.price) {
       throw new Error('Original price cannot be lower than the selling price');
@@ -259,6 +340,19 @@ export class ProductService {
           added.push(product.variants[product.variants.length - 1]);
         }
       }
+    }
+
+    // Check the finished style whenever its colours, sizes, images or variants changed
+    if (fields.colors || fields.sizes || fields.images || added.length > 0) {
+      for (const v of added) {
+        // A new variant takes its colour's swatch
+        const colour = product.colors.find((c) => c.name === v.color);
+        if (colour) v.colorHex = colour.hex;
+      }
+      this.assertShape(
+        { colors: product.colors, sizes: product.sizes, images: product.images, variants: product.variants },
+        false
+      );
     }
 
     await product.save();

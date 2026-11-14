@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useCartStore } from '@/store/useCartStore';
+import { useSettingsStore } from '@/store/useSettingsStore';
 import { MainLayout } from '@/layouts/MainLayout';
 import { HomePage } from '@/pages/HomePage';
 import { useDocumentMeta } from '@/hooks/useDocumentMeta';
@@ -48,6 +49,7 @@ const queryClient = new QueryClient();
 
 export const App: React.FC = () => {
   useEffect(() => {
+    void useSettingsStore.getState().load();
     useAuthStore.getState().checkAuth().then(() => {
       useCartStore.getState().syncWithBackend();
       void useCartStore.getState().syncWishlist();

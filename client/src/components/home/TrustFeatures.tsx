@@ -1,5 +1,6 @@
 import React from 'react';
 import { Star, CheckCircle, PackageCheck, Truck, RefreshCcw, ShieldCheck } from 'lucide-react';
+import { useSettingsStore } from '@/store/useSettingsStore';
 
 const REVIEWS = [
   {
@@ -35,6 +36,7 @@ const REVIEWS = [
 ];
 
 export const TrustFeatures: React.FC = () => {
+  const returnWindowDays = useSettingsStore((s) => s.settings.returnWindowDays);
   return (
     <section className="py-20 bg-ivory-50 border-b border-ivory-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -124,7 +126,7 @@ export const TrustFeatures: React.FC = () => {
               <div className="bg-charcoal-800/80 p-4 rounded-xs border border-charcoal-700">
                 <RefreshCcw className="w-6 h-6 text-sand-400 mx-auto mb-2" />
                 <p className="text-xs font-semibold text-ivory-100">Doorstep Exchange</p>
-                <p className="text-[10px] text-charcoal-400 mt-1">Size swap in 7 days</p>
+                <p className="text-[10px] text-charcoal-400 mt-1">Size swap in {returnWindowDays} days</p>
               </div>
               <div className="bg-charcoal-800/80 p-4 rounded-xs border border-charcoal-700">
                 <ShieldCheck className="w-6 h-6 text-sand-400 mx-auto mb-2" />

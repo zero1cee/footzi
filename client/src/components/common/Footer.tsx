@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, CheckCircle2, Shield, Truck, RefreshCw, Award } from 'lucide-react';
+import { useSettingsStore } from '@/store/useSettingsStore';
 
 export const Footer: React.FC = () => {
+  const returnWindowDays = useSettingsStore((s) => s.settings.returnWindowDays);
   const [email, setEmail] = useState('');
   const [subscribed, setSubscribed] = useState(false);
 
@@ -55,7 +57,7 @@ export const Footer: React.FC = () => {
               <div>
                 <p className="font-serif text-base font-medium text-ivory-50">Hassle-Free Exchanges</p>
                 <p className="text-xs text-charcoal-400 mt-1 leading-relaxed">
-                  Complimentary 7-day doorstep size replacement across all pincodes.
+                  Complimentary {returnWindowDays}-day doorstep size replacement across all pincodes.
                 </p>
               </div>
             </div>
