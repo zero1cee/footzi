@@ -29,6 +29,9 @@ export const validateEnv = (): void => {
 
 export const getJwtSecret = (): string => process.env.JWT_SECRET || DEV_JWT_SECRET;
 
+/** Secret key used to sign and verify guest order lookup links. Decoupled from JWT_SECRET so secret rotation does not invalidate old email links. */
+export const getOrderSecret = (): string => process.env.ORDER_LINK_SECRET || getJwtSecret();
+
 /** Comma-separated list of allowed browser origins, e.g. "https://a.com,https://b.com". */
 export const getCorsOrigins = (): string[] =>
   [

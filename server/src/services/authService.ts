@@ -183,7 +183,7 @@ export class AuthService {
         $set: { passwordHash: await bcrypt.hash(newPassword, 10), passwordChangedAt: new Date() },
         $unset: { resetTokenHash: '', resetTokenExpires: '' },
       },
-      { new: true }
+      { returnDocument: 'after' }
     );
     if (!user) throw new AuthError('This reset link is invalid or has expired. Please request a new one.');
 

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 500" width="100%" height="100%" fill="none">
+  <rect width="400" height="500" fill="#FBF9F5"/>
+  <rect x="20" y="20" width="360" height="460" rx="4" stroke="#EAE4D9" stroke-width="1.5" stroke-dasharray="4 4"/>
+  <g transform="translate(100, 160)" stroke="#A07F45" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <!-- Stylized Oxford / Loafer Silhouette -->
+    <path d="M20 110 C 35 70, 70 50, 110 50 C 140 50, 155 70, 175 85 C 190 95, 195 105, 195 115 C 190 125, 150 130, 100 130 C 40 130, 20 120, 20 110 Z"/>
+    <path d="M20 110 L 20 125 C 20 135, 45 138, 70 138 L 70 128"/>
+    <path d="M110 50 C 105 35, 120 20, 140 20 C 150 20, 158 28, 160 38"/>
+    <circle cx="95" cy="75" r="2" fill="#A07F45"/>
+    <circle cx="110" cy="70" r="2" fill="#A07F45"/>
+    <circle cx="125" cy="65" r="2" fill="#A07F45"/>
+  </g>
+  <text x="200" y="320" text-anchor="middle" font-family="Georgia, serif" font-size="14" font-weight="600" letter-spacing="4" fill="#2C2723">FOOTZI ATELIER</text>
+  <text x="200" y="342" text-anchor="middle" font-family="sans-serif" font-size="10" letter-spacing="2" fill="#8C7A6B">AGRA • HANDCRAFTED</text>
+</svg>

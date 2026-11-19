@@ -36,6 +36,12 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
             alt={product.name}
             className="w-full h-full object-cover object-center transition-transform duration-700 ease-out group-hover:scale-105"
             loading="lazy"
+            onError={(e) => {
+              const target = e.currentTarget;
+              if (!target.src.includes('placeholder-shoe.svg')) {
+                target.src = '/images/placeholder-shoe.svg';
+              }
+            }}
           />
         </Link>
 

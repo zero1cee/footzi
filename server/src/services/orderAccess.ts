@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import mongoose from 'mongoose';
-import { getJwtSecret } from '../config/env.js';
+import { getOrderSecret } from '../config/env.js';
 
 /**
  * Guests have no account, so what proves an order is theirs is a link only they received (in the
@@ -10,7 +10,7 @@ import { getJwtSecret } from '../config/env.js';
  * string, so it does not end up in server logs.
  */
 export const orderAccessToken = (orderId: unknown): string =>
-  crypto.createHmac('sha256', getJwtSecret()).update(`order-access:${String(orderId)}`).digest('hex');
+  crypto.createHmac('sha256', getOrderSecret()).update(`order-access:${String(orderId)}`).digest('hex');
 
 export const isValidOrderToken = (orderId: unknown, token: unknown): boolean => {
   if (typeof token !== 'string' || token.length !== 64) return false;

@@ -266,7 +266,7 @@ export class ReturnService {
     const moved = await ReturnRequest.findOneAndUpdate(
       { _id: request._id, status: request.status },
       { $set: update },
-      { new: true }
+      { returnDocument: 'after' }
     );
     if (!moved) {
       throw new Error('This request was just updated by someone else. Please refresh and try again.');

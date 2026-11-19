@@ -383,7 +383,7 @@ export class ProductService {
     const inv = await Inventory.findOneAndUpdate(
       { variantSku: sku },
       { availableStock: Math.max(0, newStock) },
-      { new: true }
+      { returnDocument: 'after' }
     );
 
     // The catalog shows pairs on hand, which includes the ones held for unpaid orders
@@ -434,7 +434,7 @@ export class ProductService {
     const product = await Product.findOneAndUpdate(
       { _id: productId, 'reviews.user': { $ne: user._id } },
       { $push: { reviews: { $each: [review], $position: 0 } } },
-      { new: true }
+      { returnDocument: 'after' }
     );
     if (!product) {
       return (await Product.exists({ _id: productId })) ? 'duplicate' : 'not_found';

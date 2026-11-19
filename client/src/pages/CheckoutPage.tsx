@@ -78,6 +78,11 @@ export const CheckoutPage: React.FC = () => {
         state: defaultAddr?.state || prev.state,
         pincode: defaultAddr?.pincode || prev.pincode,
       }));
+    } else {
+      const savedPin = localStorage.getItem('footzi_shipping_pincode');
+      if (savedPin) {
+        setFormData((prev) => ({ ...prev, pincode: prev.pincode || savedPin }));
+      }
     }
   }, [user]);
 

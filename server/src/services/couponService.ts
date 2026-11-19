@@ -108,7 +108,7 @@ export class CouponService {
       if (value === null) $unset[key] = '';
       else $set[key] = value;
     }
-    return Coupon.findByIdAndUpdate(id, { ...(Object.keys($set).length ? { $set } : {}), ...(Object.keys($unset).length ? { $unset } : {}) }, { new: true, runValidators: true });
+    return Coupon.findByIdAndUpdate(id, { ...(Object.keys($set).length ? { $set } : {}), ...(Object.keys($unset).length ? { $unset } : {}) }, { returnDocument: 'after', runValidators: true });
   }
 }
 

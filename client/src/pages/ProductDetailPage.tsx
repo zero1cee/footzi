@@ -30,6 +30,7 @@ import { ProductCard } from '@/components/ui/ProductCard';
 import { SizeGuideModal } from '@/components/common/SizeGuideModal';
 import { RecentlyViewed } from '@/components/ui/RecentlyViewed';
 import { NotifyWhenBack } from '@/components/ui/NotifyWhenBack';
+import { PincodeEstimator } from '@/components/ui/PincodeEstimator';
 import { useRecentStore } from '@/store/useRecentStore';
 import { useSettingsStore } from '@/store/useSettingsStore';
 
@@ -209,6 +210,12 @@ const ProductDetailContent: React.FC<{ product: Product }> = ({ product }) => {
                 src={product.images[activeImageIndex] || product.images[0]}
                 alt={product.name}
                 className="w-full h-full object-cover object-center transition-transform duration-500 group-hover:scale-105"
+                onError={(e) => {
+                  const target = e.currentTarget;
+                  if (!target.src.includes('placeholder-shoe.svg')) {
+                    target.src = '/images/placeholder-shoe.svg';
+                  }
+                }}
               />
               {product.badge && (
                 <div className="absolute top-4 left-4">
@@ -232,7 +239,12 @@ const ProductDetailContent: React.FC<{ product: Product }> = ({ product }) => {
                         : 'border-ivory-300 opacity-70 hover:opacity-100'
                     }`}
                   >
-                    <img decoding="async" loading="lazy" src={img} alt={`${product.name}, view ${idx + 1}`} className="w-full h-full object-cover" />
+                    <img decoding="async" loading="lazy" src={img} alt={`${product.name}, view ${idx + 1}`} className="w-full h-full object-cover" onError={(e) => {
+                      const target = e.currentTarget;
+                      if (!target.src.includes('placeholder-shoe.svg')) {
+                        target.src = '/images/placeholder-shoe.svg';
+                      }
+                    }} />
                   </button>
                 ))}
               </div>
@@ -466,6 +478,9 @@ const ProductDetailContent: React.FC<{ product: Product }> = ({ product }) => {
                 Instant Buy Now <ArrowRight className="w-4 h-4" />
               </Button>
             </div>
+
+            {/* Pincode & Delivery Serviceability Widget */}
+            <PincodeEstimator />
 
             {/* Trust Assurances */}
             <div className="grid grid-cols-3 gap-3 pt-4 border-t border-ivory-200 text-center">

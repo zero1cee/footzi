@@ -102,7 +102,7 @@ export class RefundService {
       await Payment.updateOne({ _id: payment._id }, { $set: { status: 'refunded' } });
     }
 
-    const order = await Order.findByIdAndUpdate(orderId, { $inc: { refundedAmount: amount } }, { new: true });
+    const order = await Order.findByIdAndUpdate(orderId, { $inc: { refundedAmount: amount } }, { returnDocument: 'after' });
     if (order && order.refundedAmount >= order.total) {
       order.paymentStatus = 'refunded';
       await order.save();

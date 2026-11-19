@@ -151,7 +151,7 @@ export class SupplierFulfillmentService {
           shipmentEvents: { timestamp: new Date(), status: nextStatus.toUpperCase(), location: eventLocation, note: note || defaultNote },
         },
       },
-      { new: true }
+      { returnDocument: 'after' }
     );
     if (!moved) {
       throw new Error('This supplier order was just updated by someone else. Please refresh and try again.');

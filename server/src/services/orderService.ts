@@ -198,7 +198,7 @@ export class OrderService {
   async claimGuestOrder(orderId: string, userId: string, token: string): Promise<IOrder> {
     const filter = orderFilterFor(orderId, { guestToken: token });
     const claimed = filter
-      ? await Order.findOneAndUpdate(filter, { $set: { user: userId, isGuest: false }, $push: { statusHistory: { status: 'claimed', timestamp: new Date(), note: 'Order added to a customer account.' } } }, { new: true })
+      ? await Order.findOneAndUpdate(filter, { $set: { user: userId, isGuest: false }, $push: { statusHistory: { status: 'claimed', timestamp: new Date(), note: 'Order added to a customer account.' } } }, { returnDocument: 'after' })
       : null;
     if (!claimed) throw new Error('This order link is not valid, or the order already belongs to an account.');
     return claimed;
@@ -253,7 +253,7 @@ export class OrderService {
         $set: { orderStatus: 'cancelled' },
         $push: { statusHistory: { status: 'cancelled', timestamp: new Date(), note } },
       },
-      { new: true }
+      { returnDocument: 'after' }
     );
     if (!order) return null;
 
@@ -308,7 +308,7 @@ export class OrderService {
     const order = await Order.findOneAndUpdate(
       filter,
       { $set: { orderStatus: 'cancelled' }, $push: { statusHistory: { status: 'cancelled', timestamp: new Date(), note } } },
-      { new: true }
+      { returnDocument: 'after' }
     );
     if (!order) {
       const current = await Order.findById(orderId);

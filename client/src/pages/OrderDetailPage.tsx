@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, Circle, MapPin, Truck, XCircle } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Circle, MapPin, Truck, XCircle, FileText } from 'lucide-react';
 import { useOrderAccess } from '@/hooks/useOrderAccess';
 import { orderService } from '@/services/orderService';
 import { formatINR } from '@/lib/utils';
@@ -317,8 +317,9 @@ export const OrderDetailPage: React.FC<Props> = ({ mode = 'account' }) => {
           <div className="mt-8 pt-5 border-t border-ivory-200">
             {(order.paymentStatus === 'paid' || order.paymentStatus === 'refunded') && (
               <p className="text-xs text-charcoal-600 mb-3">
-                <Link to={`${base}/${order._id}/receipt`} className="font-semibold text-charcoal-900 underline">
-                  View or print your receipt
+                <Link to={`${base}/${order._id}/receipt`} className="inline-flex items-center gap-1.5 font-semibold text-charcoal-900 hover:text-sand-600 underline">
+                  <FileText className="w-3.5 h-3.5 text-sand-600" />
+                  View or print your receipt & GST tax invoice
                 </Link>
               </p>
             )}
