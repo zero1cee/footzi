@@ -98,7 +98,7 @@ const SupplierOrderSchema = new Schema<ISupplierOrder>(
     },
     totalWholesaleCost: { type: Number, required: true },
     trackingNumber: { type: String },
-    carrier: { type: String, default: 'BlueDart Air Express' },
+    carrier: { type: String, default: 'Delhivery Express' },
     shipmentEvents: [ShipmentEventSchema],
     submittedAt: { type: Date },
     acceptedAt: { type: Date },

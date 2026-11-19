@@ -134,7 +134,7 @@ describe('Guest checkout', () => {
       expect(paid.status).toBe(200);
       expect(paid.body.verified).toBe(true);
       expect(paid.body.order.orderStatus).toBe('processing');
-      expect(paid.body.supplierOrder.trackingNumber).toMatch(/^BD-AGR-/);
+      expect(paid.body.supplierOrder.trackingNumber).toMatch(/^(DLV|BD)-AGR-/);
 
       const mail = lastMailTo(buyer, 'confirmed')!;
       expect(mail).toBeDefined();

@@ -224,11 +224,11 @@ export const OrderReceiptPage: React.FC<{ mode?: 'account' | 'guest' }> = ({ mod
                   <strong className="text-charcoal-900">Tax Payable On Reverse Charge:</strong> N/A
                 </p>
                 <p className="text-[11px] text-charcoal-600">
-                  <strong className="text-charcoal-900">Logistics Carrier:</strong> BlueDart Air Express
+                  <strong className="text-charcoal-900">Logistics Carrier:</strong> Delhivery Express
                 </p>
                 <p className="text-[11px] text-charcoal-600">
                   <strong className="text-charcoal-900">AWB Tracking:</strong>{' '}
-                  <span className="font-mono">{order.trackingNumber || 'BD-EXP-AGR-IN'}</span>
+                  <span className="font-mono">{order.trackingNumber || 'DLV-EXP-AGR-IN'}</span>
                 </p>
               </div>
             </div>

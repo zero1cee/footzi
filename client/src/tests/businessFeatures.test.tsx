@@ -2,6 +2,7 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { PincodeEstimator, calculateEstimate } from '@/components/ui/PincodeEstimator';
+import { OrderTrackingStepper } from '@/components/ui/OrderTrackingStepper';
 import { numberToIndianWords, getIndianStateCode } from '@/lib/utils';
 
 describe('Business Features: Indian GST & Pincode Logistics', () => {
@@ -17,7 +18,7 @@ describe('Business Features: Indian GST & Pincode Logistics', () => {
       expect(est?.city).toBe('Agra');
       expect(est?.state).toBe('Uttar Pradesh');
       expect(est?.zone).toBe('Local');
-      expect(est?.courier).toBe('BlueDart Air Express');
+      expect(est?.courier).toBe('Delhivery Express');
       expect(est?.isExpress).toBe(true);
     });
 
@@ -89,7 +90,7 @@ describe('Business Features: Indian GST & Pincode Logistics', () => {
 
       expect(screen.getByText(/Estimated Delivery by/i)).toBeInTheDocument();
       expect(screen.getByText(/Delivering to/i)).toHaveTextContent('Agra');
-      expect(screen.getByText(/Fulfilled by BlueDart Air Express/i)).toBeInTheDocument();
+      expect(screen.getByText(/Fulfilled by Delhivery Express/i)).toBeInTheDocument();
       expect(localStorage.getItem('footzi_shipping_pincode')).toBe('282001');
 
       // Click "Change PIN" to reset
@@ -105,6 +106,59 @@ describe('Business Features: Indian GST & Pincode Logistics', () => {
       fireEvent.click(screen.getByRole('button', { name: /check/i }));
 
       expect(screen.getByText(/Please enter a valid 6-digit Indian postal code/i)).toBeInTheDocument();
+    });
+  });
+
+  describe('OrderTrackingStepper & Delhivery Logistics Milestones', () => {
+    it('renders the 5 atelier & logistics milestones with active status', () => {
+      render(
+        <OrderTrackingStepper
+          orderStatus="processing"
+          paymentStatus="paid"
+          trackingNumber="DLV-AGR-88231456IN"
+          destinationCity="Mumbai"
+        />
+      );
+
+      expect(screen.getByText('Order Placed')).toBeInTheDocument();
+      expect(screen.getByText('Guild Accepted')).toBeInTheDocument();
+      expect(screen.getByText('Artisan Hand-Crafting')).toBeInTheDocument();
+      expect(screen.getByText('Dispatched via Delhivery')).toBeInTheDocument();
+      expect(screen.getByText('Doorstep Handover')).toBeInTheDocument();
+      expect(screen.getByText('Current Status')).toBeInTheDocument();
+    });
+
+    it('renders Delhivery live waybill tracking card and external link', () => {
+      render(
+        <OrderTrackingStepper
+          orderStatus="shipped"
+          paymentStatus="paid"
+          trackingNumber="DLV-AGR-88231456IN"
+          carrier="Delhivery Express"
+          destinationCity="Bengaluru"
+        />
+      );
+
+      expect(screen.getByText('Delhivery Express')).toBeInTheDocument();
+      expect(screen.getByText('DLV-AGR-88231456IN')).toBeInTheDocument();
+      const link = screen.getByRole('link', { name: /track on delhivery\.com/i });
+      expect(link).toHaveAttribute(
+        'href',
+        'https://www.delhivery.com/track/package/DLV-AGR-88231456IN'
+      );
+    });
+
+    it('renders clean cancellation card when order is cancelled', () => {
+      render(
+        <OrderTrackingStepper
+          orderStatus="cancelled"
+          paymentStatus="refunded"
+        />
+      );
+
+      expect(screen.getByText('Order Cancelled')).toBeInTheDocument();
+      expect(screen.getByText(/initiated back to your original payment method/i)).toBeInTheDocument();
+      expect(screen.queryByText('Dispatched via Delhivery')).not.toBeInTheDocument();
     });
   });
 });

@@ -129,8 +129,8 @@ describe('account flows', () => {
       shippingFee: 0,
       total: 4000,
       refundedAmount: 0,
-      carrier: 'BlueDart Air Express',
-      trackingNumber: 'BD-AGR-1234',
+      carrier: 'Delhivery Express',
+      trackingNumber: 'DLV-AGR-1234',
       items: [{ sku: 'SKU1', name: 'Test Loafer', size: 'UK 8', color: 'Tan', quantity: 1, lineTotal: 4000, image: 'x.jpg' }],
       shippingAddress: { name: 'Test Patron', phone: '9876543210', addressLine: '1 Road', city: 'Agra', state: 'UP', pincode: '282001' },
       statusHistory: [{ status: 'confirmed', timestamp: '2026-11-01T10:05:00.000Z', note: 'Payment verified' }],
@@ -156,7 +156,7 @@ describe('account flows', () => {
       renderDetail();
       expect(await screen.findByText('Order #FTZ-AGR-100001')).toBeInTheDocument();
       expect(screen.getByText('Test Loafer')).toBeInTheDocument();
-      expect(screen.getByText('BD-AGR-1234')).toBeInTheDocument();
+      expect(screen.getByText('DLV-AGR-1234')).toBeInTheDocument();
       expect(screen.getByText('Payment verified')).toBeInTheDocument();
 
       // First click only asks for confirmation

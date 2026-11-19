@@ -124,7 +124,7 @@ const ReturnRequestSchema = new Schema<IReturnRequest>(
     adminNotes: { type: String, default: '' },
     pickupTrackingNumber: { type: String },
     replacementTrackingNumber: { type: String },
-    carrier: { type: String, default: 'BlueDart Reverse Logistics' },
+    carrier: { type: String, default: 'Delhivery Reverse Logistics' },
     refundAmount: { type: Number, default: 0 },
   },
   {

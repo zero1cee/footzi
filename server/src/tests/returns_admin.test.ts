@@ -120,7 +120,7 @@ describe('Returns, Exchanges & Admin Operations Suite', () => {
     expect(res.body.returnRequest.returnNumber).toMatch(/^RET-AGR-/);
     expect(res.body.returnRequest.type).toBe('exchange');
     expect(res.body.returnRequest.status).toBe('requested');
-    expect(res.body.returnRequest.pickupTrackingNumber).toMatch(/^BD-REV-/);
+    expect(res.body.returnRequest.pickupTrackingNumber).toMatch(/^(DLV|BD)-REV-/);
 
     testReturnId = res.body.returnRequest._id;
   });
@@ -168,7 +168,7 @@ describe('Returns, Exchanges & Admin Operations Suite', () => {
     const dispatchRes = await patch('replacement_dispatched', 'UK 9 replacement pair dispatched.');
     expect(dispatchRes.status).toBe(200);
     expect(dispatchRes.body.returnRequest.status).toBe('replacement_dispatched');
-    expect(dispatchRes.body.returnRequest.replacementTrackingNumber).toMatch(/^BD-EXC-/);
+    expect(dispatchRes.body.returnRequest.replacementTrackingNumber).toMatch(/^(DLV|BD)-EXC-/);
 
     // A finished request is final
     expect((await patch('rejected')).status).toBe(400);

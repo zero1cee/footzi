@@ -38,7 +38,7 @@ export class SupplierFulfillmentService {
     }
 
     const supplierOrderNumber = `SUP-AGR-${Math.floor(100000 + Math.random() * 900000)}`;
-    const trackingNumber = `BD-AGR-${Math.floor(10000000 + Math.random() * 90000000)}IN`;
+    const trackingNumber = `DLV-AGR-${Math.floor(10000000 + Math.random() * 90000000)}IN`;
 
     // Calculate wholesale supplier items cost (approx 55% of retail price)
     const supplierItems = customerOrder.items.map((item) => {
@@ -67,7 +67,7 @@ export class SupplierFulfillmentService {
       status: 'accepted', // Auto-accepted in simulation
       totalWholesaleCost,
       trackingNumber,
-      carrier: 'BlueDart Air Express',
+      carrier: 'Delhivery Express',
       shipmentEvents: [
         {
           timestamp: new Date(),
@@ -133,8 +133,8 @@ export class SupplierFulfillmentService {
       customerStatus = 'processing';
     } else if (nextStatus === 'shipped') {
       update.shippedAt = new Date();
-      eventLocation = 'BlueDart Agra Logistics Hub';
-      defaultNote = `Dispatched via BlueDart Air Express. Tracking ID: ${supplierOrder.trackingNumber}`;
+      eventLocation = 'Delhivery Agra Logistics Hub';
+      defaultNote = `Dispatched via Delhivery Express. Tracking ID: ${supplierOrder.trackingNumber}`;
       customerStatus = 'shipped';
     } else if (nextStatus === 'delivered') {
       update.deliveredAt = new Date();

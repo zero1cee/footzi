@@ -149,7 +149,8 @@ export const CheckoutPage: React.FC = () => {
         }
       } catch (err: any) {
         // A real rejection from the API (out of stock, validation, auth) must reach the patron
-        if (!isBackendUnreachable(err)) throw err;
+        const allowSimulated = import.meta.env.DEV || import.meta.env.VITE_ALLOW_SIMULATED_CHECKOUT === 'true';
+        if (!isBackendUnreachable(err) || !allowSimulated) throw err;
 
         console.warn('[Checkout] Backend offline, simulating order:', err.message);
         createdOrder = {
@@ -274,7 +275,7 @@ export const CheckoutPage: React.FC = () => {
 
       const assignedTracking =
         verifyResult?.supplierOrder?.trackingNumber ||
-        `BD-AGR-${Math.floor(10000000 + Math.random() * 90000000)}IN`;
+        `DLV-AGR-${Math.floor(10000000 + Math.random() * 90000000)}IN`;
 
       setCompletedOrderData({
         orderNumber: createdOrder.orderNumber,
@@ -364,7 +365,7 @@ export const CheckoutPage: React.FC = () => {
               <div className="flex items-start gap-2">
                 <span className="w-2 h-2 rounded-full bg-sand-500 mt-1.5 shrink-0" />
                 <p>
-                  <strong>Logistics Gateway:</strong> Dispatched via <strong>BlueDart Air Express</strong> from Taj Crafts Enclave, Agra.
+                  <strong>Logistics Gateway:</strong> Dispatched via <strong>Delhivery Express</strong> from Taj Crafts Enclave, Agra.
                 </p>
               </div>
               <div className="flex items-start gap-2">
@@ -765,7 +766,7 @@ export const CheckoutPage: React.FC = () => {
                   <span>Simulated 256-bit Encrypted Transaction</span>
                 </div>
                 <p className="leading-relaxed">
-                  Clicking confirm executes the backend payment verification endpoint, checks cryptographic signature integrity, deducts reserved stock, and allocates an Agra BlueDart tracking number.
+                  Clicking confirm executes the backend payment verification endpoint, checks cryptographic signature integrity, deducts reserved stock, and allocates an Agra Delhivery tracking number.
                 </p>
               </div>
 

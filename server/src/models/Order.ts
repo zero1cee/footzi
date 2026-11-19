@@ -166,7 +166,7 @@ const OrderSchema = new Schema<IOrder>(
     ],
     supplierOrderId: { type: Schema.Types.ObjectId, ref: 'SupplierOrder' },
     trackingNumber: { type: String },
-    carrier: { type: String, default: 'BlueDart Air Express' },
+    carrier: { type: String, default: 'Delhivery Express' },
   },
   {
     timestamps: true,

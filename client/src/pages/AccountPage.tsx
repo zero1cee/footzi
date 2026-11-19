@@ -165,8 +165,8 @@ export const AccountPage: React.FC = () => {
       orderNumber: 'FTZ-AGR-882194',
       createdAt: new Date().toISOString(),
       orderStatus: 'shipped',
-      carrier: 'BlueDart Air Express',
-      trackingNumber: 'BD-AGR-98231456IN',
+      carrier: 'Delhivery Express',
+      trackingNumber: 'DLV-AGR-98231456IN',
       total: 3899,
       items: [
         {
@@ -500,7 +500,7 @@ export const AccountPage: React.FC = () => {
                             <strong className="font-mono text-charcoal-900">
                               {order.trackingNumber || 'Pending Allocation'}
                             </strong>{' '}
-                            ({order.carrier || 'BlueDart Air Express'})
+                            ({order.carrier || 'Delhivery Express'})
                           </p>
                           {returnEligibility(order, returnWindowDays).eligible ? (
                             <div className="flex flex-col sm:items-end gap-1">
@@ -1003,7 +1003,7 @@ export const AccountPage: React.FC = () => {
                 <p className="font-semibold text-sand-800 flex items-center gap-1 mb-0.5">
                   <CheckCircle2 className="w-3.5 h-3.5 text-sand-600" /> Complimentary Doorstep Reverse Pickup
                 </p>
-                A BlueDart courier agent will collect the boxed footwear with barcode label pre-printed.
+                A Delhivery courier agent will collect the boxed footwear with barcode label pre-printed.
               </div>
 
               {returnError && (

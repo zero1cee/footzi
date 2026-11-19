@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { useDocumentMeta } from '@/hooks/useDocumentMeta';
 import { useSettingsStore } from '@/store/useSettingsStore';
+import { OrderTrackingStepper } from '@/components/ui/OrderTrackingStepper';
 
 const STATUS_LABELS: Record<string, string> = {
   pending_payment: 'Awaiting payment',
@@ -269,25 +270,33 @@ export const OrderDetailPage: React.FC<Props> = ({ mode = 'account' }) => {
                 <h2 className="text-[11px] uppercase tracking-widest font-bold text-charcoal-700 mb-2 flex items-center gap-1.5">
                   <Truck className="w-3.5 h-3.5 text-sand-600" /> Shipment
                 </h2>
-                {trackingNumber ? (
-                  <p className="text-xs text-charcoal-600">
-                    {order.carrier || supplier?.carrier || 'BlueDart Air Express'} •{' '}
-                    <strong className="font-mono text-charcoal-900">{trackingNumber}</strong>
-                  </p>
-                ) : (
-                  <p className="text-xs text-charcoal-500">A tracking number appears here once your order is confirmed.</p>
+                {!trackingNumber && (
+                  <p className="text-xs text-charcoal-500 mb-3">A tracking number appears here once your order is confirmed.</p>
                 )}
+                
+                <OrderTrackingStepper
+                  orderStatus={order.orderStatus}
+                  paymentStatus={order.paymentStatus}
+                  trackingNumber={trackingNumber}
+                  carrier={order.carrier || supplier?.carrier || 'Delhivery Express'}
+                  destinationCity={order.shippingAddress?.city}
+                  createdAt={order.createdAt}
+                />
+
                 {events.length > 0 && (
-                  <ol className="mt-3 space-y-2 border-l border-ivory-300 pl-4">
-                    {events.map((event, index) => (
-                      <li key={`${event.timestamp}-${index}`} className="text-xs relative">
-                        <Circle className="w-2.5 h-2.5 text-sand-600 fill-sand-400 absolute -left-[1.4rem] top-1" />
-                        <p className="font-semibold text-charcoal-800 capitalize">{String(event.status).toLowerCase()}</p>
-                        <p className="text-charcoal-500">{event.location}</p>
-                        <p className="text-[10px] text-charcoal-400">{formatDateTime(event.timestamp)}</p>
-                      </li>
-                    ))}
-                  </ol>
+                  <div className="mt-4 pt-4 border-t border-ivory-200">
+                    <p className="text-[10px] uppercase tracking-wider font-semibold text-charcoal-600 mb-2">Detailed Logistics Log:</p>
+                    <ol className="space-y-2 border-l border-ivory-300 pl-4">
+                      {events.map((event, index) => (
+                        <li key={`${event.timestamp}-${index}`} className="text-xs relative">
+                          <Circle className="w-2.5 h-2.5 text-sand-600 fill-sand-400 absolute -left-[1.4rem] top-1" />
+                          <p className="font-semibold text-charcoal-800 capitalize">{String(event.status).toLowerCase()}</p>
+                          <p className="text-charcoal-500">{event.location}</p>
+                          <p className="text-[10px] text-charcoal-400">{formatDateTime(event.timestamp)}</p>
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
                 )}
               </div>
 

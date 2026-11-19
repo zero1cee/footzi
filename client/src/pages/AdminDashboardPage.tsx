@@ -559,7 +559,7 @@ export const AdminDashboardPage: React.FC = () => {
                 Agra Artisan Dropshipping Simulation Pipeline
               </h3>
               <p className="text-xs text-charcoal-500 mt-1">
-                Automated workflow: Customer purchase → Supplier order (SUP-AGR-01) → Crafting/Lasting → BlueDart dispatch → Doorstep delivery.
+                Automated workflow: Customer purchase → Supplier order (SUP-AGR-01) → Crafting/Lasting → Delhivery dispatch → Doorstep delivery.
               </p>
             </div>
 
@@ -780,7 +780,7 @@ export const AdminDashboardPage: React.FC = () => {
                 Customer Size Exchanges & Returns Center
               </h3>
               <p className="text-xs text-charcoal-500 mt-1">
-                Review patron exchange requests, schedule BlueDart reverse pickups, and dispatch replacements.
+                Review patron exchange requests, schedule Delhivery reverse pickups, and dispatch replacements.
               </p>
             </div>
 

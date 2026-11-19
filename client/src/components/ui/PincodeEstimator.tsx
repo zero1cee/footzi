@@ -61,7 +61,7 @@ export const calculateEstimate = (pincode: string): PincodeEstimate | null => {
       daysMax: match.daysMax + dispatchDelay,
       deliveryDateStr: dateStr,
       isExpress: match.isExpress,
-      courier: 'BlueDart Air Express',
+      courier: 'Delhivery Express',
     };
   }
 
@@ -106,7 +106,7 @@ export const calculateEstimate = (pincode: string): PincodeEstimate | null => {
     daysMax: daysMax + dispatchDelay,
     deliveryDateStr: dateStr,
     isExpress: false,
-    courier: 'BlueDart Air Express',
+    courier: 'Delhivery Express',
   };
 };
 

@@ -10,6 +10,7 @@ export const TrackOrderPage: React.FC = () => {
   useDocumentMeta({ title: 'Find your order — Footzi', noindex: true });
   const [orderNumber, setOrderNumber] = useState('');
   const [email, setEmail] = useState('');
+  const [delhiveryAwb, setDelhiveryAwb] = useState('');
   const [sending, setSending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -83,6 +84,39 @@ export const TrackOrderPage: React.FC = () => {
               </Button>
             </form>
           )}
+
+          <div className="mt-8 pt-6 border-t border-ivory-200">
+            <span className="text-[10px] uppercase tracking-wider font-semibold text-charcoal-700 block mb-1">
+              Direct Delhivery Courier Tracking
+            </span>
+            <p className="text-xs text-charcoal-500 mb-3">
+              Already have an assigned tracking code (e.g. <span className="font-mono text-[11px] text-charcoal-800">DLV-AGR-...</span>)?
+            </p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={delhiveryAwb}
+                onChange={(e) => setDelhiveryAwb(e.target.value)}
+                placeholder="Enter Delhivery AWB number..."
+                className="flex-1 bg-ivory-50 border border-ivory-300 px-3 py-2 text-xs text-charcoal-900 uppercase placeholder:normal-case rounded-xs focus:outline-none focus:border-charcoal-900"
+              />
+              <a
+                href={delhiveryAwb.trim() ? `https://www.delhivery.com/track/package/${encodeURIComponent(delhiveryAwb.trim())}` : '#'}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => {
+                  if (!delhiveryAwb.trim()) e.preventDefault();
+                }}
+                className={`px-3 py-2 text-xs font-semibold rounded-xs transition-colors flex items-center gap-1 shrink-0 ${
+                  delhiveryAwb.trim()
+                    ? 'bg-charcoal-900 hover:bg-charcoal-800 text-white'
+                    : 'bg-ivory-200 text-charcoal-400 cursor-not-allowed'
+                }`}
+              >
+                Track ↗
+              </a>
+            </div>
+          </div>
         </div>
       </div>
     </div>

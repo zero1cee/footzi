@@ -174,8 +174,8 @@ export class ReturnService {
         items: returnItems,
         customerComments: customerComments || '',
         status: 'requested',
-        pickupTrackingNumber: `BD-REV-${Math.floor(10000000 + Math.random() * 90000000)}IN`,
-        carrier: 'BlueDart Reverse Logistics',
+        pickupTrackingNumber: `DLV-REV-${Math.floor(10000000 + Math.random() * 90000000)}IN`,
+        carrier: 'Delhivery Reverse Logistics',
         refundAmount,
       });
 
@@ -258,7 +258,7 @@ export class ReturnService {
     if (adminNotes && !refundNote) update.adminNotes = adminNotes;
     if (status === 'replacement_dispatched') {
       update.replacementTrackingNumber =
-        replacementTrackingNumber || `BD-EXC-${Math.floor(10000000 + Math.random() * 90000000)}IN`;
+        replacementTrackingNumber || `DLV-EXC-${Math.floor(10000000 + Math.random() * 90000000)}IN`;
     }
 
     // Only one admin action can move a request out of its current status, so the

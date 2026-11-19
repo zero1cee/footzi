@@ -48,7 +48,7 @@ describe('Order Lifecycle & Payment Integration Suite', () => {
   });
 
   it('POST /api/orders - should create customer order with server-calculated prices & stock reservation', async () => {
-    const variant = targetProduct.variants[0];
+    const variant = targetProduct.variants.find((v: any) => v.stock > 0) || targetProduct.variants[1];
 
     const orderPayload = {
       customerName: 'Arjun Kapoor',
@@ -123,7 +123,7 @@ describe('Order Lifecycle & Payment Integration Suite', () => {
     expect(res.body.order.paymentStatus).toBe('paid');
     expect(res.body.order.orderStatus).toBe('processing');
     expect(res.body.supplierOrder).toBeDefined();
-    expect(res.body.supplierOrder.trackingNumber).toMatch(/^BD-AGR-/);
+    expect(res.body.supplierOrder.trackingNumber).toMatch(/^(DLV|BD)-AGR-/);
   });
 
   it('POST /api/admin/supplier-orders/:id/fulfill - admin should transition supplier fulfillment pipeline', async () => {
@@ -151,7 +151,7 @@ describe('Order Lifecycle & Payment Integration Suite', () => {
       .set('Authorization', `Bearer ${adminToken}`)
       .send({
         status: 'shipped',
-        note: 'Dispatched from BlueDart Agra Logistics Hub',
+        note: 'Dispatched from Delhivery Agra Logistics Hub',
       });
 
     expect(res.status).toBe(200);

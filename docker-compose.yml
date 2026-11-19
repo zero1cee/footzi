@@ -1,0 +1,61 @@
+services:
+  mongodb:
+    image: mongo:7.0
+    container_name: footzi-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - footzi-network
+
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: footzi-server
+    restart: unless-stopped
+    ports:
+      - "5001:5001"
+    environment:
+      - NODE_ENV=production
+      - PORT=5001
+      - MONGODB_URI=mongodb://mongodb:27017/footzi
+      - JWT_SECRET=${JWT_SECRET:-footzi_taj_crafts_production_jwt_secret_2026}
+      - ORDER_LINK_SECRET=${ORDER_LINK_SECRET:-footzi_order_link_secret_2026}
+      - CLIENT_URL=http://localhost
+      - RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID:-rzp_test_placeholder}
+      - RAZORPAY_KEY_SECRET=${RAZORPAY_KEY_SECRET:-rzp_test_placeholder_secret}
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - footzi-network
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: footzi-client
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - server
+    networks:
+      - footzi-network
+
+volumes:
+  mongo-data:
+    driver: local
+
+networks:
+  footzi-network:
+    driver: bridge
