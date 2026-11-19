@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { X, Star, Check, ShoppingBag, ArrowRight } from 'lucide-react';
+import { X, Star, Check, ShoppingBag, ArrowRight, Maximize2 } from 'lucide-react';
 import { useCartStore } from '@/store/useCartStore';
 import { formatINR } from '@/lib/utils';
 import { ShoeSize } from '@/types';
 import { Button } from '@/components/ui/Button';
 import { useDialogA11y } from '@/hooks/useDialogA11y';
+import { ImageLightbox } from './ImageLightbox';
 
 export const QuickViewModal: React.FC = () => {
   const { quickViewProduct, setQuickViewProduct, addItem } = useCartStore();
@@ -13,6 +14,30 @@ export const QuickViewModal: React.FC = () => {
   const [selectedSize, setSelectedSize] = useState<ShoeSize | null>(null);
   const [selectedColor, setSelectedColor] = useState<{ name: string; hex: string } | null>(null);
   const [isAdded, setIsAdded] = useState(false);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (!quickViewProduct) return;
+    if (touchStartRef.current && e.changedTouches.length === 1) {
+      const deltaX = e.changedTouches[0].clientX - touchStartRef.current.x;
+      const deltaY = e.changedTouches[0].clientY - touchStartRef.current.y;
+      if (Math.abs(deltaX) > 40 && Math.abs(deltaX) > Math.abs(deltaY) * 1.5) {
+        if (deltaX < 0 && selectedImageIndex < quickViewProduct.images.length - 1) {
+          setSelectedImageIndex((i) => i + 1);
+        } else if (deltaX > 0 && selectedImageIndex > 0) {
+          setSelectedImageIndex((i) => i - 1);
+        }
+      }
+    }
+    touchStartRef.current = null;
+  };
 
   useEffect(() => {
     if (quickViewProduct) {
@@ -79,12 +104,31 @@ export const QuickViewModal: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2">
           {/* Product Gallery */}
           <div className="bg-ivory-200/60 p-6 flex flex-col justify-between">
-            <div className="aspect-[4/5] w-full rounded-xs overflow-hidden bg-white shadow-inner">
-              <img decoding="async" loading="lazy"
+            <div
+              className="aspect-[4/5] w-full rounded-xs overflow-hidden bg-white shadow-inner relative group cursor-pointer"
+              onClick={() => setLightboxOpen(true)}
+              onTouchStart={handleTouchStart}
+              onTouchEnd={handleTouchEnd}
+            >
+              <img
+                decoding="async"
+                loading="lazy"
                 src={quickViewProduct.images[selectedImageIndex] || quickViewProduct.images[0]}
                 alt={quickViewProduct.name}
-                className="w-full h-full object-cover object-center transition-all duration-300"
+                className="w-full h-full object-cover object-center transition-all duration-300 group-hover:scale-105"
               />
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setLightboxOpen(true);
+                }}
+                className="absolute bottom-3 right-3 bg-charcoal-950/80 hover:bg-charcoal-900 text-ivory-100 backdrop-blur-xs px-2.5 py-1 rounded-full text-[10px] font-medium tracking-wider flex items-center gap-1 shadow-md border border-sand-500/40 transition-all cursor-pointer z-10"
+                aria-label="Inspect craftsmanship"
+              >
+                <Maximize2 className="w-3 h-3 text-sand-400" />
+                <span>Zoom</span>
+              </button>
             </div>
 
             {quickViewProduct.images.length > 1 && (
@@ -92,8 +136,10 @@ export const QuickViewModal: React.FC = () => {
                 {quickViewProduct.images.map((img, idx) => (
                   <button
                     key={idx}
+                    type="button"
                     onClick={() => setSelectedImageIndex(idx)}
-                    className={`w-14 h-14 rounded-xs overflow-hidden border-2 transition-all ${
+                    aria-label={`View angle ${idx + 1}`}
+                    className={`w-14 h-14 rounded-xs overflow-hidden border-2 transition-all cursor-pointer ${
                       selectedImageIndex === idx
                         ? 'border-charcoal-900 shadow-sm'
                         : 'border-transparent opacity-60 hover:opacity-100'
@@ -261,6 +307,17 @@ export const QuickViewModal: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Fullscreen High-Resolution Image Lightbox */}
+      <ImageLightbox
+        isOpen={lightboxOpen}
+        onClose={() => setLightboxOpen(false)}
+        images={quickViewProduct.images}
+        currentIndex={selectedImageIndex}
+        onIndexChange={setSelectedImageIndex}
+        productName={quickViewProduct.name}
+        craftsmanshipDetail={quickViewProduct.material || quickViewProduct.craftsmanshipLocation}
+      />
     </div>
   );
 };

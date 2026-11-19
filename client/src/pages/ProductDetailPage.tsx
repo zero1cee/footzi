@@ -16,6 +16,7 @@ import {
   Ruler,
   CheckCircle2,
   MessageSquare,
+  Maximize2,
 } from 'lucide-react';
 import { useProducts, useProductBySlug, useSubmitReview } from '@/hooks/useProducts';
 import { useDocumentMeta } from '@/hooks/useDocumentMeta';
@@ -28,6 +29,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { ProductCard } from '@/components/ui/ProductCard';
 import { SizeGuideModal } from '@/components/common/SizeGuideModal';
+import { ImageLightbox } from '@/components/common/ImageLightbox';
 import { RecentlyViewed } from '@/components/ui/RecentlyViewed';
 import { NotifyWhenBack } from '@/components/ui/NotifyWhenBack';
 import { PincodeEstimator } from '@/components/ui/PincodeEstimator';
@@ -98,6 +100,38 @@ const ProductDetailContent: React.FC<{ product: Product }> = ({ product }) => {
   const wishlisted = isInWishlist(product.id);
 
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [isHoverZooming, setIsHoverZooming] = useState(false);
+  const [zoomOrigin, setZoomOrigin] = useState({ x: 50, y: 50 });
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100));
+    const y = Math.max(0, Math.min(100, ((e.clientY - rect.top) / rect.height) * 100));
+    setZoomOrigin({ x, y });
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartRef.current && e.changedTouches.length === 1) {
+      const deltaX = e.changedTouches[0].clientX - touchStartRef.current.x;
+      const deltaY = e.changedTouches[0].clientY - touchStartRef.current.y;
+      if (Math.abs(deltaX) > 40 && Math.abs(deltaX) > Math.abs(deltaY) * 1.5) {
+        if (deltaX < 0 && activeImageIndex < product.images.length - 1) {
+          setActiveImageIndex((i) => i + 1);
+        } else if (deltaX > 0 && activeImageIndex > 0) {
+          setActiveImageIndex((i) => i - 1);
+        }
+      }
+    }
+    touchStartRef.current = null;
+  };
   const [selectedSize, setSelectedSize] = useState<ShoeSize>(product.sizes[0] || 'UK 8');
   const [selectedColor, setSelectedColor] = useState<{ name: string; hex: string }>(
     product.colors[0] || { name: 'Natural', hex: '#8C4E28' }
@@ -247,11 +281,26 @@ const ProductDetailContent: React.FC<{ product: Product }> = ({ product }) => {
           {/* Left Column: Gallery */}
           <div className="lg:col-span-7 space-y-4">
             {/* Primary High-Res Display */}
-            <div className="aspect-[4/5] rounded-xs overflow-hidden bg-ivory-200 border border-ivory-300 shadow-sm relative group">
-              <img decoding="async" ref={(el) => el?.setAttribute("fetchpriority", "high")}
+            <div
+              className="aspect-[4/5] rounded-xs overflow-hidden bg-ivory-200 border border-ivory-300 shadow-sm relative group cursor-pointer"
+              onClick={() => setLightboxOpen(true)}
+              onMouseEnter={() => setIsHoverZooming(true)}
+              onMouseLeave={() => setIsHoverZooming(false)}
+              onMouseMove={handleMouseMove}
+              onTouchStart={handleTouchStart}
+              onTouchEnd={handleTouchEnd}
+            >
+              <img
+                decoding="async"
+                ref={(el) => el?.setAttribute("fetchpriority", "high")}
                 src={product.images[activeImageIndex] || product.images[0]}
                 alt={product.name}
-                className="w-full h-full object-cover object-center transition-transform duration-500 group-hover:scale-105"
+                style={{
+                  transformOrigin: isHoverZooming ? `${zoomOrigin.x}% ${zoomOrigin.y}%` : 'center center',
+                }}
+                className={`w-full h-full object-cover object-center transition-transform duration-300 select-none ${
+                  isHoverZooming ? 'scale-[1.8]' : 'scale-100 group-hover:scale-105'
+                }`}
                 onError={(e) => {
                   const target = e.currentTarget;
                   if (!target.src.includes('placeholder-shoe.svg')) {
@@ -260,22 +309,45 @@ const ProductDetailContent: React.FC<{ product: Product }> = ({ product }) => {
                 }}
               />
               {product.badge && (
-                <div className="absolute top-4 left-4">
+                <div className="absolute top-4 left-4 z-10 pointer-events-none">
                   <Badge variant={product.badge === 'Artisan Heritage' ? 'sand' : 'default'}>
                     {product.badge}
                   </Badge>
                 </div>
               )}
+
+              {/* Mobile Perspective Counter Pill */}
+              {product.images.length > 1 && (
+                <div className="absolute bottom-4 left-4 bg-charcoal-950/75 backdrop-blur-xs text-ivory-100 px-2.5 py-1 rounded-full text-[10px] font-mono tracking-wider sm:hidden border border-white/10 z-10 pointer-events-none">
+                  {activeImageIndex + 1} / {product.images.length}
+                </div>
+              )}
+
+              {/* Inspect Leather Zoom Button */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setLightboxOpen(true);
+                }}
+                className="absolute bottom-4 right-4 bg-charcoal-950/85 hover:bg-charcoal-900 text-ivory-100 backdrop-blur-xs px-3 py-1.5 rounded-full text-[11px] font-medium tracking-wider flex items-center gap-1.5 shadow-md border border-sand-500/40 transition-all hover:scale-105 cursor-pointer z-10"
+                aria-label="Inspect leather texture and craftsmanship"
+              >
+                <Maximize2 className="w-3.5 h-3.5 text-sand-400" />
+                <span>Inspect Leather</span>
+              </button>
             </div>
 
             {/* Thumbnail selector */}
             {product.images.length > 1 && (
-              <div className="flex gap-3">
+              <div className="flex gap-3 overflow-x-auto pb-1">
                 {product.images.map((img, idx) => (
                   <button
                     key={idx}
+                    type="button"
                     onClick={() => setActiveImageIndex(idx)}
-                    className={`w-20 h-24 rounded-xs overflow-hidden border-2 transition-all ${
+                    aria-label={`View angle ${idx + 1}`}
+                    className={`w-20 h-24 rounded-xs overflow-hidden border-2 transition-all shrink-0 cursor-pointer ${
                       activeImageIndex === idx
                         ? 'border-charcoal-900 shadow-sm'
                         : 'border-ivory-300 opacity-70 hover:opacity-100'
@@ -870,6 +942,17 @@ const ProductDetailContent: React.FC<{ product: Product }> = ({ product }) => {
           </div>
         </div>
       )}
+
+      {/* Fullscreen High-Resolution Image Lightbox */}
+      <ImageLightbox
+        isOpen={lightboxOpen}
+        onClose={() => setLightboxOpen(false)}
+        images={product.images}
+        currentIndex={activeImageIndex}
+        onIndexChange={setActiveImageIndex}
+        productName={product.name}
+        craftsmanshipDetail={product.material || product.craftsmanshipLocation}
+      />
     </div>
   );
 };
