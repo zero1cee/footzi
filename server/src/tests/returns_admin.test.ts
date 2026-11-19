@@ -40,6 +40,20 @@ describe('Returns, Exchanges & Admin Operations Suite', () => {
 
     // Create a fulfilled test order for return/exchange testing
     const sampleProduct = await Product.findOne({ isActive: true });
+    if (sampleProduct) {
+      const replVariant = sampleProduct.variants.find((v: any) => v.size === 'UK 9' && v.color === 'Vintage Tan')
+        || sampleProduct.variants.find((v: any) => v.size === 'UK 9');
+      if (replVariant) {
+        await Inventory.updateOne(
+          { variantSku: replVariant.sku },
+          {
+            $set: { availableStock: 10, reservedStock: 0 },
+            $setOnInsert: { product: sampleProduct._id, size: replVariant.size, color: replVariant.color },
+          },
+          { upsert: true }
+        );
+      }
+    }
     testOrder = await Order.create({
       orderNumber: `FTZ-AGR-TEST-${Date.now().toString().slice(-4)}`,
       user: patronUser!._id,

@@ -11,6 +11,7 @@ import {
   Sparkles,
   AlertCircle,
 } from 'lucide-react';
+import { toast } from '@/store/useToastStore';
 
 export interface OrderTrackingProps {
   orderStatus: string;
@@ -43,6 +44,7 @@ export const OrderTrackingStepper: React.FC<OrderTrackingProps> = ({
     if (!trackingNumber) return;
     navigator.clipboard.writeText(trackingNumber);
     setCopied(true);
+    toast.success(`Delhivery AWB Copied: ${trackingNumber}`);
     setTimeout(() => setCopied(false), 2500);
   };
 

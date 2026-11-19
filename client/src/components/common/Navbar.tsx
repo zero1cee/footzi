@@ -35,6 +35,18 @@ export const Navbar: React.FC = () => {
     setSearchOpen(false);
   }, [location.pathname]);
 
+  // Lock body scroll when mobile menu drawer is open
+  useEffect(() => {
+    if (mobileMenuOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [mobileMenuOpen]);
+
 
   const navLinks = [
     { name: 'Collections', href: '/shop' },
@@ -141,10 +153,16 @@ export const Navbar: React.FC = () => {
 
                 {/* Dropdown Menu */}
                 {userMenuOpen && (
-                  <div
-                    className="absolute right-0 mt-2 w-48 bg-white border border-ivory-300 rounded-xs shadow-xl py-1 z-50 animate-fade-in"
-                    onMouseLeave={() => setUserMenuOpen(false)}
-                  >
+                  <>
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={() => setUserMenuOpen(false)}
+                      aria-hidden="true"
+                    />
+                    <div
+                      className="absolute right-0 mt-2 w-48 bg-white border border-ivory-300 rounded-xs shadow-xl py-1 z-50 animate-fade-in"
+                      onMouseLeave={() => setUserMenuOpen(false)}
+                    >
                     <div className="px-3 py-2 border-b border-ivory-200">
                       <p className="text-xs font-semibold text-charcoal-900 truncate">{user.name}</p>
                       <p className="text-[10px] text-charcoal-500 truncate">{user.email}</p>
@@ -183,6 +201,7 @@ export const Navbar: React.FC = () => {
                       </button>
                     </div>
                   </div>
+                  </>
                 )}
               </div>
             ) : (

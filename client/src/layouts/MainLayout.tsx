@@ -5,6 +5,7 @@ import { Navbar } from '@/components/common/Navbar';
 import { Footer } from '@/components/common/Footer';
 import { CartDrawer } from '@/components/common/CartDrawer';
 import { QuickViewModal } from '@/components/common/QuickViewModal';
+import { Toast } from '@/components/common/Toast';
 import { RouteErrorBoundary } from '@/components/common/RouteErrorBoundary';
 
 export const MainLayout: React.FC = () => {
@@ -56,10 +57,11 @@ export const MainLayout: React.FC = () => {
         <Footer />
       </div>
 
-      {/* Global Modals & Drawers */}
+      {/* Global Modals, Drawers & Toast Notifications */}
       <div className="print:hidden">
         <CartDrawer />
         <QuickViewModal />
+        <Toast />
       </div>
     </div>
   );

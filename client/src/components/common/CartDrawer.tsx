@@ -6,6 +6,7 @@ import { useSettingsStore } from '@/store/useSettingsStore';
 import { formatINR } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 import { useDialogA11y } from '@/hooks/useDialogA11y';
+import { toast } from '@/store/useToastStore';
 
 export const CartDrawer: React.FC = () => {
   const navigate = useNavigate();
@@ -48,7 +49,10 @@ export const CartDrawer: React.FC = () => {
     const res = await applyCoupon(inputCoupon);
     setCouponFeedback({ success: res.success, text: res.message });
     if (res.success) {
+      toast.success(res.message);
       setInputCoupon('');
+    } else {
+      toast.error(res.message);
     }
   };
 

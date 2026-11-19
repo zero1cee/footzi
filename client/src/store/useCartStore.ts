@@ -7,6 +7,7 @@ import { couponService, computeCouponDiscount, AppliedCoupon } from '@/services/
 import { wishlistService } from '@/services/wishlistService';
 import { currentSettings } from '@/store/useSettingsStore';
 import { isBackendUnreachable } from '@/lib/utils';
+import { toast } from './useToastStore';
 
 interface CartState {
   items: CartItem[];
@@ -204,6 +205,7 @@ export const useCartStore = create<CartState>()(
         const before = get().wishlist;
         const adding = !before.includes(productId);
         set({ wishlist: adding ? [...before, productId] : before.filter((id) => id !== productId) });
+        toast.show(adding ? 'Added to your Private Wishlist' : 'Removed from Wishlist');
 
         const token = useAuthStore.getState().token;
         if (!token || token.startsWith('demo-jwt-token')) return;
