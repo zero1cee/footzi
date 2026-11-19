@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   Star,
@@ -106,6 +106,25 @@ const ProductDetailContent: React.FC<{ product: Product }> = ({ product }) => {
   const [isAddedFeedback, setIsAddedFeedback] = useState(false);
   const [openAccordion, setOpenAccordion] = useState<string | null>('specs');
   const [sizeGuideOpen, setSizeGuideOpen] = useState(false);
+  const [showStickyBar, setShowStickyBar] = useState(false);
+  const ctaRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = ctaRef.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        // Show sticky bar when primary purchase buttons have scrolled above the viewport
+        const isPast = entry.boundingClientRect.bottom < 0;
+        setShowStickyBar(isPast);
+      },
+      { threshold: 0 }
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   // Review Form State
   const { isAuthenticated, user } = useAuthStore();
@@ -429,7 +448,7 @@ const ProductDetailContent: React.FC<{ product: Product }> = ({ product }) => {
             </div>
 
             {/* Quantity and Purchase Buttons */}
-            <div className="space-y-4 pt-3">
+            <div ref={ctaRef} className="space-y-4 pt-3">
               <div className="flex items-center gap-4">
                 <span className="text-xs uppercase tracking-wider text-charcoal-700 font-semibold">Quantity:</span>
                 <div className="flex items-center border border-ivory-300 rounded-xs bg-white">
@@ -803,6 +822,54 @@ const ProductDetailContent: React.FC<{ product: Product }> = ({ product }) => {
 
       {/* Indian Shoe Size Conversion Guide Modal */}
       <SizeGuideModal isOpen={sizeGuideOpen} onClose={() => setSizeGuideOpen(false)} />
+
+      {/* Sticky Mobile Add-to-Bag Bar */}
+      {showStickyBar && (
+        <div
+          data-testid="sticky-mobile-cta"
+          className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t border-ivory-300 p-3 shadow-2xl animate-fade-in"
+        >
+          <div className="max-w-md mx-auto flex items-center justify-between gap-3">
+            <img
+              src={product.images[activeImageIndex] || product.images[0]}
+              alt={product.name}
+              className="w-11 h-12 object-cover rounded-xs border border-ivory-300 shrink-0 bg-ivory-200"
+            />
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold text-charcoal-900 truncate">{product.name}</p>
+              <div className="flex items-center gap-1.5 text-[11px] text-charcoal-600 mt-0.5">
+                <span className="font-bold text-charcoal-950">{formatINR(product.price)}</span>
+                <span>•</span>
+                <span className="bg-ivory-200 px-1.5 py-0.5 rounded-xs font-semibold text-charcoal-800">
+                  {selectedSize}
+                </span>
+              </div>
+            </div>
+            <Button
+              variant="primary"
+              size="sm"
+              disabled={isOutOfStock}
+              onClick={handleAddToCart}
+              aria-label={isOutOfStock ? 'Sold Out' : 'Quick add to bag'}
+              className="px-4 py-2.5 text-xs whitespace-nowrap shrink-0 flex items-center gap-1.5 shadow-md"
+            >
+              {isAddedFeedback ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-emerald-400" />
+                  Added!
+                </>
+              ) : isOutOfStock ? (
+                'Sold Out'
+              ) : (
+                <>
+                  <ShoppingBag className="w-3.5 h-3.5" />
+                  Add to Bag
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

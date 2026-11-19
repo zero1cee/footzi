@@ -65,7 +65,7 @@ export const QuickViewModal: React.FC = () => {
         aria-modal="true"
         aria-label={`Quick view: ${quickViewProduct.name}`}
         tabIndex={-1}
-        className="relative bg-ivory-100 max-w-3xl w-full rounded-sm shadow-2xl border border-ivory-300 overflow-hidden z-10 animate-fade-in focus:outline-none"
+        className="relative bg-ivory-100 max-w-3xl w-full rounded-sm shadow-2xl border border-ivory-300 overflow-y-auto max-h-[90vh] z-10 animate-fade-in focus:outline-none"
       >
         {/* Close Button */}
         <button

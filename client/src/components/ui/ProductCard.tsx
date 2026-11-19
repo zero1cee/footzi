@@ -76,8 +76,21 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
           />
         </button>
 
-        {/* Quick View Button (desktop hover slide-up) */}
-        <div className="absolute inset-x-3 bottom-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10">
+        {/* Mobile Quick View Action (always accessible on touch devices) */}
+        <button
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setQuickViewProduct(product);
+          }}
+          aria-label={`Quick view ${product.name}`}
+          className="sm:hidden absolute bottom-3 right-3 z-10 w-9 h-9 rounded-full bg-white/95 backdrop-blur-sm flex items-center justify-center text-charcoal-800 shadow-md border border-ivory-300 hover:bg-charcoal-900 hover:text-white transition-colors"
+        >
+          <Eye className="w-4 h-4" />
+        </button>
+
+        {/* Desktop Quick View Button (hover slide-up) */}
+        <div className="hidden sm:block absolute inset-x-3 bottom-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10">
           <button
             onClick={(e) => {
               e.preventDefault();

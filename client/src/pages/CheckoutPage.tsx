@@ -114,6 +114,12 @@ export const CheckoutPage: React.FC = () => {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
 
+    if (name === 'phone') {
+      const cleanPhone = value.replace(/\D/g, '').slice(0, 10);
+      setFormData((prev) => ({ ...prev, phone: cleanPhone }));
+      return;
+    }
+
     if (name === 'pincode') {
       const cleanPin = value.replace(/\D/g, '').slice(0, 6);
       const geo = getCityAndStateFromPincode(cleanPin);
@@ -147,6 +153,19 @@ export const CheckoutPage: React.FC = () => {
   const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
+
+    const cleanPhone = formData.phone.replace(/\D/g, '');
+    if (!/^[6-9]\d{9}$/.test(cleanPhone)) {
+      setErrorMessage('Please enter a valid 10-digit Indian mobile number (e.g. 9876543210) to receive Delhivery delivery OTP and tracking updates.');
+      return;
+    }
+
+    const cleanPin = formData.pincode.replace(/\D/g, '');
+    if (cleanPin.length !== 6) {
+      setErrorMessage('Please enter a valid 6-digit Indian postal PIN code.');
+      return;
+    }
+
     setIsProcessing(true);
 
     try {
@@ -616,14 +635,31 @@ export const CheckoutPage: React.FC = () => {
                   <label htmlFor="checkout-phone" className="block text-[11px] uppercase tracking-wider font-semibold text-charcoal-700 mb-1">
                     Mobile Number (for SMS & WhatsApp Dispatch Alerts)
                   </label>
-                  <input id="checkout-phone"
-                    type="tel"
-                    required
-                    name="phone"
-                    value={formData.phone}
-                    onChange={handleChange}
-                    className="w-full bg-ivory-50 border border-ivory-300 px-3 py-2 text-xs text-charcoal-900 rounded-xs focus:outline-none focus:border-charcoal-900"
-                  />
+                  <div className="relative flex items-center">
+                    <span className="absolute left-3 text-xs font-semibold text-charcoal-500 border-r border-ivory-300 pr-2 select-none">
+                      +91
+                    </span>
+                    <input id="checkout-phone"
+                      type="tel"
+                      required
+                      name="phone"
+                      placeholder="9876543210"
+                      maxLength={10}
+                      value={formData.phone}
+                      onChange={handleChange}
+                      className="w-full bg-ivory-50 border border-ivory-300 py-2 pl-14 pr-3 text-xs text-charcoal-900 rounded-xs focus:outline-none focus:border-charcoal-900 font-mono tracking-wider"
+                    />
+                  </div>
+                  {formData.phone && formData.phone.length > 0 && formData.phone.length < 10 && (
+                    <span className="text-[10px] text-amber-700 mt-1 block">
+                      Enter 10-digit Indian mobile number ({formData.phone.length}/10 digits)
+                    </span>
+                  )}
+                  {formData.phone && formData.phone.length === 10 && !/^[6-9]/.test(formData.phone) && (
+                    <span className="text-[10px] text-red-600 mt-1 block">
+                      Indian numbers must begin with 6, 7, 8, or 9
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -710,12 +746,17 @@ export const CheckoutPage: React.FC = () => {
 
             {/* Payment Method Selector */}
             <div className="bg-white p-6 sm:p-8 rounded-xs border border-ivory-200 shadow-sm space-y-4">
-              <h2 className="font-serif text-base font-semibold uppercase tracking-wider text-charcoal-900 border-b border-ivory-200 pb-3 flex items-center gap-2">
-                <CreditCard className="w-4 h-4 text-sand-600" />
-                2. Payment Gateway (Razorpay Test Mode)
+              <h2 className="font-serif text-base font-semibold uppercase tracking-wider text-charcoal-900 border-b border-ivory-200 pb-3 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <CreditCard className="w-4 h-4 text-sand-600" />
+                  <span>2. Payment Method</span>
+                </div>
+                <span className="text-[10px] text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-xs font-sans font-medium flex items-center gap-1">
+                  <ShieldCheck className="w-3 h-3 text-emerald-700" /> 100% Encrypted
+                </span>
               </h2>
 
-              <div className="p-4 bg-ivory-100 rounded-xs border border-ivory-300 flex items-start gap-3">
+              <div className="p-4 bg-ivory-50 rounded-xs border border-ivory-300 flex items-start gap-3">
                 <input
                   type="radio"
                   id="razorpay"
@@ -726,10 +767,10 @@ export const CheckoutPage: React.FC = () => {
                 />
                 <div>
                   <label htmlFor="razorpay" className="text-xs font-semibold text-charcoal-900 block cursor-pointer">
-                    Razorpay Gateway (UPI, Cards, NetBanking, RuPay)
+                    Razorpay Gateway (UPI, Google Pay, PhonePe, Cards, NetBanking, RuPay)
                   </label>
                   <p className="text-[11px] text-charcoal-500 mt-1 leading-relaxed">
-                    Test Mode active. Generates gateway order ID and cryptographically verifies SHA-256 HMAC signature on the backend before triggering Agra supplier fulfillment.
+                    Zero card details captured or stored on our servers. Processed through a PCI-DSS Level 1 certified TLS vault with RBI two-factor verification.
                   </p>
                 </div>
               </div>
