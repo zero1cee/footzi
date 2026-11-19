@@ -10,6 +10,7 @@ import { formatINR, isBackendUnreachable } from '@/lib/utils';
 import { INDIAN_STATES, STATE_TO_CITIES, getStateFromCity, getCityAndStateFromPincode } from '@/lib/indiaGeo';
 import { Button } from '@/components/ui/Button';
 import { useDocumentMeta } from '@/hooks/useDocumentMeta';
+import { trackInitiateCheckout, trackPurchase } from '@/lib/analytics';
 
 interface PendingPayment {
   createdOrder: any;
@@ -93,6 +94,15 @@ export const CheckoutPage: React.FC = () => {
       }
     }
   }, [user]);
+
+  useEffect(() => {
+    if (items.length > 0) {
+      trackInitiateCheckout({
+        items: items.map((i) => ({ id: i.id, name: i.productName, price: i.price, quantity: i.quantity })),
+        totalValue: getTotal(),
+      });
+    }
+  }, []);
 
   const subtotal = getSubtotal();
   const discount = getDiscountAmount();
@@ -325,6 +335,18 @@ export const CheckoutPage: React.FC = () => {
             ? `/order/${createdOrder._id}#t=${auth.orderToken}`
             : `/account/orders/${createdOrder._id}`,
         email: formData.email.trim(),
+      });
+
+      trackPurchase({
+        orderNumber: createdOrder.orderNumber,
+        total: createdOrder.total || total,
+        items: (createdOrder.items || items).map((i: any) => ({
+          id: i.id || i.product || i.sku,
+          sku: i.sku,
+          name: i.name || i.productName,
+          unitPrice: i.unitPrice || i.price,
+          quantity: i.quantity,
+        })),
       });
 
       setPendingPayment(null);

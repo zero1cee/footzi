@@ -1,0 +1,21 @@
+# Footzi Luxury Footwear Robots Exclusion
+User-agent: *
+Allow: /
+Allow: /shop
+Allow: /product/
+Allow: /size-guide
+Allow: /leather-care
+Allow: /privacy-policy
+Allow: /terms
+Allow: /shipping-policy
+Allow: /refund-policy
+Allow: /contact
+
+# Protect private shopper dashboards & checkout
+Disallow: /admin
+Disallow: /account/
+Disallow: /checkout
+Disallow: /reset-password
+Disallow: /order/
+
+Sitemap: https://footzi.in/sitemap.xml

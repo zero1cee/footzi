@@ -134,12 +134,17 @@ export const Footer: React.FC = () => {
               </li>
               <li>
                 <Link to="/track-order" className="hover:text-ivory-100 transition-colors">
-                  Find an Order (no account)
+                  Delhivery Tracking (No account)
                 </Link>
               </li>
               <li>
-                <Link to="/account/returns" className="hover:text-ivory-100 transition-colors">
-                  Size Exchange & Returns
+                <Link to="/refund-policy" className="hover:text-ivory-100 transition-colors">
+                  Size Exchange & Refunds
+                </Link>
+              </li>
+              <li>
+                <Link to="/shipping-policy" className="hover:text-ivory-100 transition-colors">
+                  Delhivery Express Shipping
                 </Link>
               </li>
               <li>
@@ -150,6 +155,11 @@ export const Footer: React.FC = () => {
               <li>
                 <Link to="/leather-care" className="hover:text-ivory-100 transition-colors">
                   Leather Care Rituals
+                </Link>
+              </li>
+              <li>
+                <Link to="/contact" className="hover:text-ivory-100 transition-colors">
+                  Contact & Grievance Desk
                 </Link>
               </li>
               <li>
@@ -201,30 +211,54 @@ export const Footer: React.FC = () => {
           </div>
         </div>
 
-        {/* Bottom Bar: Copyright & Payment Badges */}
-        <div className="mt-16 pt-8 border-t border-charcoal-800 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-charcoal-500">
-          <div>
-            <p>© {new Date().getFullYear()} FOOTZI LUXURY FOOTWEAR PRIVATE LIMITED. All rights reserved.</p>
-            <p className="text-[11px] text-charcoal-600 mt-0.5">
-              Architecturally Conceived in Agra • Hand-Finished in India.
-            </p>
+        {/* Bottom Bar: Legal Links & Copyright */}
+        <div className="mt-16 pt-8 border-t border-charcoal-800 space-y-6">
+          <div className="flex flex-wrap items-center justify-center md:justify-start gap-x-6 gap-y-2 text-[11px] text-charcoal-400">
+            <Link to="/privacy-policy" className="hover:text-sand-400 transition-colors">
+              Privacy Policy
+            </Link>
+            <span className="text-charcoal-700">•</span>
+            <Link to="/terms" className="hover:text-sand-400 transition-colors">
+              Terms of Service
+            </Link>
+            <span className="text-charcoal-700">•</span>
+            <Link to="/shipping-policy" className="hover:text-sand-400 transition-colors">
+              Shipping & Delivery
+            </Link>
+            <span className="text-charcoal-700">•</span>
+            <Link to="/refund-policy" className="hover:text-sand-400 transition-colors">
+              Return & Refund Policy
+            </Link>
+            <span className="text-charcoal-700">•</span>
+            <Link to="/contact" className="hover:text-sand-400 transition-colors">
+              Grievance Officer
+            </Link>
           </div>
 
-          {/* Payment & Security Badges */}
-          <div className="flex items-center gap-3">
-            <span className="text-[10px] tracking-wider uppercase text-charcoal-400">
-              Secured with Razorpay
-            </span>
-            <div className="flex items-center gap-2 text-[10px] bg-charcoal-900 px-2.5 py-1 rounded-xs border border-charcoal-800 text-charcoal-300">
-              <span>UPI</span>
-              <span>•</span>
-              <span>RuPay</span>
-              <span>•</span>
-              <span>Visa</span>
-              <span>•</span>
-              <span>Mastercard</span>
-              <span>•</span>
-              <span>NetBanking</span>
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-charcoal-500">
+            <div>
+              <p>© {new Date().getFullYear()} FOOTZI LUXURY FOOTWEAR PRIVATE LIMITED. All rights reserved.</p>
+              <p className="text-[11px] text-charcoal-600 mt-0.5">
+                GSTIN: 09AAECF1234A1Z5 • HSN 6403 • Architecturally Conceived in Agra, Uttar Pradesh.
+              </p>
+            </div>
+
+            {/* Payment & Security Badges */}
+            <div className="flex items-center gap-3">
+              <span className="text-[10px] tracking-wider uppercase text-charcoal-400">
+                Secured with Razorpay
+              </span>
+              <div className="flex items-center gap-2 text-[10px] bg-charcoal-900 px-2.5 py-1 rounded-xs border border-charcoal-800 text-charcoal-300">
+                <span>UPI</span>
+                <span>•</span>
+                <span>RuPay</span>
+                <span>•</span>
+                <span>Visa</span>
+                <span>•</span>
+                <span>Mastercard</span>
+                <span>•</span>
+                <span>NetBanking</span>
+              </div>
             </div>
           </div>
         </div>

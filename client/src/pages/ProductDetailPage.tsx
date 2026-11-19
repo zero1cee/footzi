@@ -33,6 +33,7 @@ import { NotifyWhenBack } from '@/components/ui/NotifyWhenBack';
 import { PincodeEstimator } from '@/components/ui/PincodeEstimator';
 import { useRecentStore } from '@/store/useRecentStore';
 import { useSettingsStore } from '@/store/useSettingsStore';
+import { trackViewContent, trackAddToCart } from '@/lib/analytics';
 
 const NotFound: React.FC = () => {
   useDocumentMeta({ title: 'Product not found — Footzi', noindex: true });
@@ -126,6 +127,12 @@ const ProductDetailContent: React.FC<{ product: Product }> = ({ product }) => {
       }
       setActiveImageIndex(0);
       setReviewsList(product.reviews || []);
+      trackViewContent({
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        category: product.category,
+      });
     }
   }, [product]);
 
@@ -139,6 +146,14 @@ const ProductDetailContent: React.FC<{ product: Product }> = ({ product }) => {
   const handleAddToCart = () => {
     if (isOutOfStock) return;
     addItem(product, selectedSize, selectedColor.name, selectedColor.hex, quantity);
+    trackAddToCart({
+      id: product.id,
+      name: product.name,
+      price: product.price,
+      size: selectedSize,
+      color: selectedColor.name,
+      quantity,
+    });
     setIsAddedFeedback(true);
     setTimeout(() => setIsAddedFeedback(false), 2000);
   };
@@ -146,6 +161,14 @@ const ProductDetailContent: React.FC<{ product: Product }> = ({ product }) => {
   const handleBuyNow = () => {
     if (isOutOfStock) return;
     addItem(product, selectedSize, selectedColor.name, selectedColor.hex, quantity);
+    trackAddToCart({
+      id: product.id,
+      name: product.name,
+      price: product.price,
+      size: selectedSize,
+      color: selectedColor.name,
+      quantity,
+    });
     navigate('/checkout');
   };
 

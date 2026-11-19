@@ -1,5 +1,5 @@
 import React, { lazy, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useCartStore } from '@/store/useCartStore';
@@ -9,6 +9,7 @@ import { HomePage } from '@/pages/HomePage';
 import { useDocumentMeta } from '@/hooks/useDocumentMeta';
 import { ProtectedRoute } from '@/components/common/ProtectedRoute';
 import { AdminRoute } from '@/components/common/AdminRoute';
+import { initMetaPixel, initGA4, trackPageView } from '@/lib/analytics';
 
 // Only the home page ships with the first load; every other screen is fetched when it is
 // opened, so a shopper never downloads the admin panel or checkout code just to browse.
@@ -31,6 +32,11 @@ const ResetPasswordPage = page(() => import('@/pages/ResetPasswordPage'), 'Reset
 const WishlistPage = page(() => import('@/pages/WishlistPage'), 'WishlistPage');
 const SizeGuidePage = page(() => import('@/pages/SizeGuidePage'), 'SizeGuidePage');
 const LeatherCarePage = page(() => import('@/pages/LeatherCarePage'), 'LeatherCarePage');
+const PrivacyPolicyPage = page(() => import('@/pages/PrivacyPolicyPage'), 'PrivacyPolicyPage');
+const TermsPage = page(() => import('@/pages/TermsPage'), 'TermsPage');
+const ShippingPolicyPage = page(() => import('@/pages/ShippingPolicyPage'), 'ShippingPolicyPage');
+const RefundPolicyPage = page(() => import('@/pages/RefundPolicyPage'), 'RefundPolicyPage');
+const ContactUsPage = page(() => import('@/pages/ContactUsPage'), 'ContactUsPage');
 
 const NotFoundPage: React.FC = () => {
   useDocumentMeta({ title: 'Page not found — Footzi', noindex: true });
@@ -45,10 +51,20 @@ const NotFoundPage: React.FC = () => {
   );
 };
 
+const RouteTracker: React.FC = () => {
+  const location = useLocation();
+  useEffect(() => {
+    trackPageView(location.pathname);
+  }, [location.pathname]);
+  return null;
+};
+
 const queryClient = new QueryClient();
 
 export const App: React.FC = () => {
   useEffect(() => {
+    initMetaPixel();
+    initGA4();
     void useSettingsStore.getState().load();
     useAuthStore.getState().checkAuth().then(() => {
       useCartStore.getState().syncWithBackend();
@@ -59,6 +75,7 @@ export const App: React.FC = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
+        <RouteTracker />
         <Routes>
           <Route path="/" element={<MainLayout />}>
             <Route index element={<HomePage />} />
@@ -97,6 +114,11 @@ export const App: React.FC = () => {
             <Route path="wishlist" element={<WishlistPage />} />
             <Route path="size-guide" element={<SizeGuidePage />} />
             <Route path="leather-care" element={<LeatherCarePage />} />
+            <Route path="privacy-policy" element={<PrivacyPolicyPage />} />
+            <Route path="terms" element={<TermsPage />} />
+            <Route path="shipping-policy" element={<ShippingPolicyPage />} />
+            <Route path="refund-policy" element={<RefundPolicyPage />} />
+            <Route path="contact" element={<ContactUsPage />} />
             <Route path="login" element={<LoginPage />} />
             <Route path="register" element={<RegisterPage />} />
             <Route path="forgot-password" element={<ForgotPasswordPage />} />
