@@ -96,7 +96,7 @@ describe('Phase 3 UI: Image Lightbox & Leather Craftsmanship Inspection', () => 
     expect(handleIndexChange).toHaveBeenCalledWith(2);
   });
 
-  it('ProductDetailPage allows opening fullscreen lightbox via "Inspect Leather" button', async () => {
+  it('ProductDetailPage allows opening fullscreen lightbox via "Inspect" button', async () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
     render(
@@ -109,9 +109,10 @@ describe('Phase 3 UI: Image Lightbox & Leather Craftsmanship Inspection', () => 
       </QueryClientProvider>
     );
 
-    // Find Inspect Leather button on PDP
-    const inspectBtn = await screen.findByRole('button', { name: /inspect leather texture and craftsmanship/i });
+    // Find Inspect button on PDP
+    const inspectBtn = await screen.findByRole('button', { name: /inspect craftsmanship/i });
     expect(inspectBtn).toBeInTheDocument();
+    expect(inspectBtn).toHaveTextContent('Inspect');
 
     // Click to open lightbox
     act(() => {

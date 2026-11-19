@@ -127,7 +127,7 @@ export const QuickViewModal: React.FC = () => {
                 aria-label="Inspect craftsmanship"
               >
                 <Maximize2 className="w-3 h-3 text-sand-400" />
-                <span>Zoom</span>
+                <span>Inspect</span>
               </button>
             </div>
 

@@ -323,18 +323,20 @@ const ProductDetailContent: React.FC<{ product: Product }> = ({ product }) => {
                 </div>
               )}
 
-              {/* Inspect Leather Zoom Button */}
+              {/* Inspect Button - Hidden while actively zooming on desktop to keep leather texture unobstructed */}
               <button
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
                   setLightboxOpen(true);
                 }}
-                className="absolute bottom-4 right-4 bg-charcoal-950/85 hover:bg-charcoal-900 text-ivory-100 backdrop-blur-xs px-3 py-1.5 rounded-full text-[11px] font-medium tracking-wider flex items-center gap-1.5 shadow-md border border-sand-500/40 transition-all hover:scale-105 cursor-pointer z-10"
-                aria-label="Inspect leather texture and craftsmanship"
+                className={`absolute bottom-4 right-4 bg-charcoal-950/85 hover:bg-charcoal-900 text-ivory-100 backdrop-blur-xs px-3 py-1.5 rounded-full text-[11px] font-medium tracking-wider flex items-center gap-1.5 shadow-md border border-sand-500/40 transition-all hover:scale-105 cursor-pointer z-10 ${
+                  isHoverZooming ? 'opacity-0 pointer-events-none' : 'opacity-100'
+                }`}
+                aria-label="Inspect craftsmanship"
               >
                 <Maximize2 className="w-3.5 h-3.5 text-sand-400" />
-                <span>Inspect Leather</span>
+                <span>Inspect</span>
               </button>
             </div>
 
