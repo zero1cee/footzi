@@ -29,11 +29,11 @@ export const Navbar: React.FC = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Close mobile menu on route change
+  // Close mobile menu on route change or search param change
   useEffect(() => {
     setMobileMenuOpen(false);
     setSearchOpen(false);
-  }, [location.pathname]);
+  }, [location.pathname, location.search]);
 
   // Lock body scroll when mobile menu drawer is open
   useEffect(() => {
@@ -239,36 +239,47 @@ export const Navbar: React.FC = () => {
         {searchOpen && <SearchSuggest onDone={() => setSearchOpen(false)} />}
       </div>
 
-      {/* Mobile Menu Drawer Overlay */}
+      {/* Mobile Menu Backdrop & Drawer Overlay */}
       {mobileMenuOpen && (
-        <div className="lg:hidden fixed inset-x-0 top-full bg-ivory-100 border-b border-ivory-300 px-6 py-6 shadow-xl animate-fade-in">
-          <div className="flex flex-col space-y-4">
-            {navLinks.map((link) => (
-              <Link
-                key={link.name}
-                to={link.href}
-                className="text-sm font-medium uppercase tracking-widest text-charcoal-800 hover:text-charcoal-950 flex items-center justify-between py-2 border-b border-ivory-200"
-              >
-                <span>{link.name}</span>
-                <ArrowRight className="w-4 h-4 text-charcoal-400" />
-              </Link>
-            ))}
-            <div className="pt-2 flex flex-col gap-2">
-              <Link
-                to="/account"
-                className="text-xs uppercase tracking-wider font-semibold text-charcoal-800 py-2 flex items-center gap-2"
-              >
-                <User className="w-4 h-4" /> Account & Orders
-              </Link>
-              <Link
-                to="/admin"
-                className="text-xs uppercase tracking-wider font-semibold text-sand-600 py-2 flex items-center gap-2"
-              >
-                Admin Control Panel
-              </Link>
+        <>
+          {/* Outside touch dismiss backdrop */}
+          <div
+            className="lg:hidden fixed inset-0 top-[60px] bg-charcoal-950/50 backdrop-blur-xs z-30"
+            onClick={() => setMobileMenuOpen(false)}
+            aria-hidden="true"
+          />
+          <div className="lg:hidden fixed inset-x-0 top-full bg-ivory-100 border-b border-ivory-300 px-6 py-6 shadow-xl animate-fade-in z-40 max-h-[calc(100vh-80px)] overflow-y-auto">
+            <div className="flex flex-col space-y-4">
+              {navLinks.map((link) => (
+                <Link
+                  key={link.name}
+                  to={link.href}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="text-sm font-medium uppercase tracking-widest text-charcoal-800 hover:text-charcoal-950 flex items-center justify-between py-2 border-b border-ivory-200"
+                >
+                  <span>{link.name}</span>
+                  <ArrowRight className="w-4 h-4 text-charcoal-400" />
+                </Link>
+              ))}
+              <div className="pt-2 flex flex-col gap-2">
+                <Link
+                  to="/account"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="text-xs uppercase tracking-wider font-semibold text-charcoal-800 py-2 flex items-center gap-2"
+                >
+                  <User className="w-4 h-4" /> Account & Orders
+                </Link>
+                <Link
+                  to="/admin"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="text-xs uppercase tracking-wider font-semibold text-sand-600 py-2 flex items-center gap-2"
+                >
+                  Admin Control Panel
+                </Link>
+              </div>
             </div>
           </div>
-        </div>
+        </>
       )}
     </header>
   );

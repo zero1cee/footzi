@@ -147,4 +147,31 @@ describe('Phase 2 UI Interaction & Micro-Interaction Fixes', () => {
 
     expect(screen.getByText(/removed from wishlist/i)).toBeInTheDocument();
   });
+
+  it('Navbar mobile menu drawer closes immediately when tapping any collection link', () => {
+    render(
+      <BrowserRouter>
+        <Navbar />
+      </BrowserRouter>
+    );
+
+    const menuToggle = screen.getByLabelText(/open mobile menu/i);
+
+    // Open mobile menu
+    act(() => {
+      fireEvent.click(menuToggle);
+    });
+
+    const loafersLinks = screen.getAllByRole('link', { name: /^loafers/i });
+    expect(loafersLinks.length).toBe(2); // 1 desktop nav, 1 mobile drawer
+
+    // Click mobile drawer link
+    act(() => {
+      fireEvent.click(loafersLinks[1]);
+    });
+
+    // Mobile menu drawer should now be closed, leaving only desktop nav link
+    expect(screen.getAllByRole('link', { name: /^loafers/i }).length).toBe(1);
+    expect(document.body.style.overflow).toBe('');
+  });
 });
