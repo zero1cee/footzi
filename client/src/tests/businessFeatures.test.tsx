@@ -4,6 +4,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { PincodeEstimator, calculateEstimate } from '@/components/ui/PincodeEstimator';
 import { OrderTrackingStepper } from '@/components/ui/OrderTrackingStepper';
 import { numberToIndianWords, getIndianStateCode } from '@/lib/utils';
+import { INDIAN_STATES, getStateFromCity, getCityAndStateFromPincode } from '@/lib/indiaGeo';
 
 describe('Business Features: Indian GST & Pincode Logistics', () => {
   beforeEach(() => {
@@ -159,6 +160,56 @@ describe('Business Features: Indian GST & Pincode Logistics', () => {
       expect(screen.getByText('Order Cancelled')).toBeInTheDocument();
       expect(screen.getByText(/initiated back to your original payment method/i)).toBeInTheDocument();
       expect(screen.queryByText('Dispatched via Delhivery')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Indian Geographic Destination Details & Auto-Detection Engine', () => {
+    it('detects city and state from 6-digit Indian PIN codes', () => {
+      expect(getCityAndStateFromPincode('282001')).toEqual({ city: 'Agra', state: 'Uttar Pradesh' });
+      expect(getCityAndStateFromPincode('110001')).toEqual({ city: 'New Delhi', state: 'Delhi' });
+      expect(getCityAndStateFromPincode('400001')).toEqual({ city: 'Mumbai', state: 'Maharashtra' });
+      expect(getCityAndStateFromPincode('560001')).toEqual({ city: 'Bengaluru', state: 'Karnataka' });
+      expect(getCityAndStateFromPincode('600001')).toEqual({ city: 'Chennai', state: 'Tamil Nadu' });
+      expect(getCityAndStateFromPincode('700001')).toEqual({ city: 'Kolkata', state: 'West Bengal' });
+      expect(getCityAndStateFromPincode('302001')).toEqual({ city: 'Jaipur', state: 'Rajasthan' });
+      expect(getCityAndStateFromPincode('500001')).toEqual({ city: 'Hyderabad', state: 'Telangana' });
+      expect(getCityAndStateFromPincode('380001')).toEqual({ city: 'Ahmedabad', state: 'Gujarat' });
+      expect(getCityAndStateFromPincode('682001')).toEqual({ city: 'Kochi', state: 'Kerala' });
+    });
+
+    it('returns null on invalid or incomplete PIN codes', () => {
+      expect(getCityAndStateFromPincode('12345')).toBeNull();
+      expect(getCityAndStateFromPincode('012345')).toBeNull();
+      expect(getCityAndStateFromPincode('')).toBeNull();
+    });
+
+    it('detects state from city names (case-insensitive)', () => {
+      expect(getStateFromCity('Agra')).toBe('Uttar Pradesh');
+      expect(getStateFromCity('lucknow')).toBe('Uttar Pradesh');
+      expect(getStateFromCity('Noida')).toBe('Uttar Pradesh');
+      expect(getStateFromCity('Mumbai')).toBe('Maharashtra');
+      expect(getStateFromCity('PUNE')).toBe('Maharashtra');
+      expect(getStateFromCity('Bengaluru')).toBe('Karnataka');
+      expect(getStateFromCity('bangalore')).toBe('Karnataka');
+      expect(getStateFromCity('Jaipur')).toBe('Rajasthan');
+      expect(getStateFromCity('Kolkata')).toBe('West Bengal');
+      expect(getStateFromCity('Chennai')).toBe('Tamil Nadu');
+      expect(getStateFromCity('Hyderabad')).toBe('Telangana');
+      expect(getStateFromCity('Gurugram')).toBe('Haryana');
+      expect(getStateFromCity('Panaji')).toBe('Goa');
+    });
+
+    it('provides all 36 Indian states and union territories for dropdown selection', () => {
+      expect(INDIAN_STATES.length).toBe(36);
+      expect(INDIAN_STATES).toContain('Uttar Pradesh');
+      expect(INDIAN_STATES).toContain('Maharashtra');
+      expect(INDIAN_STATES).toContain('Karnataka');
+      expect(INDIAN_STATES).toContain('Delhi');
+      expect(INDIAN_STATES).toContain('Tamil Nadu');
+      expect(INDIAN_STATES).toContain('Gujarat');
+      expect(INDIAN_STATES).toContain('Rajasthan');
+      expect(INDIAN_STATES).toContain('Chandigarh');
+      expect(INDIAN_STATES).toContain('Goa');
     });
   });
 });

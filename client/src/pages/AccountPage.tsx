@@ -20,6 +20,7 @@ import { useProducts } from '@/hooks/useProducts';
 import { MOCK_PRODUCTS } from '@/data/mockProducts';
 import { ProductCard } from '@/components/ui/ProductCard';
 import { formatINR } from '@/lib/utils';
+import { INDIAN_STATES, STATE_TO_CITIES, getStateFromCity, getCityAndStateFromPincode } from '@/lib/indiaGeo';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { orderService } from '@/services/orderService';
@@ -734,20 +735,46 @@ export const AccountPage: React.FC = () => {
                     <input
                       type="text"
                       required
+                      list="account-city-list"
+                      placeholder="e.g. Agra"
                       value={addrForm.city}
-                      onChange={(e) => setAddrForm({ ...addrForm, city: e.target.value })}
+                      onChange={(e) => {
+                        const cityVal = e.target.value;
+                        const detectedState = getStateFromCity(cityVal);
+                        setAddrForm({
+                          ...addrForm,
+                          city: cityVal,
+                          state: detectedState || addrForm.state,
+                        });
+                      }}
                       className="w-full bg-ivory-50 border border-ivory-300 px-3 py-2 rounded-xs focus:outline-none focus:border-charcoal-900"
                     />
+                    <datalist id="account-city-list">
+                      {(STATE_TO_CITIES[addrForm.state] || []).map((c) => (
+                        <option key={c} value={c} />
+                      ))}
+                    </datalist>
+                    <span className="text-[9px] text-charcoal-400 block mt-0.5">Auto-detects state</span>
                   </div>
                   <div>
                     <label className="block font-semibold text-charcoal-700 mb-1">State</label>
                     <input
                       type="text"
                       required
+                      list="account-states-list"
+                      placeholder="Select State / UT"
                       value={addrForm.state}
                       onChange={(e) => setAddrForm({ ...addrForm, state: e.target.value })}
                       className="w-full bg-ivory-50 border border-ivory-300 px-3 py-2 rounded-xs focus:outline-none focus:border-charcoal-900"
                     />
+                    <datalist id="account-states-list">
+                      {INDIAN_STATES.map((s) => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                    </datalist>
+                    <span className="text-[9px] text-charcoal-400 block mt-0.5">Dropdown options available</span>
                   </div>
                   <div>
                     <label className="block font-semibold text-charcoal-700 mb-1">6-Digit PIN Code</label>
@@ -755,11 +782,22 @@ export const AccountPage: React.FC = () => {
                       type="text"
                       required
                       pattern="\d{6}"
+                      maxLength={6}
                       placeholder="282001"
                       value={addrForm.pincode}
-                      onChange={(e) => setAddrForm({ ...addrForm, pincode: e.target.value })}
+                      onChange={(e) => {
+                        const pin = e.target.value.replace(/\D/g, '').slice(0, 6);
+                        const geo = getCityAndStateFromPincode(pin);
+                        setAddrForm({
+                          ...addrForm,
+                          pincode: pin,
+                          city: geo?.city || addrForm.city,
+                          state: geo?.state || addrForm.state,
+                        });
+                      }}
                       className="w-full bg-ivory-50 border border-ivory-300 px-3 py-2 rounded-xs focus:outline-none focus:border-charcoal-900"
                     />
+                    <span className="text-[9px] text-charcoal-400 block mt-0.5">Auto-detects city & state</span>
                   </div>
                 </div>
 

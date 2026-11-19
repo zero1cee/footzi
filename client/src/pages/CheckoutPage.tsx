@@ -7,6 +7,7 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { couponService } from '@/services/couponService';
 import { orderService, OrderAuth } from '@/services/orderService';
 import { formatINR, isBackendUnreachable } from '@/lib/utils';
+import { INDIAN_STATES, STATE_TO_CITIES, getStateFromCity, getCityAndStateFromPincode } from '@/lib/indiaGeo';
 import { Button } from '@/components/ui/Button';
 import { useDocumentMeta } from '@/hooks/useDocumentMeta';
 
@@ -81,7 +82,14 @@ export const CheckoutPage: React.FC = () => {
     } else {
       const savedPin = localStorage.getItem('footzi_shipping_pincode');
       if (savedPin) {
-        setFormData((prev) => ({ ...prev, pincode: prev.pincode || savedPin }));
+        const cleanPin = savedPin.replace(/\D/g, '').slice(0, 6);
+        const geo = getCityAndStateFromPincode(cleanPin);
+        setFormData((prev) => ({
+          ...prev,
+          pincode: prev.pincode || cleanPin,
+          city: prev.city || geo?.city || '',
+          state: prev.state || geo?.state || '',
+        }));
       }
     }
   }, [user]);
@@ -94,7 +102,36 @@ export const CheckoutPage: React.FC = () => {
   const orderCustomerName = () => `${formData.firstName} ${formData.lastName}`.trim();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+
+    if (name === 'pincode') {
+      const cleanPin = value.replace(/\D/g, '').slice(0, 6);
+      const geo = getCityAndStateFromPincode(cleanPin);
+      if (geo) {
+        localStorage.setItem('footzi_shipping_pincode', cleanPin);
+        setFormData((prev) => ({
+          ...prev,
+          pincode: cleanPin,
+          city: geo.city || prev.city,
+          state: geo.state || prev.state,
+        }));
+        return;
+      }
+      setFormData((prev) => ({ ...prev, pincode: cleanPin }));
+      return;
+    }
+
+    if (name === 'city') {
+      const detectedState = getStateFromCity(value);
+      setFormData((prev) => ({
+        ...prev,
+        city: value,
+        state: detectedState || prev.state,
+      }));
+      return;
+    }
+
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handlePlaceOrder = async (e: React.FormEvent) => {
@@ -582,45 +619,69 @@ export const CheckoutPage: React.FC = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label htmlFor="checkout-city" className="block text-[11px] uppercase tracking-wider font-semibold text-charcoal-700 mb-1">
                     City
                   </label>
-                  <input id="checkout-city"
+                  <input
+                    id="checkout-city"
                     type="text"
                     required
                     name="city"
+                    list="checkout-city-list"
+                    placeholder="e.g. Agra"
                     value={formData.city}
                     onChange={handleChange}
                     className="w-full bg-ivory-50 border border-ivory-300 px-3 py-2 text-xs text-charcoal-900 rounded-xs focus:outline-none focus:border-charcoal-900"
                   />
+                  <datalist id="checkout-city-list">
+                    {(STATE_TO_CITIES[formData.state] || []).map((c) => (
+                      <option key={c} value={c} />
+                    ))}
+                  </datalist>
+                  <span className="text-[9px] text-charcoal-400 block mt-0.5">Auto-detects state</span>
                 </div>
                 <div>
                   <label htmlFor="checkout-state" className="block text-[11px] uppercase tracking-wider font-semibold text-charcoal-700 mb-1">
                     State
                   </label>
-                  <input id="checkout-state"
+                  <input
+                    id="checkout-state"
                     type="text"
                     required
                     name="state"
+                    list="checkout-states-list"
+                    placeholder="Select State / UT"
                     value={formData.state}
                     onChange={handleChange}
                     className="w-full bg-ivory-50 border border-ivory-300 px-3 py-2 text-xs text-charcoal-900 rounded-xs focus:outline-none focus:border-charcoal-900"
                   />
+                  <datalist id="checkout-states-list">
+                    {INDIAN_STATES.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </datalist>
+                  <span className="text-[9px] text-charcoal-400 block mt-0.5">Dropdown options available</span>
                 </div>
                 <div>
                   <label htmlFor="checkout-pincode" className="block text-[11px] uppercase tracking-wider font-semibold text-charcoal-700 mb-1">
                     PIN Code
                   </label>
-                  <input id="checkout-pincode"
+                  <input
+                    id="checkout-pincode"
                     type="text"
                     required
+                    maxLength={6}
                     name="pincode"
+                    placeholder="e.g. 282001"
                     value={formData.pincode}
                     onChange={handleChange}
                     className="w-full bg-ivory-50 border border-ivory-300 px-3 py-2 text-xs text-charcoal-900 rounded-xs focus:outline-none focus:border-charcoal-900"
                   />
+                  <span className="text-[9px] text-charcoal-400 block mt-0.5">Auto-detects city & state</span>
                 </div>
               </div>
             </div>
