@@ -135,5 +135,6 @@ const ReturnRequestSchema = new Schema<IReturnRequest>(
 ReturnRequestSchema.index({ user: 1, createdAt: -1 });
 ReturnRequestSchema.index({ order: 1 });
 ReturnRequestSchema.index({ status: 1 });
+ReturnRequestSchema.index({ status: 1, createdAt: -1 });
 
 export const ReturnRequest = mongoose.model<IReturnRequest>('ReturnRequest', ReturnRequestSchema);

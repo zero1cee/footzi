@@ -39,7 +39,9 @@ describe('Returns, Exchanges & Admin Operations Suite', () => {
     const patronUser = await User.findOne({ email: 'patron@footzi.in' });
 
     // Create a fulfilled test order for return/exchange testing
-    const sampleProduct = await Product.findOne({ isActive: true });
+    const sampleProduct =
+      (await Product.findOne({ 'variants.sku': 'FTZ-BLG-TAN-UK8' })) ||
+      (await Product.findOne({ isActive: true }));
     if (sampleProduct) {
       const replVariant = sampleProduct.variants.find((v: any) => v.size === 'UK 9' && v.color === 'Vintage Tan')
         || sampleProduct.variants.find((v: any) => v.size === 'UK 9');

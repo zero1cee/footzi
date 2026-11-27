@@ -10,7 +10,13 @@ export const connectDB = async (): Promise<void> => {
   const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/footzi';
 
   try {
-    await mongoose.connect(uri, { serverSelectionTimeoutMS: 10_000 });
+    await mongoose.connect(uri, {
+      serverSelectionTimeoutMS: 10_000,
+      minPoolSize: isProduction ? 10 : 2,
+      maxPoolSize: isProduction ? 50 : 10,
+      socketTimeoutMS: 45_000,
+      maxIdleTimeMS: 30_000,
+    });
     console.log(`[Footzi DB] MongoDB connected successfully to ${redact(uri)}`);
     await ensureDefaultCoupons().catch((e) => console.error('[Footzi DB] Could not seed default coupons:', e.message));
     await ensureDemoAdminUser().catch((e) => console.error('[Footzi DB] Could not ensure demo admin:', e.message));

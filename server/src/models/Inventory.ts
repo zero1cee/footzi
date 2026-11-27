@@ -1,4 +1,4 @@
-import mongoose, { Schema, Document, Model } from 'mongoose';
+import mongoose, { Schema, Document, Model, ClientSession } from 'mongoose';
 import { ShoeSize } from './Product.js';
 
 export interface IInventory extends Document {
@@ -10,9 +10,9 @@ export interface IInventory extends Document {
   reservedStock: number;
   reorderThreshold: number;
   supplierRef?: string;
-  reserveStock(qty: number): Promise<boolean>;
-  releaseStock(qty: number): Promise<boolean>;
-  confirmFulfillment(qty: number): Promise<boolean>;
+  reserveStock(qty: number, session?: ClientSession): Promise<boolean>;
+  releaseStock(qty: number, session?: ClientSession): Promise<boolean>;
+  confirmFulfillment(qty: number, session?: ClientSession): Promise<boolean>;
 }
 
 const InventorySchema = new Schema<IInventory>(
@@ -35,31 +35,38 @@ const InventorySchema = new Schema<IInventory>(
   }
 );
 
+// High-Concurrency & Inventory Optimization Indexes
+InventorySchema.index({ variantSku: 1, availableStock: 1 });
+InventorySchema.index({ product: 1, availableStock: 1 });
+
 // Method: Atomically reserve stock for an order pending payment
-InventorySchema.methods.reserveStock = async function (qty: number): Promise<boolean> {
+InventorySchema.methods.reserveStock = async function (qty: number, session?: ClientSession): Promise<boolean> {
   // Single conditional update: the stock check and the decrement happen in one
   // document-level operation, so concurrent buyers cannot both take the last pair.
   const result = await Inventory.updateOne(
     { _id: this._id, availableStock: { $gte: qty } },
-    { $inc: { availableStock: -qty, reservedStock: qty } }
+    { $inc: { availableStock: -qty, reservedStock: qty } },
+    session ? { session } : undefined
   );
   return result.modifiedCount === 1;
 };
 
 // Method: Release reserved stock (e.g. payment failed or cancelled)
-InventorySchema.methods.releaseStock = async function (qty: number): Promise<boolean> {
+InventorySchema.methods.releaseStock = async function (qty: number, session?: ClientSession): Promise<boolean> {
   const result = await Inventory.updateOne(
     { _id: this._id, reservedStock: { $gte: qty } },
-    { $inc: { reservedStock: -qty, availableStock: qty } }
+    { $inc: { reservedStock: -qty, availableStock: qty } },
+    session ? { session } : undefined
   );
   return result.modifiedCount === 1;
 };
 
 // Method: Confirm fulfillment (payment verified -> reserved stock permanently deducted)
-InventorySchema.methods.confirmFulfillment = async function (qty: number): Promise<boolean> {
+InventorySchema.methods.confirmFulfillment = async function (qty: number, session?: ClientSession): Promise<boolean> {
   const result = await Inventory.updateOne(
     { _id: this._id, reservedStock: { $gte: qty } },
-    { $inc: { reservedStock: -qty } }
+    { $inc: { reservedStock: -qty } },
+    session ? { session } : undefined
   );
   return result.modifiedCount === 1;
 };

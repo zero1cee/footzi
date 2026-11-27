@@ -11,6 +11,7 @@ import { settingsService, shippingFor } from './settingsService.js';
 import { emailService } from './emailService.js';
 import { restock } from './returnService.js';
 import { OrderActor, orderFilterFor, ownerFilter } from './orderAccess.js';
+import { runInTransaction } from '../utils/transaction.js';
 
 const MAX_UNPAID_GUEST_ORDERS = 3;
 
@@ -49,26 +50,23 @@ export class OrderService {
 
     const reservations: { inventory: IInventory; quantity: number }[] = [];
 
-    let order: IOrder;
     try {
-      order = await this.reserveAndCreateOrder(data, reservations);
+      return await runInTransaction(async (session) => {
+        return this.reserveAndCreateOrder(data, reservations, session);
+      });
     } catch (error) {
-      // Roll back every reservation made before the failure so stock is not stranded
+      // Roll back every reservation made before the failure so stock is not stranded (for standalone fallback)
       for (const { inventory, quantity } of reservations) {
         await inventory.releaseStock(quantity).catch(() => false);
       }
       throw error;
     }
-
-    // Clear the customer's saved bag once the order is placed (guests keep their bag in the browser only)
-    if (data.userId) await Cart.findOneAndUpdate({ user: data.userId }, { items: [], subtotal: 0 });
-
-    return order;
   }
 
   private async reserveAndCreateOrder(
     data: CreateOrderDTO,
-    reservations: { inventory: IInventory; quantity: number }[]
+    reservations: { inventory: IInventory; quantity: number }[],
+    session?: mongoose.ClientSession
   ): Promise<IOrder> {
     const {
       userId,
@@ -92,7 +90,9 @@ export class OrderService {
 
     // 1. Recalculate and validate prices & stock exclusively from database
     for (const reqItem of requestedItems) {
-      const product = await Product.findById(reqItem.productId);
+      const productQuery = Product.findById(reqItem.productId);
+      if (session) productQuery.session(session);
+      const product = await productQuery;
       if (!product || !product.isActive) {
         throw new Error(`Footwear product '${reqItem.productId}' is no longer available.`);
       }
@@ -103,10 +103,12 @@ export class OrderService {
       }
 
       // Check Inventory
-      let inventory = await Inventory.findOne({ variantSku: variant.sku });
+      const invQuery = Inventory.findOne({ variantSku: variant.sku });
+      if (session) invQuery.session(session);
+      let inventory = await invQuery;
       if (!inventory) {
         // Fallback: create inventory record if not initialized
-        inventory = await Inventory.create({
+        const newInv = new Inventory({
           variantSku: variant.sku,
           product: product._id,
           size: variant.size,
@@ -114,6 +116,8 @@ export class OrderService {
           availableStock: variant.stock,
           reservedStock: 0,
         });
+        await newInv.save(session ? { session } : undefined);
+        inventory = newInv;
       }
 
       if (inventory.availableStock < reqItem.quantity) {
@@ -123,7 +127,7 @@ export class OrderService {
       }
 
       // Atomic stock reservation
-      const reserved = await inventory.reserveStock(reqItem.quantity);
+      const reserved = await inventory.reserveStock(reqItem.quantity, session);
       if (!reserved) {
         throw new Error(
           `Insufficient stock for ${product.name} (${variant.size} - ${variant.color}). It was just reserved by another patron.`
@@ -164,7 +168,7 @@ export class OrderService {
     const total = Math.max(0, subtotal - discount + shippingFee);
 
     // 4. Create Order document
-    return Order.create({
+    const order = new Order({
       orderNumber,
       user: userId,
       isGuest: Boolean(isGuest),
@@ -188,6 +192,19 @@ export class OrderService {
         },
       ],
     });
+
+    await order.save(session ? { session } : undefined);
+
+    // Clear the customer's saved bag once the order is placed (guests keep their bag in the browser only)
+    if (userId) {
+      await Cart.findOneAndUpdate(
+        { user: userId },
+        { items: [], subtotal: 0 },
+        session ? { session } : undefined
+      );
+    }
+
+    return order;
   }
 
   /**

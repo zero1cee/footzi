@@ -56,6 +56,9 @@ const CartSchema = new Schema<ICart>(
   }
 );
 
+// TTL index: automatically cleanup abandoned carts inactive for over 30 days
+CartSchema.index({ updatedAt: 1 }, { expireAfterSeconds: 30 * 24 * 60 * 60 });
+
 // Method to compute total subtotal
 CartSchema.methods.calculateSubtotal = function (): number {
   this.subtotal = this.items.reduce((acc: number, item: ICartItem) => acc + item.lineTotal, 0);

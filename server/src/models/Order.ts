@@ -173,6 +173,13 @@ const OrderSchema = new Schema<IOrder>(
   }
 );
 
+// High-Concurrency & E-Commerce Scale Indexes
+OrderSchema.index({ user: 1, createdAt: -1 });
+OrderSchema.index({ orderStatus: 1, createdAt: -1 });
+OrderSchema.index({ customerEmail: 1, createdAt: -1 });
+OrderSchema.index({ 'shippingAddress.pincode': 1 });
+OrderSchema.index({ trackingNumber: 1 }, { sparse: true });
+
 // State transition validation (prevent invalid lifecycle jumps)
 OrderSchema.methods.canTransitionTo = function (newStatus: OrderStatus): boolean {
   const current = this.orderStatus as OrderStatus;

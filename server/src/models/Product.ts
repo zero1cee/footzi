@@ -170,6 +170,9 @@ ProductSchema.set('toObject', {
 
 // Database Indexes for Fast Ecommerce Queries
 ProductSchema.index({ category: 1, price: 1 });
+ProductSchema.index({ isActive: 1, category: 1, price: 1 });
+ProductSchema.index({ isActive: 1, rating: -1 });
+ProductSchema.index({ isActive: 1, createdAt: -1 });
 ProductSchema.index({ 'variants.sku': 1 });
 ProductSchema.index({ name: 'text', description: 'text', brand: 'text' });
 
