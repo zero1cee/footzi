@@ -1,5 +1,6 @@
 import { getCorsOrigins } from '../config/env.js';
 import { orderAccessToken } from './orderAccess.js';
+import { withRetry } from '../utils/retry.js';
 
 /**
  * Transactional email through an HTTP API (Brevo or Resend). Render's free tier blocks
@@ -68,7 +69,7 @@ type Provider = 'brevo' | 'resend' | 'none';
 export const activeProvider = (): Provider =>
   process.env.BREVO_API_KEY ? 'brevo' : process.env.RESEND_API_KEY ? 'resend' : 'none';
 
-/** Hands one message to the configured provider. Never throws. */
+/** Hands one message to the configured provider with exponential backoff retries. Never throws. */
 export const deliver = async (message: OutgoingEmail): Promise<boolean> => {
   const provider = activeProvider();
 
@@ -77,44 +78,58 @@ export const deliver = async (message: OutgoingEmail): Promise<boolean> => {
     return false;
   }
 
-  try {
-    let res: Response;
-    if (provider === 'brevo') {
-      // Brevo only sends from a sender address you verified in its dashboard
-      if (!process.env.EMAIL_FROM) {
-        console.error('[Footzi Email] EMAIL_FROM is not set. With Brevo it must be a sender you verified there, e.g. Footzi <you@gmail.com>.');
-        return false;
-      }
-      res = await fetch('https://api.brevo.com/v3/smtp/email', {
-        method: 'POST',
-        headers: { 'api-key': process.env.BREVO_API_KEY!, 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({
-          sender: parseSender(process.env.EMAIL_FROM),
-          to: [{ email: message.to }],
-          subject: message.subject,
-          htmlContent: message.html,
-          textContent: message.text,
-        }),
-      });
-    } else {
-      res = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          from: process.env.EMAIL_FROM || 'Footzi <onboarding@resend.dev>',
-          to: [message.to],
-          subject: message.subject,
-          html: message.html,
-          text: message.text,
-        }),
-      });
-    }
+  if (provider === 'brevo' && !process.env.EMAIL_FROM) {
+    console.error('[Footzi Email] EMAIL_FROM is not set. With Brevo it must be a sender you verified there, e.g. Footzi <you@gmail.com>.');
+    return false;
+  }
 
-    if (!res.ok) {
-      console.error(`[Footzi Email] ${provider} rejected "${message.subject}" (${res.status}): ${await res.text()}`);
-      return false;
-    }
-    return true;
+  try {
+    return await withRetry(
+      async () => {
+        let res: Response;
+        if (provider === 'brevo') {
+          res = await fetch('https://api.brevo.com/v3/smtp/email', {
+            method: 'POST',
+            headers: { 'api-key': process.env.BREVO_API_KEY!, 'Content-Type': 'application/json', Accept: 'application/json' },
+            body: JSON.stringify({
+              sender: parseSender(process.env.EMAIL_FROM!),
+              to: [{ email: message.to }],
+              subject: message.subject,
+              htmlContent: message.html,
+              textContent: message.text,
+            }),
+          });
+        } else {
+          res = await fetch('https://api.resend.com/emails', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              from: process.env.EMAIL_FROM || 'Footzi <onboarding@resend.dev>',
+              to: [message.to],
+              subject: message.subject,
+              html: message.html,
+              text: message.text,
+            }),
+          });
+        }
+
+        if (!res.ok) {
+          const text = await res.text();
+          if (res.status === 429 || res.status >= 500) {
+            const err: any = new Error(`${provider} rejected "${message.subject}" (${res.status}): ${text}`);
+            err.status = res.status;
+            throw err;
+          }
+          console.error(`[Footzi Email] ${provider} rejected "${message.subject}" (${res.status}): ${text}`);
+          return false;
+        }
+        return true;
+      },
+      {
+        maxAttempts: 3,
+        baseDelayMs: isTest() ? 5 : 250,
+      }
+    );
   } catch (error: any) {
     console.error(`[Footzi Email] Could not send "${message.subject}":`, error.message);
     return false;

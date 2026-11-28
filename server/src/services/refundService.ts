@@ -3,6 +3,7 @@ import { razorpayInstance, RAZORPAY_CONFIG } from '../config/razorpay.js';
 import { Order } from '../models/Order.js';
 import { Payment } from '../models/Payment.js';
 import { emailService } from './emailService.js';
+import { withRetry } from '../utils/retry.js';
 
 const isDemoMode = (): boolean =>
   RAZORPAY_CONFIG.key_id.includes('placeholder') || RAZORPAY_CONFIG.key_secret.includes('placeholder');
@@ -79,12 +80,16 @@ export class RefundService {
       if (simulated) {
         refundId = `rfnd_demo_${crypto.randomBytes(6).toString('hex')}`;
       } else {
-        const gateway: any = await razorpayInstance.payments.refund(payment.gatewayPaymentId!, {
-          amount: Math.round(amount * 100),
-          speed: 'normal',
-          receipt: reference.slice(0, 40),
-          notes: { reason: reason.slice(0, 200), reference },
-        });
+        const gateway: any = await withRetry(
+          () =>
+            razorpayInstance.payments.refund(payment.gatewayPaymentId!, {
+              amount: Math.round(amount * 100),
+              speed: 'normal',
+              receipt: reference.slice(0, 40),
+              notes: { reason: reason.slice(0, 200), reference },
+            }),
+          { maxAttempts: 3, baseDelayMs: 250 }
+        );
         refundId = gateway.id;
       }
     } catch (err: any) {

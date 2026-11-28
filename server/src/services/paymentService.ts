@@ -5,10 +5,12 @@ import { Payment } from '../models/Payment.js';
 import { Inventory } from '../models/Inventory.js';
 import { Product } from '../models/Product.js';
 import { SupplierOrder } from '../models/SupplierOrder.js';
+import { WebhookEvent } from '../models/WebhookEvent.js';
 import { supplierFulfillmentService } from './supplierFulfillmentService.js';
 import { refundService } from './refundService.js';
 import { emailService } from './emailService.js';
 import { OrderActor, orderFilterFor } from './orderAccess.js';
+import { withRetry } from '../utils/retry.js';
 
 // Demo mode = the server is running on the placeholder Razorpay credentials.
 const isDemoMode = (): boolean =>
@@ -44,15 +46,19 @@ export class PaymentService {
     // With real credentials a gateway failure is a real failure; only demo mode simulates
     if (!isDemoMode()) {
       try {
-        const rzpOrder = await razorpayInstance.orders.create({
-          amount: amountInPaise,
-          currency: 'INR',
-          receipt: order.orderNumber,
-          notes: {
-            orderNumber: order.orderNumber,
-            customerEmail: order.customerEmail,
-          },
-        });
+        const rzpOrder = await withRetry(
+          () =>
+            razorpayInstance.orders.create({
+              amount: amountInPaise,
+              currency: 'INR',
+              receipt: order.orderNumber,
+              notes: {
+                orderNumber: order.orderNumber,
+                customerEmail: order.customerEmail,
+              },
+            }),
+          { maxAttempts: 3, baseDelayMs: 250 }
+        );
         gatewayOrderId = rzpOrder.id;
       } catch (err: any) {
         const reason = err?.error?.description || err?.message || 'unknown gateway error';
@@ -313,7 +319,7 @@ export class PaymentService {
   }
 
   // Handle Webhook Events
-  async handleWebhook(body: any, webhookSignature: string, rawBody?: Buffer) {
+  async handleWebhook(body: any, webhookSignature: string, rawBody?: Buffer, headerEventId?: string) {
     const secret = RAZORPAY_CONFIG.webhook_secret;
     const hasRealSecret = Boolean(secret) && !secret.includes('placeholder');
 
@@ -332,56 +338,90 @@ export class PaymentService {
       throw new Error('Webhook secret is not configured');
     }
 
-    const event = body.event;
-    console.log(`[Razorpay Webhook] Received event: ${event}`);
-
+    const event = body.event || 'unknown';
     const paymentEntity = body.payload?.payment?.entity;
-    if (!paymentEntity?.order_id) {
-      return { status: 'processed', event };
-    }
 
-    const payment = await Payment.findOne({ gatewayOrderId: paymentEntity.order_id });
-    if (!payment) {
-      return { status: 'processed', event };
-    }
-    payment.webhookEvents.push(body);
+    // Atomic webhook idempotency deduplication
+    const eventId =
+      headerEventId?.trim() ||
+      crypto
+        .createHash('sha256')
+        .update(`${event}:${paymentEntity?.id || ''}:${paymentEntity?.order_id || ''}:${body.created_at || ''}`)
+        .digest('hex')
+        .slice(0, 32);
 
-    if (event === 'payment.captured') {
-      const order = await Order.findById(payment.order);
-
-      // Only an authenticated webhook may confirm an order. In demo mode the
-      // webhook is unauthenticated, so it is recorded but never trusted to pay.
-      if (hasRealSecret && order) {
-        if (paymentEntity.amount !== Math.round(order.total * 100)) {
-          payment.failureReason = 'Captured amount does not match the order total';
-          console.error(`[Razorpay Webhook] Amount mismatch on order ${order.orderNumber}`);
-        } else if (order.paymentStatus !== 'paid') {
-          const outcome = await this.fulfillPaidOrder(
-            order,
-            payment,
-            paymentEntity.order_id,
-            paymentEntity.id,
-            'confirmed-by-webhook'
-          );
-          if (outcome.status === 'not_payable') {
-            payment.status = 'captured';
-            payment.gatewayPaymentId = paymentEntity.id;
-            await payment.save();
-            payment.failureReason = await this.refundLatePayment(payment);
-            console.error(`[Razorpay Webhook] Payment for cancelled order ${order.orderNumber}: ${payment.failureReason}`);
-          }
-        }
-      } else {
-        payment.status = 'captured';
+    let webhookRecordId: any;
+    try {
+      const record = await WebhookEvent.create({
+        eventId,
+        gateway: 'razorpay',
+        eventType: event,
+        status: 'processing',
+      });
+      webhookRecordId = record._id;
+    } catch (err: any) {
+      if (err?.code === 11000) {
+        return { status: 'duplicate_ignored', event, eventId };
       }
-    } else if (event === 'payment.failed' && payment.status !== 'captured') {
-      payment.status = 'failed';
-      payment.failureReason = paymentEntity.error_description || 'Gateway failed';
+      throw err;
     }
 
-    await payment.save();
+    try {
+      console.log(`[Razorpay Webhook] Received event: ${event} (${eventId})`);
 
-    return { status: 'processed', event };
+      if (!paymentEntity?.order_id) {
+        await WebhookEvent.updateOne({ _id: webhookRecordId }, { $set: { status: 'processed', processedAt: new Date() } });
+        return { status: 'processed', event, eventId };
+      }
+
+      const payment = await Payment.findOne({ gatewayOrderId: paymentEntity.order_id });
+      if (!payment) {
+        await WebhookEvent.updateOne({ _id: webhookRecordId }, { $set: { status: 'processed', processedAt: new Date() } });
+        return { status: 'processed', event, eventId };
+      }
+      payment.webhookEvents.push(body);
+
+      if (event === 'payment.captured') {
+        const order = await Order.findById(payment.order);
+
+        // Only an authenticated webhook may confirm an order. In demo mode the
+        // webhook is unauthenticated, so it is recorded but never trusted to pay.
+        if (hasRealSecret && order) {
+          if (paymentEntity.amount !== Math.round(order.total * 100)) {
+            payment.failureReason = 'Captured amount does not match the order total';
+            console.error(`[Razorpay Webhook] Amount mismatch on order ${order.orderNumber}`);
+          } else if (order.paymentStatus !== 'paid') {
+            const outcome = await this.fulfillPaidOrder(
+              order,
+              payment,
+              paymentEntity.order_id,
+              paymentEntity.id,
+              'confirmed-by-webhook'
+            );
+            if (outcome.status === 'not_payable') {
+              payment.status = 'captured';
+              payment.gatewayPaymentId = paymentEntity.id;
+              await payment.save();
+              payment.failureReason = await this.refundLatePayment(payment);
+              console.error(`[Razorpay Webhook] Payment for cancelled order ${order.orderNumber}: ${payment.failureReason}`);
+            }
+          }
+        } else {
+          payment.status = 'captured';
+        }
+      } else if (event === 'payment.failed' && payment.status !== 'captured') {
+        payment.status = 'failed';
+        payment.failureReason = paymentEntity.error_description || 'Gateway failed';
+      }
+
+      await payment.save();
+      await WebhookEvent.updateOne({ _id: webhookRecordId }, { $set: { status: 'processed', processedAt: new Date() } });
+
+      return { status: 'processed', event, eventId };
+    } catch (error: any) {
+      await WebhookEvent.deleteOne({ _id: webhookRecordId }).catch(() => {});
+      throw error;
+    }
   }
 }
 

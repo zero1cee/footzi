@@ -8,6 +8,7 @@ import { validateEnv } from './config/env.js';
 import { orderService } from './services/orderService.js';
 import { logEvent } from './middleware/errorHandler.js';
 import { stockAlertService } from './services/stockAlertService.js';
+import { workerRegistry } from './utils/workerRunner.js';
 
 const PORT = process.env.PORT || 5001;
 
@@ -24,25 +25,31 @@ const startServer = async () => {
     console.log(`[Footzi Server] Health check available at http://localhost:${PORT}/api/health`);
   });
 
-  // Release stock held by checkouts that were abandoned before payment
+  // Release stock held by checkouts that were abandoned before payment (with overlap lock)
   const sweepExpiredOrders = () =>
-    orderService
-      .expireStaleOrders()
-      .then((count) => {
-        if (count > 0) console.log(`[Footzi Orders] Expired ${count} unpaid order(s) and released their stock`);
-      })
-      .catch((error) => console.error('[Footzi Orders] Expiry sweep failed:', error.message));
+    workerRegistry
+      .run('order-expiry-sweep', () => orderService.expireStaleOrders())
+      .then((res) => {
+        if (!res.skipped && res.error) {
+          console.error('[Footzi Orders] Expiry sweep failed:', res.error);
+        } else if (!res.skipped && res.processed > 0) {
+          console.log(`[Footzi Orders] Expired ${res.processed} unpaid order(s) and released their stock`);
+        }
+      });
   void sweepExpiredOrders();
   setInterval(sweepExpiredOrders, 5 * 60 * 1000).unref();
 
-  // Tell people waiting on a sold-out size when it comes back (a cancelled order, a restock, a return)
+  // Tell people waiting on a sold-out size when it comes back (with overlap lock)
   const sweepStockAlerts = () =>
-    stockAlertService
-      .sweep()
-      .then((count) => {
-        if (count > 0) logEvent('info', 'stock_alerts_sent', { count });
-      })
-      .catch((error) => logEvent('error', 'stock_alert_sweep_failed', { message: error.message }));
+    workerRegistry
+      .run('stock-alert-sweep', () => stockAlertService.sweep())
+      .then((res) => {
+        if (!res.skipped && res.error) {
+          logEvent('error', 'stock_alert_sweep_failed', { message: res.error });
+        } else if (!res.skipped && res.processed > 0) {
+          logEvent('info', 'stock_alerts_sent', { count: res.processed });
+        }
+      });
   setInterval(sweepStockAlerts, 5 * 60 * 1000).unref();
 
   // Finish in-flight requests and close the database before the host stops the process

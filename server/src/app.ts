@@ -23,6 +23,7 @@ import { reportClientError } from './controllers/clientErrorController.js';
 import mongoose from 'mongoose';
 import { getCorsOrigins, isProduction } from './config/env.js';
 import { buildSitemap, injectSeo, publicBaseUrl, robotsTxt, seoForPath } from './services/seoService.js';
+import { workerRegistry } from './utils/workerRunner.js';
 
 // Resolved from this file rather than process.cwd(), so the server works
 // whichever directory it is started from (src/ in dev, dist/ in production).
@@ -108,6 +109,7 @@ export const createApp = (): Express => {
       timestamp: new Date().toISOString(),
       environment: process.env.NODE_ENV || 'development',
       uptimeSeconds: Math.round(process.uptime()),
+      workers: workerRegistry.getStatus(),
     });
   });
 
