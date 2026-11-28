@@ -2,12 +2,23 @@ import { Request, Response } from 'express';
 import { AuthRequest } from '../middleware/auth.js';
 import { settingsService } from '../services/settingsService.js';
 import { updateSettingsSchema } from '../validators/settingsValidators.js';
+import { cacheService } from '../utils/cache.js';
 
-/** What the storefront needs: shipping rules, the return window, the banner. Public, and cached for a minute. */
-export const getPublicSettings = async (_req: Request, res: Response): Promise<void> => {
+/** What the storefront needs: shipping rules, the return window, the banner. Public, and cached for a minute with ETag support. */
+export const getPublicSettings = async (req: Request, res: Response): Promise<void> => {
   try {
-    res.setHeader('Cache-Control', 'public, max-age=60');
-    res.status(200).json(await settingsService.get());
+    const settings = await settingsService.get();
+    const etag = cacheService.generateETag(settings);
+
+    res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=120');
+    res.setHeader('ETag', etag);
+
+    if (cacheService.isFresh(req.headers['if-none-match'] as string, etag)) {
+      res.status(304).end();
+      return;
+    }
+
+    res.status(200).json(settings);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

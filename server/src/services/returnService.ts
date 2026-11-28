@@ -6,6 +6,7 @@ import { Inventory } from '../models/Inventory.js';
 import { refundService } from './refundService.js';
 import { emailService } from './emailService.js';
 import { settingsService } from './settingsService.js';
+import { cacheService } from '../utils/cache.js';
 
 export const RETURN_REASONS = [
   'Fit issue - too tight',
@@ -56,6 +57,7 @@ const deliveredAt = (order: any): Date => {
 export const restock = async (sku: string, quantity: number) => {
   await Inventory.updateOne({ variantSku: sku }, { $inc: { availableStock: quantity } });
   await Product.updateOne({ 'variants.sku': sku }, { $inc: { 'variants.$.stock': quantity } });
+  cacheService.invalidatePrefix('products:');
 };
 
 export class ReturnService {

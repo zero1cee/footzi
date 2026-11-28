@@ -63,7 +63,15 @@ export const createApp = (): Express => {
     })
   );
   // Text responses (the app's JavaScript and CSS, JSON, HTML) shrink to a quarter of their size on the wire
-  app.use(compression());
+  app.use(
+    compression({
+      threshold: 1024,
+      filter: (req, res) => {
+        if (req.headers['x-no-compression']) return false;
+        return compression.filter(req, res);
+      },
+    })
+  );
   app.use(
     cors({
       origin: getCorsOrigins(),

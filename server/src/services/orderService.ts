@@ -12,6 +12,7 @@ import { emailService } from './emailService.js';
 import { restock } from './returnService.js';
 import { OrderActor, orderFilterFor, ownerFilter } from './orderAccess.js';
 import { runInTransaction } from '../utils/transaction.js';
+import { cacheService } from '../utils/cache.js';
 
 const MAX_UNPAID_GUEST_ORDERS = 3;
 
@@ -280,6 +281,7 @@ export class OrderService {
         await inv.releaseStock(item.quantity);
       }
     }
+    cacheService.invalidatePrefix('products:');
     return order;
   }
 

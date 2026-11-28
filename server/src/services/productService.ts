@@ -3,6 +3,7 @@ import { Product, IProduct } from '../models/Product.js';
 import { Order } from '../models/Order.js';
 import { IUser } from '../models/User.js';
 import { Inventory } from '../models/Inventory.js';
+import { cacheService } from '../utils/cache.js';
 import type { CreateProductInput, UpdateProductInput } from '../validators/productValidators.js';
 
 export interface ProductQueryFilters {
@@ -287,6 +288,7 @@ export class ProductService {
     }
 
     await this.createInventoryFor(product, product.variants);
+    cacheService.invalidatePrefix('products:');
     return product;
   }
 
@@ -357,6 +359,7 @@ export class ProductService {
 
     await product.save();
     await this.createInventoryFor(product, added);
+    cacheService.invalidatePrefix('products:');
     return product;
   }
 
@@ -366,6 +369,7 @@ export class ProductService {
 
     product.isActive = !product.isActive;
     await product.save();
+    cacheService.invalidatePrefix('products:');
     return product;
   }
 
@@ -376,6 +380,7 @@ export class ProductService {
     // Soft delete product by deactivating it
     product.isActive = false;
     await product.save();
+    cacheService.invalidatePrefix('products:');
     return true;
   }
 
@@ -394,6 +399,7 @@ export class ProductService {
       );
     }
 
+    cacheService.invalidatePrefix('products:');
     return inv;
   }
 
@@ -445,6 +451,7 @@ export class ProductService {
     product.rating = Number((total / product.reviews.length).toFixed(1));
     await product.save();
 
+    cacheService.invalidatePrefix('products:');
     return { review: product.reviews[0], product };
   }
 }
