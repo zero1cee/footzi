@@ -2,9 +2,12 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, CheckCircle2, Shield, Truck, RefreshCw, Award } from 'lucide-react';
 import { useSettingsStore } from '@/store/useSettingsStore';
+import { useAuthStore } from '@/store/useAuthStore';
+import { toast } from '@/store/useToastStore';
 
 export const Footer: React.FC = () => {
-  const returnWindowDays = useSettingsStore((s) => s.settings.returnWindowDays);
+  const { returnWindowDays, announcement } = useSettingsStore((s) => s.settings);
+  const { user } = useAuthStore();
   const [email, setEmail] = useState('');
   const [subscribed, setSubscribed] = useState(false);
 
@@ -13,6 +16,7 @@ export const Footer: React.FC = () => {
     if (email.trim()) {
       setSubscribed(true);
       setEmail('');
+      toast.success('Welcome to Footzi Privé.');
     }
   };
 
@@ -47,7 +51,7 @@ export const Footer: React.FC = () => {
               <div>
                 <p className="font-serif text-base font-medium text-ivory-50">Pan-India Express</p>
                 <p className="text-xs text-charcoal-400 mt-1 leading-relaxed">
-                  Dispatched in 24 hours with end-to-end simulated tracking.
+                  Dispatched within 24 hours with live Delhivery Express courier tracking.
                 </p>
               </div>
             </div>
@@ -162,11 +166,13 @@ export const Footer: React.FC = () => {
                   Contact & Grievance Desk
                 </Link>
               </li>
-              <li>
-                <Link to="/admin" className="text-sand-400 hover:text-sand-300 transition-colors">
-                  Admin & Supplier Portal
-                </Link>
-              </li>
+              {(user?.role === 'admin' || user?.role === 'demo_admin') && (
+                <li>
+                  <Link to="/admin" className="text-sand-400 hover:text-sand-300 transition-colors">
+                    Admin Control Deck
+                  </Link>
+                </li>
+              )}
             </ul>
           </div>
 
@@ -180,9 +186,12 @@ export const Footer: React.FC = () => {
             </p>
 
             {subscribed ? (
-              <div className="flex items-center gap-2 text-xs text-emerald-400 bg-emerald-950/40 border border-emerald-800 p-2.5 rounded-xs">
-                <CheckCircle2 className="w-4 h-4 shrink-0" />
-                <span>Welcome to Footzi Privé. Check your inbox for 15% off.</span>
+              <div className="flex items-start gap-2.5 text-xs text-emerald-300 bg-emerald-950/50 border border-emerald-800/80 p-3 rounded-xs leading-relaxed">
+                <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5 text-emerald-400" />
+                <span>
+                  Welcome to Footzi Privé. Enjoy 15% off your first order with privilege code{' '}
+                  <strong className="text-white tracking-wider">{announcement?.code || 'AGRAFIRST'}</strong>.
+                </span>
               </div>
             ) : (
               <form onSubmit={handleSubscribe} className="space-y-2">

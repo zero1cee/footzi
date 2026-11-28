@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { X, Trash2, Plus, Minus, ArrowRight, ShieldCheck, Tag, ShoppingBag } from 'lucide-react';
+import { X, Trash2, Plus, Minus, ArrowRight, ShieldCheck, Tag, ShoppingBag, CheckCircle2 } from 'lucide-react';
 import { useCartStore } from '@/store/useCartStore';
 import { useSettingsStore } from '@/store/useSettingsStore';
 import { formatINR } from '@/lib/utils';
@@ -65,7 +65,7 @@ export const CartDrawer: React.FC = () => {
         onClick={closeCart}
       />
 
-      <div className="fixed inset-y-0 right-0 max-w-full flex pl-10">
+      <div className="fixed inset-y-0 right-0 max-w-full flex pl-6 sm:pl-10">
         <div
           ref={dialogRef}
           role="dialog"
@@ -97,7 +97,10 @@ export const CartDrawer: React.FC = () => {
               <div className="text-[11px] text-charcoal-700 flex justify-between font-medium mb-1.5">
                 <span>
                   {remainingForFreeShipping === 0 ? (
-                    <span className="text-emerald-700 font-semibold">🎉 You have unlocked Free Pan-India Delivery!</span>
+                    <span className="inline-flex items-center gap-1.5 text-emerald-700 font-semibold">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                      Complimentary Express Pan-India Delivery unlocked
+                    </span>
                   ) : (
                     <>Add <strong className="text-charcoal-950">{formatINR(remainingForFreeShipping)}</strong> more for Free Shipping</>
                   )}

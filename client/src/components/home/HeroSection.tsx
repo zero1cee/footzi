@@ -2,8 +2,12 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { useSettingsStore } from '@/store/useSettingsStore';
+import { formatINR } from '@/lib/utils';
 
 export const HeroSection: React.FC = () => {
+  const { freeShippingThreshold, returnWindowDays } = useSettingsStore((s) => s.settings);
+
   return (
     <section className="relative overflow-hidden bg-ivory-100 border-b border-ivory-200">
       {/* Subtle architectural background texture */}
@@ -49,11 +53,11 @@ export const HeroSection: React.FC = () => {
                 <p className="text-[11px] uppercase tracking-wider text-charcoal-500 mt-0.5">Full-Grain Leather</p>
               </div>
               <div>
-                <p className="font-serif text-2xl font-bold text-charcoal-900">₹1,999+</p>
+                <p className="font-serif text-2xl font-bold text-charcoal-900">{formatINR(freeShippingThreshold)}+</p>
                 <p className="text-[11px] uppercase tracking-wider text-charcoal-500 mt-0.5">Free Express Shipping</p>
               </div>
               <div>
-                <p className="font-serif text-2xl font-bold text-charcoal-900">7 Days</p>
+                <p className="font-serif text-2xl font-bold text-charcoal-900">{returnWindowDays} Days</p>
                 <p className="text-[11px] uppercase tracking-wider text-charcoal-500 mt-0.5">Doorstep Exchange</p>
               </div>
             </div>
@@ -107,7 +111,7 @@ export const HeroSection: React.FC = () => {
               </div>
 
               {/* Agra Heritage Stamp */}
-              <div className="absolute -top-4 -right-4 bg-charcoal-900 text-ivory-50 px-3 py-2 rounded-xs shadow-md border border-charcoal-800 text-center">
+              <div className="absolute top-3 right-3 sm:-top-4 sm:-right-4 bg-charcoal-900 text-ivory-50 px-3 py-2 rounded-xs shadow-md border border-charcoal-800 text-center">
                 <p className="text-[9px] uppercase tracking-widest text-sand-300 font-semibold">Agra Origin</p>
                 <p className="font-serif text-xs font-bold tracking-wider">MUGHAL ATELIER</p>
               </div>

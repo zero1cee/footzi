@@ -127,15 +127,17 @@ export const Navbar: React.FC = () => {
             {/* Wishlist Icon */}
             <Link
               to="/wishlist"
-              className="p-3 sm:p-2.5 text-charcoal-700 hover:text-charcoal-950 transition-colors relative"
+              className="p-3 sm:p-2.5 text-charcoal-700 hover:text-charcoal-950 transition-colors relative flex items-center"
               aria-label="View Wishlist"
             >
-              <Heart className="w-4 h-4 sm:w-5 sm:h-5" />
-              {wishlist.length > 0 && (
-                <span className="absolute -top-1 -right-1 bg-sand-400 text-charcoal-950 text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
-                  {wishlist.length}
-                </span>
-              )}
+              <div className="relative">
+                <Heart className="w-4 h-4 sm:w-5 sm:h-5" />
+                {wishlist.length > 0 && (
+                  <span className="absolute -top-1.5 -right-2 bg-sand-400 text-charcoal-950 text-[10px] font-bold min-w-[16px] h-[16px] px-1 rounded-full flex items-center justify-center">
+                    {wishlist.length}
+                  </span>
+                )}
+              </div>
             </Link>
 
             {/* Account Popover / Login Link */}
@@ -261,21 +263,40 @@ export const Navbar: React.FC = () => {
                   <ArrowRight className="w-4 h-4 text-charcoal-400" />
                 </Link>
               ))}
-              <div className="pt-2 flex flex-col gap-2">
+              <div className="pt-2 flex flex-col gap-1.5">
+                {isAuthenticated && user ? (
+                  <Link
+                    to="/account"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="text-xs uppercase tracking-wider font-semibold text-charcoal-800 py-2 flex items-center gap-2"
+                  >
+                    <User className="w-4 h-4 text-sand-600" /> Account & Orders
+                  </Link>
+                ) : (
+                  <Link
+                    to="/login"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="text-xs uppercase tracking-wider font-semibold text-charcoal-800 py-2 flex items-center gap-2"
+                  >
+                    <User className="w-4 h-4 text-sand-600" /> Sign In / Register
+                  </Link>
+                )}
                 <Link
-                  to="/account"
+                  to="/track-order"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="text-xs uppercase tracking-wider font-semibold text-charcoal-800 py-2 flex items-center gap-2"
+                  className="text-xs uppercase tracking-wider font-medium text-charcoal-600 py-1.5 flex items-center gap-2"
                 >
-                  <User className="w-4 h-4" /> Account & Orders
+                  Track an Order
                 </Link>
-                <Link
-                  to="/admin"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="text-xs uppercase tracking-wider font-semibold text-sand-600 py-2 flex items-center gap-2"
-                >
-                  Admin Control Panel
-                </Link>
+                {isAuthenticated && (user?.role === 'admin' || user?.role === 'demo_admin') && (
+                  <Link
+                    to="/admin"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="text-xs uppercase tracking-wider font-semibold text-sand-600 py-2 flex items-center gap-2"
+                  >
+                    <Shield className="w-4 h-4" /> Admin Control Deck
+                  </Link>
+                )}
               </div>
             </div>
           </div>

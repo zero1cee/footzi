@@ -112,11 +112,17 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
           <span className="tracking-widest uppercase text-[10px] text-sand-600 font-semibold">
             {product.category}
           </span>
-          <div className="flex items-center gap-1 text-[11px] text-charcoal-700">
-            <Star className="w-3 h-3 fill-sand-400 text-sand-400" />
-            <span>{product.rating}</span>
-            <span className="text-charcoal-400">({product.reviewCount})</span>
-          </div>
+          {product.reviewCount > 0 ? (
+            <div className="flex items-center gap-1 text-[11px] text-charcoal-700">
+              <Star className="w-3 h-3 fill-sand-400 text-sand-400" />
+              <span>{product.rating}</span>
+              <span className="text-charcoal-400">({product.reviewCount})</span>
+            </div>
+          ) : (
+            <span className="text-[10px] uppercase tracking-wider text-charcoal-400 font-medium">
+              Atelier Edit
+            </span>
+          )}
         </div>
 
         {/* Product Title */}
@@ -136,6 +142,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
               <button
                 key={c.name}
                 type="button"
+                aria-label={`Preview ${c.name} shade`}
                 onClick={() => setSelectedImageIndex(c.imageIndex)}
                 className={`w-3.5 h-3.5 rounded-full border transition-all ${
                   selectedImageIndex === c.imageIndex

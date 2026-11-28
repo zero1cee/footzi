@@ -5,6 +5,7 @@ import { useCartStore } from '@/store/useCartStore';
 import { formatINR } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 import { useDocumentMeta } from '@/hooks/useDocumentMeta';
+import { toast } from '@/store/useToastStore';
 
 export const CartPage: React.FC = () => {
   useDocumentMeta({ title: 'Your Bag — Footzi', noindex: true });
@@ -38,7 +39,10 @@ export const CartPage: React.FC = () => {
     const res = await applyCoupon(inputCoupon);
     setCouponFeedback({ success: res.success, text: res.message });
     if (res.success) {
+      toast.success(res.message);
       setInputCoupon('');
+    } else {
+      toast.error(res.message);
     }
   };
 

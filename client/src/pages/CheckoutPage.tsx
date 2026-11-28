@@ -409,7 +409,7 @@ export const CheckoutPage: React.FC = () => {
 
           <div className="space-y-2">
             <span className="text-[10px] uppercase tracking-ultra text-sand-600 font-semibold block">
-              Cryptographic Payment Signature Verified
+              Payment Confirmed • Atelier Crafting Initiated
             </span>
             <h1 className="font-serif text-3xl sm:text-4xl font-medium text-charcoal-950">
               Your Footzi Silhouette is Confirmed
@@ -422,11 +422,11 @@ export const CheckoutPage: React.FC = () => {
             </p>
           </div>
 
-          {/* Supplier Fulfillment Simulation Card */}
+          {/* Atelier Direct Fulfillment Card */}
           <div className="bg-ivory-50 p-6 rounded-xs border border-ivory-300 text-left space-y-3">
             <div className="flex items-center justify-between border-b border-ivory-200 pb-2">
               <span className="text-[10px] uppercase tracking-wider font-bold text-sand-700 flex items-center gap-1">
-                <Sparkles className="w-3.5 h-3.5 text-sand-500" /> Agra Dropship Fulfillment Simulation
+                <Sparkles className="w-3.5 h-3.5 text-sand-500" /> Agra Atelier Direct Dispatch
               </span>
               <span className="text-[11px] font-mono font-semibold text-charcoal-800">
                 {completedOrderData.trackingNumber}
@@ -508,7 +508,7 @@ export const CheckoutPage: React.FC = () => {
             Express Checkout
           </h1>
           <p className="text-xs text-charcoal-500 mt-1">
-            Prices, discounts, and inventory are recalculated and cryptographically verified on the backend.
+            Complimentary express shipping on qualifying orders • Easy doorstep exchanges across India.
           </p>
         </div>
 
@@ -842,14 +842,14 @@ export const CheckoutPage: React.FC = () => {
 
               <div className="flex items-center justify-center gap-1.5 text-[10px] text-charcoal-500 pt-1">
                 <Lock className="w-3.5 h-3.5 text-sand-500" />
-                <span>Backend verified • Zero client-side price tampering tolerated</span>
+                <span>256-Bit SSL Encrypted • Secured by Razorpay</span>
               </div>
             </div>
           </div>
 
         </form>
 
-        {/* Interactive Razorpay Test Modal */}
+        {/* Interactive Razorpay Payment Modal */}
         {pendingPayment && (
           <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4 bg-charcoal-950/70 backdrop-blur-sm animate-fade-in">
             <div className="relative bg-white max-w-md w-full rounded-xs shadow-2xl border border-ivory-300 overflow-hidden z-10 p-6 sm:p-8 space-y-6">
@@ -861,7 +861,7 @@ export const CheckoutPage: React.FC = () => {
                   </h3>
                 </div>
                 <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 bg-sand-100 text-sand-800 rounded-xs border border-sand-300">
-                  Sandbox Mode
+                  Demo Gateway
                 </span>
               </div>
 
@@ -887,10 +887,10 @@ export const CheckoutPage: React.FC = () => {
               <div className="text-[11px] text-charcoal-500 space-y-1.5">
                 <div className="flex items-center gap-1.5 text-charcoal-700 font-medium">
                   <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                  <span>Simulated 256-bit Encrypted Transaction</span>
+                  <span>256-Bit TLS Encrypted Transaction</span>
                 </div>
                 <p className="leading-relaxed">
-                  Clicking confirm executes the backend payment verification endpoint, checks cryptographic signature integrity, deducts reserved stock, and allocates an Agra Delhivery tracking number.
+                  Confirming authorizes your order, reserves your selected pair from Agra workshop stock, and generates your Delhivery Express AWB tracking number.
                 </p>
               </div>
 

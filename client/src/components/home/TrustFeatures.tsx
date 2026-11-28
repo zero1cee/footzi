@@ -19,7 +19,7 @@ const REVIEWS = [
     rating: 5,
     title: 'The Monolith Sneaker is Flawless',
     content:
-      'The butter-soft Italian nappa leather is sublime. Clean silhouette with zero tacky logos. The dropshipping fulfillment took only 3 days from Agra to South Delhi with precise SMS tracking.',
+      'The butter-soft Italian nappa leather is sublime. Clean silhouette with zero tacky logos. Direct atelier dispatch took only 3 days from Agra to South Delhi with precise SMS tracking.',
     productName: 'The Monolith Minimalist Court',
     verified: true,
   },
@@ -97,18 +97,18 @@ export const TrustFeatures: React.FC = () => {
           ))}
         </div>
 
-        {/* Dropship Assurance Banner */}
+        {/* Atelier Direct Assurance Banner */}
         <div className="mt-16 bg-charcoal-900 text-ivory-50 p-8 sm:p-10 rounded-xs border border-charcoal-800">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
             <div className="lg:col-span-5 space-y-2">
               <span className="text-[10px] uppercase tracking-widest text-sand-400 font-semibold block">
-                The Footzi Direct Fulfillment Model
+                Atelier-to-Patron Direct Model
               </span>
               <h3 className="font-serif text-2xl font-medium text-ivory-50">
                 Direct from Agra Workshops. Zero Middlemen Markup.
               </h3>
               <p className="text-xs text-charcoal-400 font-light leading-relaxed">
-                By coordinating our direct dropship supplier fulfillment network in Agra, your footwear is dispatched fresh from the craftsman’s workshop with triple QA inspection and guaranteed authenticity.
+                By partnering directly with Agra’s master workshops, each pair is hand-finished and dispatched straight from the craftsman’s bench following triple quality inspection.
               </p>
             </div>
 
@@ -120,8 +120,8 @@ export const TrustFeatures: React.FC = () => {
               </div>
               <div className="bg-charcoal-800/80 p-4 rounded-xs border border-charcoal-700">
                 <Truck className="w-6 h-6 text-sand-400 mx-auto mb-2" />
-                <p className="text-xs font-semibold text-ivory-100">Simulated Dispatch</p>
-                <p className="text-[10px] text-charcoal-400 mt-1">Live tracking updates</p>
+                <p className="text-xs font-semibold text-ivory-100">Express Courier</p>
+                <p className="text-[10px] text-charcoal-400 mt-1">Insured AWB tracking</p>
               </div>
               <div className="bg-charcoal-800/80 p-4 rounded-xs border border-charcoal-700">
                 <RefreshCcw className="w-6 h-6 text-sand-400 mx-auto mb-2" />

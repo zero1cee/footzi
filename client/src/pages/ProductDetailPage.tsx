@@ -511,11 +511,11 @@ const ProductDetailContent: React.FC<{ product: Product }> = ({ product }) => {
                   )
                 ) : availableStock <= 5 ? (
                   <span className="text-xs font-medium text-amber-700">
-                    ⚡ Low Inventory Alert: Only {availableStock} pairs left in Agra warehouse!
+                    Limited Batch: Only {availableStock} pair{availableStock === 1 ? '' : 's'} remaining in Agra atelier
                   </span>
                 ) : (
                   <span className="text-xs text-emerald-700 flex items-center gap-1 font-medium">
-                    <Check className="w-3.5 h-3.5" /> In Stock & Ready for Rapid Supplier Dispatch
+                    <Check className="w-3.5 h-3.5" /> In Stock • Ready for 24-Hour Atelier Dispatch
                   </span>
                 )}
               </div>
@@ -607,7 +607,7 @@ const ProductDetailContent: React.FC<{ product: Product }> = ({ product }) => {
               </div>
               <div className="p-2.5 bg-white rounded-xs border border-ivory-200">
                 <RotateCcw className="w-4 h-4 text-sand-500 mx-auto mb-1" />
-                <p className="text-[10px] font-semibold text-charcoal-900">7-Day Swap</p>
+                <p className="text-[10px] font-semibold text-charcoal-900">{returnWindowDays}-Day Swap</p>
                 <p className="text-[9px] text-charcoal-500">Doorstep Size Exchange</p>
               </div>
               <div className="p-2.5 bg-white rounded-xs border border-ivory-200">
@@ -650,7 +650,7 @@ const ProductDetailContent: React.FC<{ product: Product }> = ({ product }) => {
                   onClick={() => setOpenAccordion(openAccordion === 'delivery' ? null : 'delivery')}
                   className="w-full p-3.5 text-left text-xs uppercase tracking-wider font-semibold text-charcoal-900 flex items-center justify-between"
                 >
-                  <span>Pan-India Delivery & Dropship Tracking</span>
+                  <span>Pan-India Express Delivery & Tracking</span>
                   <ChevronDown
                     className={`w-4 h-4 transition-transform ${openAccordion === 'delivery' ? 'rotate-180' : ''}`}
                   />
@@ -659,7 +659,7 @@ const ProductDetailContent: React.FC<{ product: Product }> = ({ product }) => {
                   <div className="p-4 pt-0 text-xs text-charcoal-600 space-y-2 border-t border-ivory-100 font-light">
                     <p>• Dispatched within 24–48 hours directly from our partner artisan workshop in Agra.</p>
                     <p>• Delivery across Delhi NCR, Mumbai, Bengaluru, Hyderabad, Chennai, and tier-1 cities within 2–4 business days.</p>
-                    <p>• Complete SMS & WhatsApp tracking updates generated through our simulated logistics gateway.</p>
+                    <p>• Live Delhivery Express AWB tracking updates sent straight to your email and account.</p>
                   </div>
                 )}
               </div>
@@ -670,7 +670,7 @@ const ProductDetailContent: React.FC<{ product: Product }> = ({ product }) => {
                   onClick={() => setOpenAccordion(openAccordion === 'returns' ? null : 'returns')}
                   className="w-full p-3.5 text-left text-xs uppercase tracking-wider font-semibold text-charcoal-900 flex items-center justify-between"
                 >
-                  <span>7-Day Return & Size Exchange Policy</span>
+                  <span>{returnWindowDays}-Day Return & Size Exchange Policy</span>
                   <ChevronDown
                     className={`w-4 h-4 transition-transform ${openAccordion === 'returns' ? 'rotate-180' : ''}`}
                   />

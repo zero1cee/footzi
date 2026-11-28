@@ -62,7 +62,7 @@ export const AgraHeritageBanner: React.FC = () => {
             </p>
 
             <p className="text-sm sm:text-base text-charcoal-700 leading-relaxed font-light">
-              At Footzi, we collaborate directly with Agra’s generational workshops. By bypassing traditional multi-tier retail markups through our curated direct-fulfillment dropshipping architecture, we deliver genuine artisanal calfskin footwear to your doorstep at unmatched fair prices.
+              At Footzi, we collaborate directly with Agra’s generational workshops. By bypassing traditional multi-tier retail markups through our atelier-to-patron direct craftsmanship model, we deliver genuine hand-finished calfskin footwear to your doorstep at fair, transparent prices.
             </p>
 
             {/* Micro Feature Pillars */}
@@ -88,10 +88,15 @@ export const AgraHeritageBanner: React.FC = () => {
               </div>
             </div>
 
-            <div className="pt-4">
-              <Link to="/brand-story">
+            <div className="pt-4 flex flex-wrap gap-3">
+              <Link to="/shop?badge=Artisan+Heritage">
                 <Button variant="primary" size="lg" className="gap-2 shadow-md">
-                  Read The Footzi Manifesto <ArrowRight className="w-4 h-4" />
+                  Explore The Heritage Series <ArrowRight className="w-4 h-4" />
+                </Button>
+              </Link>
+              <Link to="/leather-care">
+                <Button variant="outline" size="lg">
+                  Leather Care Rituals
                 </Button>
               </Link>
             </div>
